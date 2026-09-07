@@ -1,0 +1,67 @@
+services:
+  # ---------------------------------------------------------------------------
+  # 1. KAI FastAPI Backend Sidecar & Clinical RAG Engine
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: kai-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8000
+      - OLLAMA_BASE_URL=http://ollama:11434
+      - OLLAMA_MODEL=qwen2.5:7b
+      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+    volumes:
+      - kai_sqlite_data:/app/backend/data
+      - ./backend/kai_sanctuary.db:/app/backend/kai_sanctuary.db
+    restart: unless-stopped
+    networks:
+      - kai-network
+
+  # ---------------------------------------------------------------------------
+  # 2. KAI Next.js Frontend & Founder Sanctuary Portal
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        - NEXT_PUBLIC_SIDECAR_API_URL=http://localhost:8000/api/v1/sidecar
+    container_name: kai-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - NEXT_PUBLIC_SIDECAR_API_URL=http://localhost:8000/api/v1/sidecar
+    depends_on:
+      - backend
+    restart: unless-stopped
+    networks:
+      - kai-network
+
+  # ---------------------------------------------------------------------------
+  # 3. Local Ollama LLM Service (Qwen 2.5)
+  # ---------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: kai-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - kai-network
+
+volumes:
+  kai_sqlite_data:
+  ollama_models:
+
+networks:
+  kai-network:
+    driver: bridge
