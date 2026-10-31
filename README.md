@@ -134,6 +134,8 @@ docker compose up --build
 * AI features (copilot, inquiry parsing, voice transcription) use Groq: set `GROQ_API_KEY` from https://console.groq.com/keys.
 
 ### Deploying (kaiwellnessretreats.com)
+Step-by-step runbook (Neon, Railway, Vercel, Squarespace DNS): [DEPLOYMENT.md](DEPLOYMENT.md).
+
 The site runs on **Vercel**; the FastAPI backend runs as a container (`Dockerfile.backend`) on Railway, Render or Fly at `api.kaiwellnessretreats.com`, backed by **Neon Postgres**.
 
 **Backend host** (container from `Dockerfile.backend`, port 8000, health check `/api/v1/health`):

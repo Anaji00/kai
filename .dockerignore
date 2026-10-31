@@ -53,5 +53,3 @@ scratch/
 .pytest_cache/
 .claude/
 *.tsbuildinfo
-Dockerfile.*
-docker-compose.yml
