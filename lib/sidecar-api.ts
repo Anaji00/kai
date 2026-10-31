@@ -5,6 +5,7 @@
  */
 
 import { FormFillProposal } from "./portal-form-bus";
+import { backendOrigin } from "./backend-origin";
 
 export interface ClinicalProfile {
   movement_experience?: string;
@@ -159,7 +160,7 @@ const getBaseUrl = (): string => {
   if (typeof window !== "undefined") {
     return "/api/v1/sidecar";
   }
-  return (process.env.FASTAPI_BACKEND_URL || "http://127.0.0.1:8000") + "/api/v1/sidecar";
+  return backendOrigin() + "/api/v1/sidecar";
 };
 
 export async function sidecarFetch(
@@ -1913,7 +1914,7 @@ const getApiBaseUrl = (): string => {
   if (typeof window !== "undefined") {
     return "/api/v1";
   }
-  return (process.env.FASTAPI_BACKEND_URL || "http://127.0.0.1:8000") + "/api/v1";
+  return backendOrigin() + "/api/v1";
 };
 
 export async function fetchPendingDrafts(status: string = "pending_review", category?: string): Promise<ApiActionDraft[]> {

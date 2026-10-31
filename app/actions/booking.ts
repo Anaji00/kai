@@ -5,6 +5,7 @@ import crypto from "crypto";
 import { Resend } from "resend";
 import { BookingFormState } from "@/lib/types";
 import { getRetreatById } from "@/lib/retreats";
+import { backendOrigin } from "@/lib/backend-origin";
 
 const bookingSchema = z.object({
   fullName: z.string().min(2, "Please provide your full legal name"),
@@ -48,7 +49,7 @@ export async function submitBookingInquiry(
   }
 
   const data = validation.data;
-  const backendUrl = process.env.FASTAPI_BACKEND_URL || "http://127.0.0.1:8000";
+  const backendUrl = backendOrigin();
 
   // 1. Primary: Wire directly to FastAPI Backend & Database
   try {
@@ -206,7 +207,7 @@ export async function subscribeNewsletter(
     };
   }
 
-  const backendUrl = process.env.FASTAPI_BACKEND_URL || "http://127.0.0.1:8000";
+  const backendUrl = backendOrigin();
 
   // 1. Primary: Wire to FastAPI Backend
   try {

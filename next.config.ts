@@ -1,12 +1,6 @@
 import type { NextConfig } from "next";
 import path from "node:path";
 
-// On Vercel the /api/v1 rewrite target is baked in at build time, so a missing backend URL
-// would silently point production at localhost. Fail the build instead.
-if (process.env.VERCEL && !process.env.FASTAPI_BACKEND_URL) {
-  throw new Error("FASTAPI_BACKEND_URL must be set in the Vercel project (e.g. https://api.kaiwellnessretreats.com).");
-}
-
 const nextConfig: NextConfig = {
   // Standalone output is for the Docker image; Vercel uses its own build output.
   output: process.env.VERCEL ? undefined : "standalone",
@@ -55,6 +49,9 @@ const nextConfig: NextConfig = {
     ];
   },
   async rewrites() {
+    // On Vercel, /api/v1/* is served by the FastAPI Python function (api/index.py) via vercel.json.
+    if (process.env.VERCEL) return [];
+    // Local dev and Docker: forward to the separately running FastAPI server.
     const backendUrl = process.env.FASTAPI_BACKEND_URL || "http://127.0.0.1:8000";
     return [
       {

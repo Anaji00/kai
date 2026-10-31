@@ -134,32 +134,11 @@ docker compose up --build
 * AI features (copilot, inquiry parsing, voice transcription) use Groq: set `GROQ_API_KEY` from https://console.groq.com/keys.
 
 ### Deploying (kaiwellnessretreats.com)
-Step-by-step runbook (Neon, Railway, Vercel, Squarespace DNS): [DEPLOYMENT.md](DEPLOYMENT.md).
+Everything runs on **Vercel**, in one project: the Next.js site plus the FastAPI backend as a Python
+function (`api/index.py`, reached through the `/api/v1/*` rewrite in `vercel.json`), backed by
+**Neon Postgres**. Step-by-step runbook including Squarespace DNS: [DEPLOYMENT.md](DEPLOYMENT.md).
 
-The site runs on **Vercel**; the FastAPI backend runs as a container (`Dockerfile.backend`) on Railway, Render or Fly at `api.kaiwellnessretreats.com`, backed by **Neon Postgres**.
-
-**Backend host** (container from `Dockerfile.backend`, port 8000, health check `/api/v1/health`):
-
-| Variable | Value |
-|---|---|
-| `ENVIRONMENT` | `production` |
-| `DATABASE_URL` | Neon pooled connection string (`...-pooler...neon.tech/kai?sslmode=require`) |
-| `UVICORN_WORKERS` | `2` (Postgres handles concurrent workers) |
-| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | portal credentials (same values as Vercel) |
-| `JWT_SECRET_KEY`, `TERN_WEBHOOK_SECRET`, `EMAIL_WEBHOOK_SECRET`, `CIRIUM_WEBHOOK_SECRET`, `EXPEDIA_WEBHOOK_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | long random values; the backend refuses to boot on defaults |
-| `GROQ_API_KEY` | from https://console.groq.com/keys |
-| `RESEND_API_KEY` | from Resend, once the domain is verified |
-
-**Vercel project** (framework is pinned to Next.js in `vercel.json`; `.vercelignore` keeps the Python backend out of the upload):
-
-| Variable | Value |
-|---|---|
-| `FASTAPI_BACKEND_URL` | `https://api.kaiwellnessretreats.com` (required: the build fails without it) |
-| `ADMIN_USERNAME`, `ADMIN_PASSWORD` | same as the backend |
-| `NEXT_PUBLIC_SITE_URL` | `https://kaiwellnessretreats.com` |
-| `RESEND_API_KEY` | same as the backend (booking fallback email) |
-
-Load sample data into a fresh database once: `DATABASE_URL=... python -m backend.sidecar.services.synthetic_data_seeder`.
+Docker (`docker compose up`) remains the way to run the full stack locally.
 
 ### Running Tests
 ```bash

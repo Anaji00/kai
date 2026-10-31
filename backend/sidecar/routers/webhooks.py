@@ -13,21 +13,43 @@ from backend.config import settings
 
 logger = logging.getLogger("kai_webhooks_router")
 
+import hashlib
+import hmac
 import secrets
+from fastapi import Cookie
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
 
-security = HTTPBasic()
+security = HTTPBasic(auto_error=False)
 
-def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
-    correct_username = secrets.compare_digest(credentials.username, settings.ADMIN_USERNAME)
-    correct_password = secrets.compare_digest(credentials.password, settings.ADMIN_PASSWORD)
-    if not (correct_username and correct_password):
-        raise HTTPException(
-            status_code=401,
-            detail="Incorrect admin username or password",
-            headers={"WWW-Authenticate": "Basic"},
-        )
-    return credentials.username
+PORTAL_SESSION_COOKIE = "kai_portal_session"
+
+
+def portal_session_token() -> str:
+    """Same HMAC proxy.ts issues after the /portal login; changes whenever the admin password does."""
+    key = f"{settings.ADMIN_USERNAME}:{settings.ADMIN_PASSWORD}".encode()
+    return hmac.new(key, b"kai-portal-session-v1", hashlib.sha256).hexdigest()
+
+
+def verify_admin(
+    credentials: Optional[HTTPBasicCredentials] = Depends(security),
+    portal_session: Optional[str] = Cookie(None, alias=PORTAL_SESSION_COOKIE),
+):
+    """
+    Accepts HTTP Basic admin credentials, or the portal session cookie set by proxy.ts.
+    The cookie path matters on Vercel, where the browser reaches this function directly.
+    """
+    if credentials:
+        correct_username = secrets.compare_digest(credentials.username, settings.ADMIN_USERNAME)
+        correct_password = secrets.compare_digest(credentials.password, settings.ADMIN_PASSWORD)
+        if correct_username and correct_password:
+            return credentials.username
+    elif portal_session and settings.ADMIN_PASSWORD and secrets.compare_digest(portal_session, portal_session_token()):
+        return settings.ADMIN_USERNAME
+    raise HTTPException(
+        status_code=401,
+        detail="Incorrect admin username or password",
+        headers={"WWW-Authenticate": "Basic"},
+    )
 
 
 def verify_webhook_secret(

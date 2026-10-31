@@ -47,8 +47,18 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("kai_api")
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
+_startup_complete = False
+
+
+def run_startup() -> None:
+    """
+    Secret checks, schema init and status logging. Runs once per process: from the ASGI lifespan under
+    uvicorn, or at import time from api/index.py on Vercel (serverless runtimes may skip lifespan events).
+    """
+    global _startup_complete
+    if _startup_complete:
+        return
+
     if settings.ENVIRONMENT == "production":
         insecure = settings.insecure_default_secrets()
         if insecure:
@@ -79,6 +89,12 @@ async def lifespan(app: FastAPI):
             logger.warning("Configuration warning: ENABLE_LIVE_EMAIL_DISPATCH is true but RESEND_API_KEY is missing.")
         if not settings.WHATSAPP_CLOUD_API_KEY and settings.ENABLE_LIVE_WHATSAPP_DISPATCH:
             logger.warning("Configuration warning: ENABLE_LIVE_WHATSAPP_DISPATCH is true but WHATSAPP_CLOUD_API_KEY is missing.")
+    _startup_complete = True
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    run_startup()
     yield
     logger.info("Shutting down KAI Sanctuary API.")
 

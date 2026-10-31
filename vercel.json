@@ -2,5 +2,14 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
   "installCommand": "npm ci",
-  "buildCommand": "npm run build"
+  "buildCommand": "npm run build",
+  "rewrites": [
+    { "source": "/api/v1/:path*", "destination": "/api/index" }
+  ],
+  "functions": {
+    "api/index.py": {
+      "maxDuration": 60,
+      "excludeFiles": "{backend/**/test_*.py,backend/**/run_*.py,backend/test_*.py,backend/conftest.py,backend/seed_drafts.py,scratch/**,**/__pycache__/**,*.db,*.db-*,node_modules/**,.next/**,public/**}"
+    }
+  }
 }

@@ -2,6 +2,8 @@
  * KAI Wellness Retreats - Typed API Client for FastAPI Backend
  */
 
+import { backendOrigin } from "./backend-origin";
+
 export interface ApiRetreatAvailability {
   id: string;
   slug: string;
@@ -114,7 +116,7 @@ const getBaseUrl = (): string => {
     return "/api/v1";
   }
   // Server-side
-  return (process.env.FASTAPI_BACKEND_URL || "http://127.0.0.1:8000") + "/api/v1";
+  return backendOrigin() + "/api/v1";
 };
 
 export async function fetchApiHealth(): Promise<ApiHealthResponse | null> {

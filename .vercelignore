@@ -1,12 +1,12 @@
-# Vercel hosts only the Next.js app. The FastAPI backend deploys separately as a container
-# (Dockerfile.backend), so keep Python sources out of the upload; otherwise the root main.py and
-# requirements.txt could be auto-detected as a Python app.
-backend/
+# The FastAPI backend ships as a Vercel Python function (api/index.py imports backend/).
+# Root main.py is only the local uvicorn runner; leaving it out also avoids FastAPI auto-detection.
 main.py
-requirements.txt
-*.py
 __pycache__/
 .pytest_cache/
+backend/**/test_*.py
+backend/**/run_*.py
+backend/test_*.py
+backend/conftest.py
 
 # Local state and container tooling
 *.db
@@ -18,4 +18,3 @@ Dockerfile.*
 docker-compose.yml
 .env
 .env.*
-railway.json
