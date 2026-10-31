@@ -17,7 +17,9 @@ def send_booking_confirmation(booking_data: dict, retreat_info: dict) -> bool:
     guest_email = booking_data.get("email")
     guest_name = booking_data.get("full_name")
     
-    if settings.RESEND_API_KEY:
+    is_live = bool(settings.RESEND_API_KEY and (getattr(settings, "ENABLE_LIVE_EMAIL_DISPATCH", False) or settings.ENVIRONMENT == "production"))
+    
+    if is_live:
         try:
             # 1. Internal Alert
             headers = {
@@ -25,7 +27,7 @@ def send_booking_confirmation(booking_data: dict, retreat_info: dict) -> bool:
                 "Content-Type": "application/json",
             }
             payload_admin = {
-                "from": "KAI Sanctuary Reservations <inquiries@kaiwellnessretreats.com>",
+                "from": settings.RESEND_FROM_EMAIL,
                 "to": [settings.KAREENA_ROUTING_EMAIL],
                 "subject": f"[New Reservation Inquiry] {retreat_title} - {guest_name} ({ref})",
                 "html": f"""
@@ -51,38 +53,26 @@ def send_booking_confirmation(booking_data: dict, retreat_info: dict) -> bool:
             }
             requests.post("https://api.resend.com/emails", json=payload_admin, headers=headers, timeout=5)
 
-            # 2. Guest Confirmation
-            payload_guest = {
-                "from": "Kareena Islam | KAI Retreats <concierge@kaiwellnessretreats.com>",
-                "to": [guest_email],
-                "subject": f"Your Sanctuary Inquiry for {retreat_title} [Ref: {ref}]",
-                "html": f"""
-                <div style="font-family: Georgia, serif; color: #2D3E35; max-width: 600px; margin: 0 auto; padding: 40px; background-color: #FAF7F2; border: 1px solid #E5DDD0; border-radius: 16px; line-height: 1.6;">
-                    <div style="text-align: center; margin-bottom: 30px;">
-                        <span style="font-size: 24px; letter-spacing: 4px; text-transform: uppercase; color: #2D3E35; display: block;">K A I</span>
-                        <span style="font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #5C6B5E;">Wellness Retreats</span>
-                    </div>
-                    <p>Dear {guest_name},</p>
-                    <p>Thank you for placing your trust in KAI. Your reservation inquiry for <strong>{retreat_title}</strong> ({retreat_dates}) has been received with warmth and intention.</p>
-                    <div style="background-color: #F2ECE4; padding: 20px; border-radius: 12px; margin: 24px 0; border: 1px solid #E5DDD0;">
-                        <p style="margin: 0; font-size: 15px;"><strong>Sanctuary:</strong> {retreat_title}</p>
-                        <p style="margin: 4px 0 0 0; font-size: 14px;"><strong>Reference Code:</strong> {ref}</p>
-                        <p style="margin: 4px 0 0 0; font-size: 14px;"><strong>Room Tier:</strong> {booking_data.get('room_preference', '').replace('-', ' ').upper()}</p>
-                    </div>
-                    <p>Because each KAI sanctuary is intentionally capped at 12 to 14 guests, I personally curate every cohort to ensure harmony, safety, and a restorative somatic environment.</p>
-                    <p>Over the next 24 to 48 hours, our team (in partnership with Grand Travel & Cruise) will review your intake details and reach out directly to coordinate your flight logistics and finalize your placement.</p>
-                    <p style="margin-top: 30px; font-style: italic; color: #5C6B5E;">
-                        &ldquo;Kai means renewal in Japanese. A return to balance. To presence. To yourself.&rdquo;
-                    </p>
-                    <p style="margin-top: 24px;">
-                        With gratitude and warm calm,<br />
-                        <strong>Kareena Islam</strong><br />
-                        <span style="font-size: 13px; color: #738475;">Founder & Clinical Director, KAI Wellness Retreats<br />Grand Travel & Cruise Luxury Advisor</span>
-                    </p>
-                </div>
-                """
-            }
-            requests.post("https://api.resend.com/emails", json=payload_guest, headers=headers, timeout=5)
+            # 2. Guest Confirmation - Drafted to Action Review Queue
+            # Enforcing Zero Autonomous Dispatch Policy
+            from backend.database import SessionLocal
+            from backend.models import ActionDraft
+            
+            db = SessionLocal()
+            try:
+                draft_content = f"Draft Booking Receipt for {guest_name} [{ref}]\n\nSanctuary: {retreat_title}\nDates: {retreat_dates}\nRoom: {booking_data.get('room_preference')}\n\nPlease review before dispatching."
+                new_draft = ActionDraft(
+                    type="guest_email_confirmation",
+                    guest_name=guest_name,
+                    content=draft_content
+                )
+                db.add(new_draft)
+                db.commit()
+            except Exception as e:
+                logger.error(f"Error staging guest email draft: {e}")
+            finally:
+                db.close()
+                
             return True
         except Exception as e:
             logger.error(f"Resend email dispatch error: {e}")
@@ -90,7 +80,26 @@ def send_booking_confirmation(booking_data: dict, retreat_info: dict) -> bool:
     else:
         # Graceful development simulation log
         logger.info(f"[Email Simulation] Admin Alert to {settings.KAREENA_ROUTING_EMAIL} for {ref} - {guest_name}")
-        logger.info(f"[Email Simulation] Guest Confirmation to {guest_email} for {ref}")
+        
+        from backend.database import SessionLocal
+        from backend.models import ActionDraft
+        
+        db = SessionLocal()
+        try:
+            draft_content = f"Draft Booking Receipt for {guest_name} [{ref}]\n\nSanctuary: {retreat_title}\nDates: {retreat_dates}\nRoom: {booking_data.get('room_preference')}\n\nPlease review before dispatching."
+            new_draft = ActionDraft(
+                type="guest_email_confirmation",
+                guest_name=guest_name,
+                content=draft_content
+            )
+            db.add(new_draft)
+            db.commit()
+            logger.info(f"Staged guest email confirmation draft for {ref}")
+        except Exception as e:
+            logger.error(f"Error staging guest email draft: {e}")
+        finally:
+            db.close()
+            
         return True
 
 

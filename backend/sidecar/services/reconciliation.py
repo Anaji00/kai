@@ -3,9 +3,8 @@ import logging
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from rapidfuzz import fuzz
-import polars as pl
-
 from backend.sidecar.models import StagedVoucherDiff, StagingIntake
+from backend.models import ActionDraft
 
 logger = logging.getLogger("kai_reconciliation")
 
@@ -93,7 +92,6 @@ def audit_manifest_diff(
         ext_name = ext_guest.get("name", ext_guest.get("client_name", ""))
         ext_room = ext_guest.get("room", ext_guest.get("room_tier", "Unassigned"))
 
-        matched = False
         best_score = 0
         best_match = None
 
@@ -104,7 +102,6 @@ def audit_manifest_diff(
                 best_match = tern_guest
 
         if best_score >= 80:
-            matched = True
             # Check room tier alignment
             if ext_room != "Unassigned" and best_match and ext_room.lower() not in best_match["room_tier"].lower():
                 discrepancies.append({
@@ -143,7 +140,26 @@ def audit_manifest_diff(
         status="PENDING_APPROVAL"
     )
     db.add(diff_record)
+
+    # Stage ActionDraft if discrepancies or over-capacity conditions exist
+    if discrepancies or over_capacity == "YES":
+        disc_summary = "\n".join([f"• [{d.get('severity', 'WARN')}] {d.get('message', '')}" for d in discrepancies[:3]])
+        draft = ActionDraft(
+            type="manifest_discrepancy",
+            guest_name=f"{sanctuary_slug.title()} Ground Manifest",
+            content=(
+                f"Manifest Reconciliation Discrepancy ({sanctuary_slug.title()}):\n"
+                f"Document: {document_name} | Over Capacity: {over_capacity}\n"
+                f"External Count: {ext_count} | Tern Count: {tern_count} (Cap: {cohort_cap})\n"
+                f"Issues Flagged:\n{disc_summary}\n\n"
+                f"Approving this draft acknowledges and resolves the discrepancy in the audit log."
+            ),
+            status="pending_review"
+        )
+        db.add(draft)
+
     db.commit()
     db.refresh(diff_record)
 
     return diff_record
+

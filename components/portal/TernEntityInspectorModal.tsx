@@ -274,10 +274,10 @@ export default function TernEntityInspectorModal({
                 </div>
               </div>
 
-              {/* Applied Clinical Tags */}
+              {/* Applied Guest Tags */}
               <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] space-y-2">
                 <span className="font-bold text-xs uppercase tracking-wider text-[#2D3E35]">
-                  Standardized Clinical Tags in Tern CRM
+                  Standardized Guest Tags in Tern CRM
                 </span>
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {tags.map((t) => (

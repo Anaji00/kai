@@ -214,7 +214,7 @@ export default function FlightConciergeModal({
                           {r.destination} ({r.dates})
                         </option>
                       ))}
-                      <option value="custom">Bespoke Private Cohort</option>
+                      <option value="custom">Bespoke Private Group</option>
                     </select>
                   </div>
                 </div>

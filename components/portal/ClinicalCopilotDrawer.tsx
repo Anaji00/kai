@@ -19,13 +19,13 @@ import {
   Mic,
   MicOff,
   Share2,
-  FileText,
   Upload,
   CheckCircle2,
   Clock
 } from "lucide-react";
 import {
   chatWithCopilot,
+  chatWithCopilotStream,
   CopilotChatResponse,
   uploadGuestDocument,
   UploadedDocument
@@ -38,15 +38,23 @@ interface ClinicalCopilotDrawerProps {
   guestContext?: Record<string, unknown>;
 }
 
+export type CopilotMode =
+  | "wellness_safety"
+  | "itinerary_curation"
+  | "concierge_prep"
+  | "studio_ops"
+  | "clinical_safety"
+  | "consult_prep"
+  | "travel_concierge";
+
 export default function ClinicalCopilotDrawer({
   isOpen,
   onClose,
   guestContext
 }: ClinicalCopilotDrawerProps) {
-  const [activeMode, setActiveMode] = useState<
-    "clinical_safety" | "consult_prep" | "travel_concierge" | "studio_ops"
-  >("clinical_safety");
+  const [activeMode, setActiveMode] = useState<CopilotMode>("wellness_safety");
   const [inputMessage, setInputMessage] = useState("");
+  const [selectedTool, setSelectedTool] = useState("chat");
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
@@ -68,12 +76,13 @@ export default function ClinicalCopilotDrawer({
       form_fill_proposal?: FormFillProposal;
       proposal_authorized?: boolean;
       latency_ms?: number;
+      model_used?: string;
       sanctuary_slug?: string;
     }>
   >([
     {
       sender: "copilot",
-      text: "**Welcome, Kareena.** I am your AI Chief of Staff & Clinical Somatic Assistant.\n\nI am here to support you with guest clinical screening, preferred Tern supplier contracts, scenic chauffeur transit, microclimate sun windows, and pre-call consult preparation.\n\nAll operational actions and supplier updates require your direct review and approval."
+      text: "**Welcome, Kareena.** I am your AI Chief of Staff & Wellness Concierge.\n\nI am here to support you with restorative wellness intentions, curated travel logistics, preferred Tern supplier partnerships, scenic chauffeur transit, microclimate sun windows, and pre-arrival guest itineraries. Clinical contraindication screening is an elevated safety module whenever specialized medical flags arise.\n\nAll operational actions and communications require your direct review and authorization."
     }
   ]);
 
@@ -109,48 +118,137 @@ export default function ClinicalCopilotDrawer({
         if (lower.includes("ai chief of staff") || lower.includes("clinical somatic assistant") || lower.includes("i am here to support you")) return false;
         return true;
       })
-      .slice(-4)
+      .slice(-2)
       .map((m) => ({
         role: m.sender === "user" ? "user" : "assistant",
         content: m.text
       }));
 
+    const currentPath = typeof window !== "undefined" ? window.location.pathname : undefined;
+    let accumulatedText = "";
+
+    // Append placeholder copilot response message
+    setMessages((prev) => [
+      ...prev,
+      {
+        sender: "copilot",
+        text: "",
+        safety_level: undefined,
+        safety_screened: false,
+        citations: [],
+        suggested_followups: [],
+        form_fill_proposal: undefined,
+        proposal_authorized: false,
+        latency_ms: undefined,
+        sanctuary_slug: undefined
+      }
+    ]);
+
     try {
-      const currentPath = typeof window !== "undefined" ? window.location.pathname : undefined;
-      const res: CopilotChatResponse = await chatWithCopilot(
+      await chatWithCopilotStream(
         query,
         activeMode,
         guestContext,
         undefined,
         currentPath,
-        convHistory
-      );
-      setMessages((prev) => [
-        ...prev,
+        convHistory,
         {
-          sender: "copilot",
-          text: res.response_text,
-          safety_level: res.safety_level,
-          safety_screened: res.safety_screened,
-          citations: res.citations,
-          suggested_followups: res.suggested_followups,
-          form_fill_proposal: res.form_fill_proposal,
-          proposal_authorized: false,
-          latency_ms: res.latency_ms,
-          sanctuary_slug: res.sanctuary_slug
+          onToken: (token) => {
+            accumulatedText += token;
+            setMessages((prev) => {
+              const lastIdx = prev.length - 1;
+              if (lastIdx < 0) return prev;
+              const copy = [...prev];
+              copy[lastIdx] = { ...copy[lastIdx], text: accumulatedText };
+              return copy;
+            });
+          },
+          onMeta: (meta) => {
+            setMessages((prev) => {
+              const lastIdx = prev.length - 1;
+              if (lastIdx < 0) return prev;
+              const copy = [...prev];
+              copy[lastIdx] = {
+                ...copy[lastIdx],
+                safety_level: meta.safety_level,
+                safety_screened: meta.safety_screened,
+                citations: meta.citations || copy[lastIdx].citations,
+                suggested_followups: meta.suggested_followups || copy[lastIdx].suggested_followups,
+                form_fill_proposal: meta.form_fill_proposal || copy[lastIdx].form_fill_proposal,
+                sanctuary_slug: meta.sanctuary_slug || copy[lastIdx].sanctuary_slug,
+                latency_ms: meta.latency_ms,
+                model_used: meta.model_used
+              };
+              return copy;
+            });
+          },
+          onDone: () => {
+            setLoading(false);
+          },
+          onError: async (err) => {
+            console.warn("SSE stream failed, attempting synchronous copilot fallback:", err);
+            if (!accumulatedText) {
+              try {
+                const res: CopilotChatResponse = await chatWithCopilot(
+                  query,
+                  activeMode,
+                  guestContext,
+                  undefined,
+                  currentPath,
+                  convHistory
+                );
+                setMessages((prev) => {
+                  const lastIdx = prev.length - 1;
+                  if (lastIdx < 0) return prev;
+                  const copy = [...prev];
+                  copy[lastIdx] = {
+                    sender: "copilot",
+                    text: res.response_text,
+                    safety_level: res.safety_level,
+                    safety_screened: res.safety_screened,
+                    citations: res.citations,
+                    suggested_followups: res.suggested_followups,
+                    form_fill_proposal: res.form_fill_proposal,
+                    proposal_authorized: false,
+                    latency_ms: res.latency_ms,
+                    model_used: res.model_used,
+                    sanctuary_slug: res.sanctuary_slug
+                  };
+                  return copy;
+                });
+              } catch (fallbackErr) {
+                console.error("Fallback copilot failed:", fallbackErr);
+                setMessages((prev) => {
+                  const lastIdx = prev.length - 1;
+                  if (lastIdx < 0) return prev;
+                  const copy = [...prev];
+                  copy[lastIdx] = {
+                    sender: "copilot",
+                    text: "I encountered a momentary connection issue. Please ensure the KAI API service is running.",
+                    safety_screened: false
+                  };
+                  return copy;
+                });
+              }
+            }
+            setLoading(false);
+          }
         }
-      ]);
+      );
     } catch (err) {
       console.error(err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          sender: "copilot",
-          text: "I encountered a momentary connection issue. Please ensure the KAI API service is running.",
-          safety_screened: false
-        }
-      ]);
-    } finally {
+      if (!accumulatedText) {
+        setMessages((prev) => {
+          const lastIdx = prev.length - 1;
+          const copy = [...prev];
+          copy[lastIdx] = {
+            sender: "copilot",
+            text: "I encountered a momentary connection issue. Please ensure the KAI API service is running.",
+            safety_screened: false
+          };
+          return copy;
+        });
+      }
       setLoading(false);
     }
   };
@@ -342,17 +440,23 @@ export default function ClinicalCopilotDrawer({
   };
 
   const QUICK_PROMPTS: Record<string, string[]> = {
+    wellness_safety: [
+      "Curate: Nervous system restorative protocol & sleep optimization",
+      "Review 4-7-8 vagal breathing & 432Hz acoustic grounding",
+      "Elevated Screen: Guest with epilepsy requesting rapid breathwork",
+      "Elevated Screen: Pregnant guest (1st trimester) requesting Finnish sauna"
+    ],
     clinical_safety: [
       "Screen: Guest with epilepsy requesting rapid breathwork",
       "Screen: Guest with Raynaud's syndrome requesting cold plunge",
       "Screen: Pregnant guest (1st trimester) requesting Finnish sauna",
       "Review clinical mechanism of 4-7-8 vagal breathing"
     ],
-    consult_prep: [
-      "Draft consultation email for Sarah Jenkins (Nosara Reset)",
-      "Draft consultation follow-up for Eleanor Vance (Executive Burnout)",
-      "What are the top 3 talk tracks for hesitant executives?",
-      "Explain 12–14 guest intimate cohort safety"
+    itinerary_curation: [
+      "Calculate scenic transit from airport to private villa",
+      "What is the microclimate weather and breathwork window today in Nosara?",
+      "Find nourishing Blue Zone and plant-forward dining in Nosara",
+      "Coordinate Grand Travel & Cruise air desk for lie-flat routing"
     ],
     travel_concierge: [
       "Show our active chauffeur partners in Nosara",
@@ -361,12 +465,24 @@ export default function ClinicalCopilotDrawer({
       "Find gluten-free and Blue Zone dining spots in Nosara",
       "Search luxury pre-retreat hotels near Costa Rica (SJO/LIR)"
     ],
+    concierge_prep: [
+      "Draft restorative welcome email for Sarah Jenkins (Nosara Reset)",
+      "Review guest intake and intentions for Eleanor Vance",
+      "What are the top 3 talk tracks for hesitant executives seeking deep rest?",
+      "Explain 12–14 guest intimate group restorative experience"
+    ],
+    consult_prep: [
+      "Draft consultation email for Sarah Jenkins (Nosara Reset)",
+      "Draft consultation follow-up for Eleanor Vance (Executive Burnout)",
+      "What are the top 3 talk tracks for hesitant executives?",
+      "Explain 12–14 guest intimate group safety"
+    ],
     studio_ops: [
       "Show our registered preferred suppliers in Nosara",
       "Add a new vendor: Pacific Alchemy sound bowls in Nosara, 15% commission",
       "Explain Tern Back Office Vendor & Supplier Registry",
       "Explain Personalized Founder Approval (Zero Autonomous Writes)",
-      "What is the status of our upcoming 12–14 guest cohorts?"
+      "What is the status of our upcoming 12–14 guest retreat groups?"
     ]
   };
 
@@ -381,13 +497,13 @@ export default function ClinicalCopilotDrawer({
             </div>
             <div>
               <h2 className="text-base font-serif text-stone-100 flex items-center gap-2">
-                AI Clinical Somatic Copilot
+                AI Chief of Staff & Wellness Concierge
                 <span className="text-[10px] font-sans px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 font-medium">
                   KAI Brain
                 </span>
               </h2>
               <p className="text-xs text-stone-400">
-                Kareena Islam, BSN, RN · Clinical Safety, Routes & Care Planning
+                Kareena Islam · Restorative Wellness, Curated Travel & Founder Ops
               </p>
             </div>
           </div>
@@ -402,47 +518,51 @@ export default function ClinicalCopilotDrawer({
         {/* 4 Mode Tabs */}
         <div className="grid grid-cols-4 gap-1 p-2 bg-stone-950/90 border-b border-stone-800/80 text-[11px] font-medium">
           <button
-            onClick={() => setActiveMode("clinical_safety")}
-            className={`py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center gap-1 ${activeMode === "clinical_safety"
+            onClick={() => setActiveMode("wellness_safety")}
+            className={`py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center gap-1 ${
+              activeMode === "wellness_safety" || activeMode === "clinical_safety"
                 ? "bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold"
                 : "text-stone-400 hover:text-stone-200 hover:bg-stone-900"
-              }`}
+            }`}
           >
             <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Clinical Safety</span>
+            <span>Wellness & Safety</span>
           </button>
 
           <button
-            onClick={() => setActiveMode("consult_prep")}
-            className={`py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center gap-1 ${activeMode === "consult_prep"
+            onClick={() => setActiveMode("itinerary_curation")}
+            className={`py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center gap-1 ${
+              activeMode === "itinerary_curation" || activeMode === "travel_concierge"
                 ? "bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold"
                 : "text-stone-400 hover:text-stone-200 hover:bg-stone-900"
-              }`}
-          >
-            <Mail className="w-3.5 h-3.5" />
-            <span>Consult Prep</span>
-          </button>
-
-          <button
-            onClick={() => setActiveMode("travel_concierge")}
-            className={`py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center gap-1 ${activeMode === "travel_concierge"
-                ? "bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold"
-                : "text-stone-400 hover:text-stone-200 hover:bg-stone-900"
-              }`}
+            }`}
           >
             <Compass className="w-3.5 h-3.5" />
-            <span>Travel & Dining</span>
+            <span>Travel & Itinerary</span>
+          </button>
+
+          <button
+            onClick={() => setActiveMode("concierge_prep")}
+            className={`py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center gap-1 ${
+              activeMode === "concierge_prep" || activeMode === "consult_prep"
+                ? "bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold"
+                : "text-stone-400 hover:text-stone-200 hover:bg-stone-900"
+            }`}
+          >
+            <Mail className="w-3.5 h-3.5" />
+            <span>Concierge & Intake</span>
           </button>
 
           <button
             onClick={() => setActiveMode("studio_ops")}
-            className={`py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center gap-1 ${activeMode === "studio_ops"
+            className={`py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center gap-1 ${
+              activeMode === "studio_ops"
                 ? "bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold"
                 : "text-stone-400 hover:text-stone-200 hover:bg-stone-900"
-              }`}
+            }`}
           >
             <Building className="w-3.5 h-3.5" />
-            <span>Studio Ops</span>
+            <span>Sanctuary Ops</span>
           </button>
         </div>
 
@@ -451,7 +571,7 @@ export default function ClinicalCopilotDrawer({
           <span className="text-[10px] text-stone-500 uppercase tracking-wider font-semibold shrink-0">
             Suggested:
           </span>
-          {QUICK_PROMPTS[activeMode].map((prompt, idx) => (
+          {(QUICK_PROMPTS[activeMode] || QUICK_PROMPTS.wellness_safety).map((prompt, idx) => (
             <button
               key={idx}
               onClick={() => handleSend(prompt)}
@@ -477,13 +597,13 @@ export default function ClinicalCopilotDrawer({
                     : "bg-stone-950/80 border border-stone-800 text-stone-200 rounded-bl-none shadow-sm"
                   }`}
               >
-                {/* Clinical Safety & Latency Telemetry Header */}
+                {/* Health Safety & System Response Header */}
                 {m.sender === "copilot" && (
                   <div className="mb-2.5 flex items-center justify-between gap-2 flex-wrap">
                     {m.safety_level === "CONTRAINDICATION_ALERT" ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 border border-rose-500/40 text-rose-400">
                         <AlertTriangle className="w-3 h-3" />
-                        CONTRAINDICATION ALERT (NURSE REVIEW REQUIRED)
+                        HEALTH CONSIDERATION ALERT (FOUNDER REVIEW REQUIRED)
                       </span>
                     ) : m.safety_level === "MODERATE_REVIEW" ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 border border-amber-500/40 text-amber-300">
@@ -500,7 +620,7 @@ export default function ClinicalCopilotDrawer({
                     {m.latency_ms !== undefined && (
                       <span className="text-[9px] font-mono text-stone-400 bg-stone-900 border border-stone-800 px-2 py-0.5 rounded-full flex items-center gap-1">
                         <Clock className="w-2.5 h-2.5 text-amber-400" />
-                        {(m.latency_ms / 1000).toFixed(1)}s · Qwen 0.5B
+                        {(m.latency_ms / 1000).toFixed(1)}s{m.model_used ? ` · ${m.model_used}` : ""}
                       </span>
                     )}
                   </div>
@@ -511,7 +631,7 @@ export default function ClinicalCopilotDrawer({
                   {m.text}
                 </div>
 
-                {/* Founder Approval Card (Zero Autonomous Writes) */}
+                {/* Founder Approval Card (100% Founder-Approved) */}
                 {m.form_fill_proposal && (
                   <div className="mt-3.5 p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/40 text-stone-200 space-y-2">
                     <div className="flex items-center justify-between">
@@ -619,7 +739,7 @@ export default function ClinicalCopilotDrawer({
           {uploading && (
             <div className="flex items-center gap-2 text-xs text-amber-400/80 py-2">
               <Upload className="w-4 h-4 animate-bounce" />
-              <span>Analyzing document for clinical contraindications & travel notes...</span>
+              <span>Analyzing document for health considerations & travel notes...</span>
             </div>
           )}
         </div>
@@ -668,11 +788,41 @@ export default function ClinicalCopilotDrawer({
               </button>
             )}
 
+            {/* Agentic Tools Dropdown */}
+            <select
+              value={selectedTool}
+              onChange={(e) => {
+                const tool = e.target.value;
+                setSelectedTool(tool);
+                if (tool !== "chat") {
+                  const msgWithoutCmd = inputMessage.replace(/^\/\w+\s*/, "");
+                  setInputMessage(`${tool} ${msgWithoutCmd}`);
+                } else {
+                  setInputMessage(inputMessage.replace(/^\/\w+\s*/, ""));
+                }
+              }}
+              className="pl-3 pr-8 py-2.5 text-xs bg-stone-900 border border-stone-700/80 rounded-xl text-stone-200 focus:outline-none focus:border-amber-500/50 appearance-none cursor-pointer shrink-0"
+              style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23a8a29e%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px top 50%', backgroundSize: '8px auto' }}
+            >
+              <option value="chat">Chat</option>
+              <option value="/sales">💰 Sales</option>
+              <option value="/screen">🩺 Screen</option>
+              <option value="/draft">📝 Draft</option>
+              <option value="/route">🗺️ Route</option>
+              <option value="/weather">🌤️ Weather</option>
+              <option value="/vendors">🏬 Vendors</option>
+            </select>
+
             {/* Text Input */}
             <input
               type="text"
               value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
+              onChange={(e) => {
+                setInputMessage(e.target.value);
+                if (!e.target.value.startsWith("/") && selectedTool !== "chat") {
+                  setSelectedTool("chat");
+                }
+              }}
               placeholder={
                 activeMode === "clinical_safety"
                   ? "Screen guest medical conditions or symptoms..."
@@ -680,7 +830,7 @@ export default function ClinicalCopilotDrawer({
                     ? "Ask about a guest's care plan, draft an email, or consult prep..."
                     : activeMode === "travel_concierge"
                       ? "Ask about routes, weather windows, dining, reviews..."
-                      : "Ask about tools, cohorts, or operations..."
+                      : "Ask about tools, retreat groups, or operations..."
               }
               className="flex-1 px-3.5 py-2.5 text-xs bg-stone-900 border border-stone-700/80 rounded-xl text-stone-200 placeholder-stone-500 focus:outline-none focus:border-amber-500/50"
             />

@@ -2,7 +2,6 @@ import math
 import logging
 import httpx
 from typing import Dict, Any, List, Optional
-from datetime import datetime
 from sqlalchemy.orm import Session
 from backend.config import settings
 from backend.sidecar.models import SanctuaryRoute, SomaticPointOfInterest, generate_uuid_str

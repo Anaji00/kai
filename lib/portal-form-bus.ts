@@ -17,8 +17,8 @@ export interface FormFillProposal {
   target_tab?: string; // "vendors", "routes", "dining", "reviews", "destination", "messaging", "founder_studio"
   target_url?: string; // "/portal", "/portal/vendors", "/portal/travel-logistics?tab=dining"
   action_title?: string;
-  fields: Record<string, any>;
-  payload?: Record<string, any>;
+  fields: Record<string, unknown>;
+  payload?: Record<string, unknown>;
   summary: string;
   requires_approval?: boolean;
   approval_required?: boolean;

@@ -1,6 +1,7 @@
 "use server";
 
 import { z } from "zod";
+import crypto from "crypto";
 import { Resend } from "resend";
 import { BookingFormState } from "@/lib/types";
 import { getRetreatById } from "@/lib/retreats";
@@ -73,7 +74,7 @@ export async function submitBookingInquiry(
   const retreat = getRetreatById(data.retreatId);
   const retreatTitle = retreat ? `${retreat.title} (${retreat.destination})` : data.retreatId;
   const retreatDates = retreat ? retreat.dates : "Custom Curation";
-  const bookingReference = `KAI-${Math.random().toString(36).substring(2, 7).toUpperCase()}`;
+  const bookingReference = `KAI-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
 
   const adminEmail = process.env.KAREENA_ROUTING_EMAIL || "kareena@kaiwellnessretreats.com";
   const resendApiKey = process.env.RESEND_API_KEY;
@@ -148,6 +149,16 @@ export async function submitBookingInquiry(
           </div>
         `,
       });
+    } else if (process.env.NODE_ENV === "production") {
+      console.error("[CRITICAL] Booking inquiry received while FastAPI backend and Resend are unavailable:", {
+        bookingReference,
+        retreatTitle,
+        guestEmail: data.email,
+      });
+      return {
+        success: false,
+        message: "Our sanctuary booking service is currently synchronizing. Please email concierge@kaiwellnessretreats.com directly so we may secure your sanctuary placement immediately.",
+      };
     } else {
       // Graceful local logging for development without api keys
       console.log("[Resend Simulated Alert to Kareena]:", {
@@ -243,11 +254,11 @@ export async function subscribeNewsletter(
       success: true,
       message: "Thank you. You have been added to our private priority circle.",
     };
-  } catch (err) {
+    } catch (err) {
     console.error("Newsletter subscription error:", err);
     return {
-      success: true,
-      message: "Thank you. You have been added to our private priority circle.",
+      success: false,
+      message: "We encountered an error adding you to the circle. Please try again later.",
     };
   }
 }

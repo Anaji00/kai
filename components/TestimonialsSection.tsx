@@ -12,7 +12,7 @@ interface Testimonial {
 const TESTIMONIALS: Testimonial[] = [
   {
     quote:
-      "As an acute care physician, I spend my life in fight-or-flight. Most retreats offer superficial pampering, but Kareena's clinical understanding of vagal tone and parasympathetic activation completely reset my physiology. The 432Hz crystal bowl sound sessions in the evening produced the first uninterrupted 8-hour sleep I've had in six years.",
+      "As an acute care physician, I spend my life in fight-or-flight. Most retreats offer superficial pampering, but Kareena's clinical understanding of nervous system calming and restorative sleep completely reset my physiology. The 432Hz crystal bowl sound sessions in the evening produced the first uninterrupted 8-hour sleep I've had in six years.",
     author: "Dr. Sophia Martinez, MD",
     role: "Emergency Medicine Physician",
     location: "Houston, TX",
@@ -48,7 +48,7 @@ export default function TestimonialsSection() {
           What Our Guests Experience
         </h2>
         <p className="text-xs sm:text-sm text-sage/80 leading-relaxed font-light">
-          Reflections from executives, clinicians, and seekers who found true autonomic reset in our sanctuaries.
+          Reflections from executives, clinicians, and seekers who found true nervous system reset and renewal in our sanctuaries.
         </p>
       </div>
 

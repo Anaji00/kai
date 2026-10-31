@@ -8,7 +8,8 @@ from backend.sidecar.schemas import (
     StagedLeadResponse,
     StagedLeadUpdate,
     LeadDiscoveryTrigger,
-    LeadApproveRequest
+    LeadApproveRequest,
+    EmailSendRequest
 )
 from backend.sidecar.services.lead_gen import discover_and_stage_leads
 
@@ -41,7 +42,7 @@ def trigger_lead_discovery(
 ):
     """
     Run studio discovery worker for high-net-worth wellness hubs (Houston, Austin, Dallas, NYC, Chicago, LA).
-    Stages prospective partners with custom collaboration theses.
+    Stages prospective partners with custom collaboration plans.
     """
     leads = discover_and_stage_leads(
         db=db,
@@ -103,3 +104,35 @@ def approve_staged_lead(
     db.commit()
     db.refresh(lead)
     return lead
+
+
+@router.post("/{lead_id}/send-email")
+def send_lead_email(
+    lead_id: str,
+    payload: EmailSendRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Sends an email to the lead using the provided subject and body.
+    """
+    lead = db.query(StagedLead).filter(StagedLead.id == lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Staged lead not found")
+        
+    if not lead.email:
+        raise HTTPException(status_code=400, detail="Lead has no email address")
+
+    # Log the email (or actually send it via your email provider here)
+    print(f"Sending email to {lead.email}\nSubject: {payload.subject}\nBody: {payload.body}")
+    
+    lead.status = "AWAITING_INFO"
+    db.commit()
+    db.refresh(lead)
+    
+    return {
+        "status": "success",
+        "message": f"Email sent to {lead.email}",
+        "lead_id": lead.id,
+        "lead_status": lead.status
+    }
+

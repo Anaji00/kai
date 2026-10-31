@@ -241,13 +241,13 @@ export default function ReconciliationPage() {
         </div>
       </div>
 
-      {/* Section 2: Ground Manifest Diff & Cohort Cap Auditor */}
+      {/* Section 2: Ground Manifest & Group Size Check */}
       <div className="bg-white rounded-xl border border-[#E5DDD0] p-5 shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E5DDD0]/70 pb-3">
           <div className="flex items-center space-x-2">
             <Scale className="w-4 h-4 text-[#C07D63]" />
             <h2 className="font-serif text-base font-bold text-[#2D3E35]">
-              Ground Manifest Diff & 12–14 Cohort Cap Auditor
+              Guest Manifest &amp; 12–14 Group Size Check
             </h2>
           </div>
           <div className="flex items-center space-x-2">
@@ -291,7 +291,7 @@ export default function ReconciliationPage() {
               className="inline-flex items-center space-x-2 px-4 py-2 text-xs font-bold text-white bg-[#2D3E35] hover:bg-[#1F2C25] rounded-md transition-all shadow-sm"
             >
               <Scale className="w-3.5 h-3.5" />
-              <span>{auditingDiff ? "Auditing Manifest..." : "Run RapidFuzz Manifest Diff"}</span>
+              <span>{auditingDiff ? "Auditing Manifest..." : "Run Guest Manifest Check"}</span>
             </button>
           </div>
 
@@ -339,7 +339,7 @@ export default function ReconciliationPage() {
                     <div className="font-bold text-base">{activeDiffResult.tern_cohort_count}</div>
                   </div>
                   <div className="p-2 bg-white/80 rounded border border-black/5">
-                    <div className="text-[10px] text-[#5C6B5E]">Cohort Cap</div>
+                    <div className="text-[10px] text-[#5C6B5E]">Group Limit</div>
                     <div className="font-bold text-base">{activeDiffResult.cohort_cap}</div>
                   </div>
                 </div>
@@ -386,7 +386,7 @@ export default function ReconciliationPage() {
               </div>
             ) : (
               <div className="p-8 text-center bg-[#FAF7F2]/60 rounded-xl border border-[#E5DDD0] text-xs text-[#5C6B5E]">
-                Click &ldquo;Run RapidFuzz Manifest Diff&rdquo; to compare ground records against Tern staging data.
+                Click &ldquo;Run Guest Manifest Check&rdquo; to compare ground arrivals against confirmed guest reservations.
               </div>
             )}
           </div>

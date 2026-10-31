@@ -32,7 +32,7 @@ def search_dining_spots(
         target_tags = set(t.lower() for t in dietary_tags)
         for spot in results:
             spot_tags = set(t.lower() for t in (spot.dietary_tags or []))
-            if target_tags.issubset(spot_tags) or target_tags.intersection(spot_tags):
+            if target_tags.issubset(spot_tags):
                 filtered.append(spot)
         return filtered
 

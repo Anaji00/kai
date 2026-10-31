@@ -52,6 +52,8 @@ export interface StagingIntake {
   phone?: string;
   sanctuary_slug?: string;
   room_tier?: string;
+  wellness_profile?: Record<string, unknown>;
+  clinical_screening_enabled?: boolean;
   clinical_profile: ClinicalProfile;
   flight_request?: FlightRequest;
   consultation_thesis?: PreCallThesis;
@@ -85,7 +87,7 @@ export interface StagedLead {
   location?: string;
   website?: string;
   outreach_thesis?: string;
-  status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED";
+  status: "PENDING_APPROVAL" | "APPROVED" | "REJECTED" | "AWAITING_INFO";
   reviewed_by?: string;
   created_at: string;
 }
@@ -142,12 +144,37 @@ export interface StagedEmail {
   created_at: string;
 }
 
+// In the browser, admin auth is added by proxy.ts from the HttpOnly portal session cookie,
+// so no credentials are ever bundled client-side. Server-side callers read them from env.
+export const getAuthHeaders = (extraHeaders?: Record<string, string>): Record<string, string> => {
+  const headers: Record<string, string> = { ...(extraHeaders || {}) };
+  if (typeof window === "undefined" && process.env.ADMIN_PASSWORD) {
+    const username = process.env.ADMIN_USERNAME || "admin";
+    headers.Authorization = `Basic ${Buffer.from(`${username}:${process.env.ADMIN_PASSWORD}`).toString("base64")}`;
+  }
+  return headers;
+};
+
 const getBaseUrl = (): string => {
   if (typeof window !== "undefined") {
     return "/api/v1/sidecar";
   }
   return (process.env.FASTAPI_BACKEND_URL || "http://127.0.0.1:8000") + "/api/v1/sidecar";
 };
+
+export async function sidecarFetch(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const cleanPath = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+  const url = `${getBaseUrl()}${cleanPath}`;
+  const existingHeaders = (options.headers as Record<string, string>) || {};
+  const authHeaders = getAuthHeaders(existingHeaders);
+  return fetch(url, {
+    ...options,
+    headers: authHeaders,
+  });
+}
 
 // ----------------------------------------------------------------------------
 // Staging Intakes & 1-Click Tern Sync
@@ -816,9 +843,16 @@ export interface LaymanToolGuideItem {
   why_it_matters: string;
 }
 
+export interface CopilotStreamCallbacks {
+  onToken: (chunk: string) => void;
+  onMeta?: (meta: Partial<CopilotChatResponse>) => void;
+  onDone?: () => void;
+  onError?: (err: Error) => void;
+}
+
 export async function chatWithCopilot(
   message: string,
-  mode: string = "clinical_safety",
+  mode: string = "wellness_safety",
   guestContext?: Record<string, unknown>,
   sanctuarySlug?: string,
   currentPage?: string,
@@ -827,7 +861,7 @@ export async function chatWithCopilot(
   try {
     const res = await fetch(`${getBaseUrl()}/copilot/chat`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
         message,
         mode,
@@ -854,9 +888,81 @@ export async function chatWithCopilot(
       suggested_followups: [
         "Start backend: uvicorn main:app --reload",
         "Verify backend API docs at http://localhost:8000/docs",
-        "Check Ollama status with 'ollama list'"
+        "Check GROQ_API_KEY is set on the backend"
       ]
     };
+  }
+}
+
+export async function chatWithCopilotStream(
+  message: string,
+  mode: string = "wellness_safety",
+  guestContext?: Record<string, unknown>,
+  sanctuarySlug?: string,
+  currentPage?: string,
+  conversationHistory?: Array<{ role: string; content: string }>,
+  callbacks?: CopilotStreamCallbacks
+): Promise<void> {
+  try {
+    const res = await fetch(`${getBaseUrl()}/copilot/chat/stream`, {
+      method: "POST",
+      headers: getAuthHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({
+        message,
+        mode,
+        guest_context: guestContext,
+        sanctuary_slug: sanctuarySlug,
+        current_page: currentPage,
+        conversation_history: conversationHistory
+      })
+    });
+
+    if (!res.ok) {
+      const errData = await res.text().catch(() => "");
+      throw new Error(`SSE stream error (${res.status}): ${errData}`);
+    }
+
+    if (!res.body) {
+      throw new Error("ReadableStream is not supported by this browser environment.");
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder("utf-8");
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const events = buffer.split("\n\n");
+      buffer = events.pop() || "";
+
+      for (const event of events) {
+        const trimmed = event.trim();
+        if (trimmed.startsWith("data: ")) {
+          try {
+            const data = JSON.parse(trimmed.slice(6));
+            if (data.type === "meta" && callbacks?.onMeta) {
+              callbacks.onMeta(data);
+            } else if (data.type === "token" && data.content) {
+              callbacks?.onToken(data.content);
+            } else if (data.type === "done") {
+              callbacks?.onDone?.();
+            } else if (data.type === "error") {
+              callbacks?.onError?.(new Error(data.message || "Streaming error occurred"));
+            }
+          } catch {
+            // Non-JSON or incomplete chunk, continue buffer
+          }
+        }
+      }
+    }
+
+    callbacks?.onDone?.();
+  } catch (err) {
+    console.error("Clinical Copilot SSE Streaming failed:", err);
+    callbacks?.onError?.(err instanceof Error ? err : new Error(String(err)));
   }
 }
 
@@ -884,7 +990,7 @@ export async function fetchLaymanToolGuide(): Promise<{
           why_it_matters: "You never have to build custom payment forms or handle credit card numbers yourself. Tern manages client authorizations, bank security, and waivers 100% natively."
         },
         founder_approval: {
-          title: "Personalized Founder Approval (Zero Autonomous Writes)",
+          title: "Personalized Founder Approval (100% Founder-Approved)",
           layman_summary: "A safety shield ensuring no information is sent to external travel platforms or guests without your direct review and approval.",
           why_it_matters: "Protects your high-touch reputation and clinical standards—every proposal and message is reviewed by you."
         },
@@ -900,7 +1006,7 @@ export async function fetchLaymanToolGuide(): Promise<{
         },
         retreat_calendar: {
           title: "Retreat & Alignment Calendar",
-          layman_summary: "Your complete timeline for retreat cohort dates, 20-minute consultation calls, and airport flight arrivals.",
+          layman_summary: "Your complete timeline for retreat group dates, 20-minute consultation calls, and airport flight arrivals.",
           why_it_matters: "Syncs directly into your personal iPhone or Google Calendar with a 1-click live calendar feed link."
         },
         partner_studios: {
@@ -928,7 +1034,7 @@ export async function fetchLaymanToolGuide(): Promise<{
       founder_principles: [
         "Tern Native Payments: Zero custom payment liability, Tern handles authorizations.",
         "Personalized Founder Approval: 100% human-in-the-loop review before any external message.",
-        "Intimate Cohort Safety: Strictly 12 to 14 guests max for nervous system sanctuary."
+        "Intimate Group Safety: Strictly 12 to 14 guests max for nervous system sanctuary."
       ]
     };
   }
@@ -1034,7 +1140,7 @@ export async function fetchWebhookEventLogs(
     const params = new URLSearchParams({ limit: String(limit) });
     if (provider && provider !== "ALL") params.append("provider", provider);
 
-    const res = await fetch(`${getBaseUrl()}/webhooks/events?${params.toString()}`);
+    const res = await sidecarFetch(`/webhooks/events?${params.toString()}`, { cache: "no-store" });
     if (!res.ok) throw new Error("Failed to fetch webhook logs");
     return await res.json();
   } catch (err) {
@@ -1074,7 +1180,7 @@ export async function simulateWebhookEvent(
   payload?: Record<string, unknown>
 ): Promise<{ success: boolean; log_id: string; message: string }> {
   try {
-    const res = await fetch(`${getBaseUrl()}/webhooks/simulate`, {
+    const res = await sidecarFetch("/webhooks/simulate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ provider, event_type: eventType, payload })
@@ -1763,4 +1869,340 @@ export async function syncVendorToTern(id: string): Promise<VendorSupplier | nul
     return null;
   }
 }
+
+
+
+export async function sendLeadEmail(leadId: string, subject: string, body: string): Promise<{ status: string; message: string }> {
+  try {
+    const res = await fetch(`${getBaseUrl()}/leads/${leadId}/send-email`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subject, body })
+    });
+    if (!res.ok) {
+      throw new Error(`Error: ${res.status}`);
+    }
+    return await res.json();
+  } catch (error) {
+    console.error("Failed to send lead email:", error);
+    throw error;
+  }
+}
+
+export interface ApiActionDraft {
+  id: number;
+  type: string;
+  guest_name: string;
+  content: string;
+  status: string;
+  created_at: string;
+  channel_target?: string;
+  channel_badge?: string;
+  icon?: string;
+}
+
+export interface DraftStats {
+  total_pending: number;
+  total_approved: number;
+  total_discarded: number;
+  total_all: number;
+  by_category: Record<string, number>;
+}
+
+const getApiBaseUrl = (): string => {
+  if (typeof window !== "undefined") {
+    return "/api/v1";
+  }
+  return (process.env.FASTAPI_BACKEND_URL || "http://127.0.0.1:8000") + "/api/v1";
+};
+
+export async function fetchPendingDrafts(status: string = "pending_review", category?: string): Promise<ApiActionDraft[]> {
+  try {
+    const params = new URLSearchParams();
+    if (status) params.append("status", status);
+    if (category && category !== "all") params.append("category", category);
+    const qs = params.toString() ? `?${params.toString()}` : "";
+    const res = await fetch(`${getApiBaseUrl()}/drafts${qs}`, {
+      cache: 'no-store',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to fetch drafts');
+    return await res.json();
+  } catch (err) {
+    console.error(err);
+    return [];
+  }
+}
+
+export async function fetchDraftStats(): Promise<DraftStats> {
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/drafts/stats`, {
+      cache: 'no-store',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) throw new Error('Failed to fetch draft stats');
+    return await res.json();
+  } catch (err) {
+    console.error(err);
+    return {
+      total_pending: 0,
+      total_approved: 0,
+      total_discarded: 0,
+      total_all: 0,
+      by_category: {}
+    };
+  }
+}
+
+export async function approveDraftAction(
+  draftId: number,
+  updatedContent?: string,
+  operatorName: string = "Kareena Islam"
+): Promise<{ status: string; message: string; draft_id: number; dispatch_result?: Record<string, unknown> }> {
+  const res = await fetch(`${getApiBaseUrl()}/drafts/${draftId}/approve`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ updated_content: updatedContent, operator_name: operatorName }),
+  });
+  if (!res.ok) throw new Error('Failed to approve draft');
+  return await res.json();
+}
+
+export async function discardDraftAction(
+  draftId: number,
+  reason?: string,
+  operatorName: string = "Kareena Islam"
+): Promise<{ status: string; message: string; draft_id: number }> {
+  const res = await fetch(`${getApiBaseUrl()}/drafts/${draftId}/discard`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ reason, operator_name: operatorName }),
+  });
+  if (!res.ok) throw new Error('Failed to discard draft');
+  return await res.json();
+}
+
+export async function updateDraftStatus(draftId: number, status: string, content: string): Promise<boolean> {
+  try {
+    const res = await fetch(`${getApiBaseUrl()}/drafts/${draftId}`, {
+      method: 'PATCH',
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify({ status, content }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error(err);
+    return false;
+  }
+}
+
+export async function batchApproveDraftsAction(
+  draftIds?: number[],
+  category: string = "routine",
+  operatorName: string = "Kareena Islam"
+): Promise<{
+  status: string;
+  approved_count: number;
+  operator_name: string;
+  results: Array<{ draft_id: number; type: string; guest_name: string; dispatch_result?: Record<string, unknown> }>;
+  safety_notice?: string;
+}> {
+  const res = await fetch(`${getApiBaseUrl()}/drafts/batch-approve`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      draft_ids: draftIds && draftIds.length > 0 ? draftIds : null,
+      category,
+      operator_name: operatorName
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to batch approve action drafts');
+  }
+  return await res.json();
+}
+
+export async function dispatchDraftsDigestWhatsApp(): Promise<{
+  status: string;
+  message: string;
+  pending_count: number;
+  recipient: string;
+  digest_payload: Record<string, unknown>;
+}> {
+  const res = await fetch(`${getApiBaseUrl()}/drafts/digest/whatsapp`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to dispatch WhatsApp drafts digest');
+  }
+  return await res.json();
+}
+
+// ----------------------------------------------------------------------------
+// Voice Consultation Transcriber & 30-Day Post-Sanctuary Continuity Journey
+// ----------------------------------------------------------------------------
+export interface VoiceMemoResponse {
+  success: boolean;
+  message: string;
+  intake_id: string;
+  action_draft_id: number;
+  extracted_data: {
+    client_name: string;
+    email: string;
+    sanctuary_slug: string;
+    room_tier: string;
+    wellness_profile: Record<string, unknown>;
+    clinical_screening_enabled: boolean;
+    clinical_profile: Record<string, unknown>;
+    flight_request: Record<string, unknown>;
+    welcome_email_draft: string;
+    extracted_at: string;
+  };
+  status: string;
+}
+
+export interface ContinuityMilestone {
+  day: number;
+  title: string;
+  theme: string;
+  scheduled_date: string;
+  delivery_channel: string;
+  content_preview: string;
+  draft_id?: number;
+}
+
+export interface ContinuityArcResponse {
+  success: boolean;
+  intake_id: string;
+  guest_name: string;
+  departure_date: string;
+  milestones: ContinuityMilestone[];
+  staged_draft_count: number;
+  message: string;
+}
+
+export interface ActiveContinuityDraft {
+  draft_id: number;
+  type: string;
+  guest_name: string;
+  status: string;
+  content: string;
+  created_at: string;
+}
+
+export async function transcribeVoiceMemo(audio: Blob): Promise<string> {
+  const ext = audio.type.includes('mp4') ? 'm4a' : audio.type.includes('ogg') ? 'ogg' : 'webm';
+  const form = new FormData();
+  form.append('file', audio, `voice-memo.${ext}`);
+  const res = await fetch(`${getApiBaseUrl()}/sidecar/intakes/voice-memo/transcribe`, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+    body: form,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to transcribe the recording');
+  }
+  const data = await res.json();
+  return data.transcript as string;
+}
+
+export async function submitVoiceConsultationMemo(
+  rawTranscript: string,
+  operatorName: string = "Kareena Islam"
+): Promise<VoiceMemoResponse> {
+  const res = await fetch(`${getApiBaseUrl()}/sidecar/intakes/voice-memo`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      raw_transcript: rawTranscript,
+      operator_name: operatorName
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to process voice consultation memo');
+  }
+  return await res.json();
+}
+
+export async function generateContinuityArc(
+  intakeId: string,
+  departureDate?: string,
+  operatorName: string = "Kareena Islam"
+): Promise<ContinuityArcResponse> {
+  const res = await fetch(`${getApiBaseUrl()}/sidecar/continuity/generate-arc`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({
+      intake_id: intakeId,
+      departure_date: departureDate || null,
+      operator_name: operatorName
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to generate 30-day post-retreat continuity arc');
+  }
+  return await res.json();
+}
+
+export async function fetchContinuityArcs(
+  guestName?: string,
+  status?: string
+): Promise<ActiveContinuityDraft[]> {
+  const params = new URLSearchParams();
+  if (guestName) params.append('guest_name', guestName);
+  if (status) params.append('status', status);
+  const url = `${getApiBaseUrl()}/sidecar/continuity/active-arcs${params.toString() ? `?${params.toString()}` : ''}`;
+  const res = await fetch(url, {
+    method: 'GET',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to fetch continuity arcs');
+  }
+  return await res.json();
+}
+
+export interface GuestPortalTokenResponse {
+  token: string;
+  portal_url: string;
+  expires_at: string;
+  guest_name: string;
+  sanctuary_slug: string;
+  message?: string;
+}
+
+export async function generateGuestPortalToken(intakeId: string): Promise<GuestPortalTokenResponse> {
+  const url = `${getApiBaseUrl()}/sidecar/guest-portal/generate-token?intake_id=${encodeURIComponent(intakeId)}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: getAuthHeaders(),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to generate guest portal token');
+  }
+  return await res.json();
+}
+
+export async function fetchGuestPortalDemoToken(): Promise<GuestPortalTokenResponse> {
+  const url = `${getApiBaseUrl()}/sidecar/guest-portal/demo-token`;
+  const res = await fetch(url, {
+    method: 'POST',
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || 'Failed to generate guest demo token');
+  }
+  return await res.json();
+}
+
+
+
 

@@ -58,7 +58,7 @@ export default function AboutPage() {
           </p>
 
           <p className="text-sm text-sage/80 leading-relaxed">
-            As a Registered Nurse with intensive clinical experience in acute surgical care across premier Houston medical institutions (including Memorial Hermann and HCA Healthcare) and a proud graduate of Texas A&M, Kareena spent years observing the devastating toll of chronic autonomic stress. She witnessed how hyper-vigilance, broken circadian cycles, and unexpressed physical tension erode cardiovascular, endocrine, and immunological health.
+            As a Registered Nurse with intensive clinical experience in acute surgical care across premier Houston medical institutions (including Memorial Hermann and HCA Healthcare) and a proud graduate of Texas A&M, Kareena spent years observing the devastating toll of chronic bodily stress. She witnessed how relentless pressure, broken sleep cycles, and unexpressed physical tension erode cardiovascular health, vitality, and emotional peace.
           </p>
 
           <p className="text-sm text-sage/80 leading-relaxed">
@@ -128,10 +128,10 @@ export default function AboutPage() {
               1. Registered Nurse (BSN, RN)
             </h3>
             <p className="text-xs text-olive font-medium">
-              Texas A&M Alumna • Acute & Surgical Care
+              Texas A&M Graduate • Nurse-Led Restorative Care
             </p>
             <p className="text-xs text-sage/80 leading-relaxed">
-              Trained in high-pressure acute care hospital systems (Memorial Hermann, HCA Healthcare). Grounded in the physiological realities of autonomic balance, circadian restoration, inflammation markers, and patient safety protocols.
+              Trained in high-pressure acute care hospital systems (Memorial Hermann, HCA Healthcare). Grounded in the physiological realities of nervous system balance, deep sleep restoration, inflammation markers, and patient safety protocols.
             </p>
           </div>
 
@@ -179,7 +179,7 @@ export default function AboutPage() {
             The Clinical Science Behind KAI
           </h2>
           <p className="text-sm text-sage/80 leading-relaxed">
-            At KAI, somatic wellness is not an abstract concept; it is an orchestrated physiological down-regulation of the nervous system.
+            At KAI, somatic wellness is not an abstract concept; it is an intentional, guided transition into deep nervous system rest and physical renewal.
           </p>
         </div>
 
@@ -188,10 +188,10 @@ export default function AboutPage() {
           <div className="rounded-2xl border border-sand-border bg-linen p-6 space-y-3">
             <div className="text-2xl font-serif text-terracotta">01</div>
             <h4 className="font-serif text-xl text-sage font-normal">
-              Sympathetic Decompensation
+              Chronic Stress &amp; Fight-or-Flight Release
             </h4>
             <p className="text-xs text-sage/80 leading-relaxed">
-              Prolonged stress traps the body in sympathetic dominance (elevated cortisol, shallow breathing, constricted blood vessels). Through slow-paced pranayama (e.g. 4-7-8 rhythm) and intentional quietude, we stimulate the vagus nerve to initiate the ventral vagal &ldquo;rest-and-digest&rdquo; cascade.
+              Prolonged stress traps the body in constant fight-or-flight tension (elevated cortisol, shallow breathing, constricted blood vessels). Through slow-paced pranayama (e.g. 4-7-8 rhythm) and intentional quietude, we gently stimulate the vagus nerve to initiate deep bodily calm and restorative rest.
             </p>
           </div>
 

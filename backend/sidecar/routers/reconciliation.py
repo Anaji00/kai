@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 
 from backend.database import get_db
 from backend.sidecar.models import StagedVoucherDiff
@@ -40,7 +40,7 @@ def run_manifest_diff(
     db: Session = Depends(get_db)
 ):
     """
-    Audits external ground operator manifests against Tern CRM staging records.
+    Audits external ground operator manifests against confirmed guest reservations.
     Uses RapidFuzz similarity matching & Polars validation.
     Strictly flags capacity violations beyond 12–14 guest limits and transfer mismatches.
     """

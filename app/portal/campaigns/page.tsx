@@ -103,7 +103,7 @@ export default function CampaignsPage() {
       burnout: {
         name: "Kareena Islam",
         phone: "+17135550199",
-        msg: "KAI Clinical Alert: High-stress corporate group application received for Nosara. Pre-call consultation thesis ready in portal.",
+        msg: "KAI Alert: High-stress corporate group application received for Nosara. Pre-call consultation guide ready in portal.",
       },
       flight: {
         name: "Grand Travel Flight Desk",
@@ -113,7 +113,7 @@ export default function CampaignsPage() {
       cap: {
         name: "Kareena Islam",
         phone: "+17135550199",
-        msg: "Sanctuary Capacity Warning: Nosara Blue Zone cohort has reached 12/14 guests. Maximum cohort limit is 14.",
+        msg: "Sanctuary Capacity Warning: Nosara Blue Zone group has reached 12/14 guests. Maximum group limit is 14.",
       },
     };
 
@@ -209,8 +209,8 @@ export default function CampaignsPage() {
                 className="w-full text-xs bg-[#FAF7F2] border border-[#E5DDD0] rounded-lg p-2.5 text-[#2D3E35] focus:outline-none"
               >
                 <option value="waitlist_nosara">Nosara Waitlist (High Intent)</option>
-                <option value="alumni_circle">Private Alumni Circle (Priority Access)</option>
-                <option value="pre_departure_cohort">Confirmed Guests (Pre-Departure 4-7-8 Breathwork)</option>
+                <option value="alumni_circle">Returning Guests Circle (Priority Access)</option>
+                <option value="pre_departure_cohort">Confirmed Retreat Guests (Pre-Departure 4-7-8 Breathwork)</option>
                 <option value="corporate_feeder">Corporate Executive Network</option>
               </select>
             </div>
@@ -296,8 +296,8 @@ export default function CampaignsPage() {
               onClick={() => handleQuickAlert("cap")}
               className="w-full text-left p-2.5 rounded-lg border border-[#E5DDD0] hover:bg-[#FAF7F2] transition-colors text-xs space-y-0.5"
             >
-              <div className="font-semibold text-[#2D3E35]">⚠️ Cohort Cap Warning (&gt;=12)</div>
-              <div className="text-[11px] text-[#5C6B5E]">Alert when cohort approaches 14 limit</div>
+              <div className="font-semibold text-[#2D3E35]">⚠️ Group Size Warning (&gt;=12 Guests)</div>
+              <div className="text-[11px] text-[#5C6B5E]">Alert when retreat group approaches 14 limit</div>
             </button>
           </div>
         </div>

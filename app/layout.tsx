@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Cormorant_Garamond, Plus_Jakarta_Sans } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
+import PwaRegister from "@/components/PwaRegister";
 import "./globals.css";
 
 const cormorant = Cormorant_Garamond({
@@ -20,12 +21,13 @@ const jakarta = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://kaiwellnessretreats.com"),
+  manifest: "/manifest.webmanifest",
   title: {
-    default: "KAI Wellness Retreats | Where Clinical Science Meets Somatic Restoration",
+    default: "KAI Sanctuary & Wellness Retreats | Restorative Wellness & Curated Luxury Travel",
     template: "%s | KAI Wellness Retreats",
   },
   description:
-    "Founded by Kareena Islam. Intimate, quiet luxury wellness retreats blending clinical autonomic science, anatomical yoga, crystal singing bowl sound healing, and bespoke luxury travel curation.",
+    "Founded by Kareena Islam. Intimate, quiet luxury wellness retreats blending restorative circadian vitality, anatomical yoga, crystal singing bowl sound healing, and bespoke Grand Travel curation.",
   keywords: [
     "KAI Wellness Retreats",
     "Kareena Islam",
@@ -97,12 +99,15 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${cormorant.variable} ${jakarta.variable} scroll-smooth`}>
       <head>
+        <link rel="manifest" href="/manifest.webmanifest" />
+        <meta name="theme-color" content="#2D3E35" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
         />
       </head>
       <body className="flex min-h-screen flex-col bg-linen text-sage antialiased selection:bg-olive selection:text-linen">
+        <PwaRegister />
         <Navbar />
         <main className="flex-1 pt-20">{children}</main>
         <Footer />

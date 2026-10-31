@@ -99,7 +99,7 @@ export default function OperatorCalendarView() {
         return (
           <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
             <Users className="w-3 h-3" />
-            Retreat Cohort (12–14 Max)
+            Retreat Group (12–14 Max)
           </span>
         );
       case "CONSULTATION":
@@ -201,7 +201,7 @@ export default function OperatorCalendarView() {
                   : "text-stone-400 hover:text-stone-200 hover:bg-stone-800/50"
               }`}
             >
-              {cat === "ALL" ? "All Events" : cat.replace("_", " ")}
+              {cat === "ALL" ? "All Events" : cat === "COHORT" ? "Retreat Groups" : cat.replace("_", " ")}
             </button>
           ))}
         </div>

@@ -28,7 +28,7 @@ export default function TernFormsModal({ isOpen, onClose }: TernFormsModalProps)
 
   const forms = [
     {
-      title: "Trip Request & Cohort Reservation Form",
+      title: "Trip Request & Retreat Reservation Form",
       description: "Direct guest inquiry form that collects retreat dates, room tier, and initial health notes.",
       url: "https://app.tern.travel/public/forms/kai-nosara-intake/responses/new",
       type: "Trip Request",
@@ -42,7 +42,7 @@ export default function TernFormsModal({ isOpen, onClose }: TernFormsModalProps)
       tag: "Flight Desk Sync",
     },
     {
-      title: "Clinical Somatic Intake & Liability Waiver Form",
+      title: "Guest Somatic Intake & Liability Waiver Form",
       description: "Collects somatic health disclosures, acoustic sensitivity parameters, and e-signatures.",
       url: "https://app.tern.travel/public/forms/kai-clinical-intake/responses/new",
       type: "Custom Waiver",
@@ -77,7 +77,7 @@ export default function TernFormsModal({ isOpen, onClose }: TernFormsModalProps)
           retreatId: "nosara",
           roomPreference: "private-suite",
           movementExperience: "Restorative Yoga & Breathwork",
-          healthNotes: "Severe sympathetic hyperarousal, insomnia, high cortisol after funding round.",
+          healthNotes: "Severe chronic work stress, exhaustion, high cortisol after funding round.",
           intentions: "Deep nervous system de-escalation and circadian rhythm reset.",
           passportValid: "yes",
         }),
@@ -128,7 +128,7 @@ export default function TernFormsModal({ isOpen, onClose }: TernFormsModalProps)
           <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 flex items-start space-x-2.5">
             <ShieldCheck className="w-4 h-4 text-emerald-700 mt-0.5 shrink-0" />
             <div className="leading-relaxed">
-              <span className="font-semibold">Zero Autonomous Writes Protected:</span> All public submissions
+              <span className="font-semibold">Founder Approval Protected (No Unapproved Sends):</span> All public submissions
               from these forms land in the KAI Staging Queue for clinical review and 1-click authorization by Kareena Islam, RN.
             </div>
           </div>
@@ -213,7 +213,7 @@ export default function TernFormsModal({ isOpen, onClose }: TernFormsModalProps)
               <span className="text-[10px] text-[#5C6B5E]">Simulates external form submission</span>
             </div>
             <p className="text-xs text-[#5C6B5E] leading-relaxed">
-              Test the end-to-end flow: submits a mock high-burnout intake (Dr. Genevieve Sterling) which generates an AI Pre-Call Thesis and stages an operational notification card for WhatsApp.
+              Test the end-to-end flow: submits a mock high-burnout intake (Dr. Genevieve Sterling) which generates an AI Conversation Guide and stages an operational notification card for WhatsApp.
             </p>
             <button
               onClick={handleSimulateInbound}

@@ -1,6 +1,6 @@
 import logging
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from backend.database import get_db
@@ -8,20 +8,21 @@ from backend.sidecar.models import (
     SanctuaryRoute,
     SomaticPointOfInterest,
     GroundTransferRecord,
-    CuratedDiningSpot,
     DestinationReview,
-    DestinationGuide,
     UploadedDocumentRecord,
     generate_uuid_str
 )
+from backend.models import ActionDraft
 from backend.sidecar.schemas import (
     RouteCalculateRequest,
     SanctuaryRouteResponse,
     SomaticPointOfInterestResponse,
+    WeatherForecastRequest,
     WeatherForecastResponse,
     DiningSearchRequest,
     CuratedDiningSpotResponse,
     CuratedDiningCreateRequest,
+    AccommodationSearchRequest,
     DestinationReviewResponse,
     DestinationReviewCreateRequest,
     InboundReviewWebhookPayload,
@@ -162,6 +163,17 @@ async def get_sanctuary_weather(
     return WeatherForecastResponse(**forecast)
 
 
+@router.post("/weather/forecast", response_model=WeatherForecastResponse)
+async def get_sanctuary_weather_post(
+    req: WeatherForecastRequest
+):
+    """
+    POST variant for fetching real-time microclimate weather.
+    """
+    slug = req.sanctuary_slug.lower() if req.sanctuary_slug else "nosara"
+    forecast = await fetch_sanctuary_weather(lat=req.lat, lon=req.lon, sanctuary_slug=slug)
+    return WeatherForecastResponse(**forecast)
+
 # -----------------------------------------------------------------------------
 # 3. Curated Organic & Blue Zone Dining
 # -----------------------------------------------------------------------------
@@ -196,6 +208,24 @@ def add_curated_dining_spot(
     """
     spot = create_dining_spot(db, req.model_dump())
     return spot
+
+
+@router.post("/dining/search", response_model=List[CuratedDiningSpotResponse])
+def search_dining_spots_post(
+    req: DiningSearchRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    POST variant to search farm-to-table dining spots with complex filters.
+    """
+    seed_default_dining_if_empty(db)
+    return search_dining_spots(
+        db=db,
+        sanctuary_slug=req.sanctuary_slug,
+        dietary_tags=req.dietary_tags,
+        cuisine_type=req.cuisine_type,
+        max_distance_km=req.max_distance_km
+    )
 
 
 # -----------------------------------------------------------------------------
@@ -234,9 +264,25 @@ def submit_review(
         review_text=req.review_text,
         sentiment_label=label,
         source=req.source or "VERIFIED_GUEST",
-        status="PUBLISHED"
+        status="PENDING_REVIEW"
     )
     db.add(rev)
+
+    # Stage ActionDraft for founder review before publication
+    draft = ActionDraft(
+        type="guest_reflection",
+        guest_name=req.guest_name,
+        content=(
+            f"Submitted Guest Reflection ({req.sanctuary_slug.title()} Sanctuary):\n"
+            f"Author: {req.guest_name} ({req.stay_dates}) | Rating: {req.overall_rating}★ ({label})\n"
+            f"Scores: Deep Sleep {sleep_s}/100, Quietude {quiet_s}/100, Attentiveness {care_s}/100\n"
+            f"Review: \"{req.review_text}\"\n\n"
+            f"Approving this draft authorizes publishing this review to the live website."
+        ),
+        status="pending_review"
+    )
+    db.add(draft)
+
     db.commit()
     db.refresh(rev)
     return rev
@@ -251,6 +297,21 @@ def receive_review_webhook(
     Inbound webhook for post-retreat survey reviews.
     """
     return process_inbound_review_webhook(db=db, payload=payload.model_dump())
+
+
+@router.post("/destination-guide/{sanctuary_slug}", response_model=DestinationGuideResponse)
+def update_sanctuary_guide(
+    sanctuary_slug: str,
+    data: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Updates the destination guide for a given sanctuary.
+    """
+    guide = update_destination_guide(db=db, sanctuary_slug=sanctuary_slug, data=data)
+    if not guide:
+        raise HTTPException(status_code=404, detail=f"Guide for {sanctuary_slug} not found.")
+    return guide
 
 
 # -----------------------------------------------------------------------------
@@ -296,7 +357,7 @@ def list_ground_transfers(
             pickup_location="Liberia Airport (LIR) Private Jet Terminal",
             dropoff_location="KAI Nosara Ocean Sanctuary (Villa 4)",
             flight_number="AA 1244",
-            pickup_time=datetime.utcnow(),
+            pickup_time=datetime.now(timezone.utc),
             chauffeur_name="Carlos Mendez (Lead Sanctuary Chauffeur)",
             vehicle_type="Luxury 4WD Suburban Executive",
             status="ARRIVED_AT_TARMAC",
@@ -324,7 +385,24 @@ def update_transfer_status_webhook(
 
     transfer.status = payload.status
     if payload.chauffeur_notes:
-        transfer.dropoff_location += f" (Note: {payload.chauffeur_notes})"
+        transfer.chauffeur_notes = payload.chauffeur_notes
+
+    # If delay or route disruption is reported, stage ActionDraft for operations team
+    if payload.status in ["DELAYED", "ISSUE_REPORTED"] or (payload.chauffeur_notes and any(w in payload.chauffeur_notes.lower() for w in ["delay", "traffic", "late", "flat", "detour"])):
+        draft = ActionDraft(
+            type="flight_delay_chauffeur_update",
+            guest_name=transfer.guest_name,
+            content=(
+                f"Chauffeur Transfer Alert ({transfer.sanctuary_slug.title()} Fleet):\n"
+                f"Guest: {transfer.guest_name} | Flight: {transfer.flight_number or 'Private Transit'}\n"
+                f"Chauffeur: {transfer.chauffeur_name} ({transfer.vehicle_type})\n"
+                f"Status: {payload.status} | Note: {payload.chauffeur_notes or 'Schedule adjustment flagged'}\n\n"
+                f"Approving this draft alerts the sanctuary welcome desk and coordinates arrival timing adjustment."
+            ),
+            status="pending_review"
+        )
+        db.add(draft)
+
     db.commit()
     db.refresh(transfer)
     return {"status": "SUCCESS", "transfer_id": transfer.id, "new_status": transfer.status}
@@ -341,3 +419,22 @@ def get_uploaded_documents(
     List parsed guest medical notes, flight confirmations, and intake documents.
     """
     return db.query(UploadedDocumentRecord).order_by(UploadedDocumentRecord.created_at.desc()).all()
+
+
+# -----------------------------------------------------------------------------
+# 8. Accommodations Search
+# -----------------------------------------------------------------------------
+@router.post("/accommodations/search")
+def search_accommodations(req: AccommodationSearchRequest):
+    """
+    Search available sanctuary accommodations by tier and date.
+    """
+    # Mocking response as there is no specific DB table yet in this module
+    return {
+        "destination": req.destination or "Nosara",
+        "available_tiers": [
+            {"tier": "Private Ocean Canopy Villa", "price": 1900, "available": True},
+            {"tier": "Sacred Garden Suite", "price": 1420, "available": True},
+        ],
+        "luxury_tier_requested": req.luxury_tier
+    }

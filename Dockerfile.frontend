@@ -5,8 +5,8 @@ FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-COPY package.json package-lock.json* ./
-RUN npm install
+COPY package.json package-lock.json ./
+RUN npm ci
 
 # -----------------------------------------------------------------------------
 FROM node:20-alpine AS builder
@@ -14,9 +14,12 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Build argument for client-side API endpoint
-ARG NEXT_PUBLIC_SIDECAR_API_URL=http://localhost:8000/api/v1/sidecar
-ENV NEXT_PUBLIC_SIDECAR_API_URL=$NEXT_PUBLIC_SIDECAR_API_URL \
+# next.config.ts rewrites /api/v1/* to the backend; rewrites are baked in at build time,
+# so the backend's in-network URL must be known here.
+ARG FASTAPI_BACKEND_URL=http://backend:8000
+ARG NEXT_PUBLIC_SITE_URL=http://localhost:3000
+ENV FASTAPI_BACKEND_URL=$FASTAPI_BACKEND_URL \
+    NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL \
     NEXT_TELEMETRY_DISABLED=1 \
     NODE_ENV=production
 
@@ -26,23 +29,27 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
+# HOSTNAME=0.0.0.0 makes the standalone server listen on all interfaces
+# (Docker otherwise sets HOSTNAME to the container id and the healthcheck can't reach it).
 ENV NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
-    PORT=3000
+    PORT=3000 \
+    HOSTNAME=0.0.0.0
 
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
 
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
+
+# Automatically leverage output traces to reduce image size
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 USER nextjs
 
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/ || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://127.0.0.1:3000/ || exit 1
 
-CMD ["npm", "run", "start"]
+CMD ["node", "server.js"]

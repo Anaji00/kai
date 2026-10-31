@@ -112,7 +112,7 @@ export default function RetreatsPage() {
         </div>
       </section>
 
-      {/* FAQs / Cohort Philosophy */}
+      {/* FAQs / Small Group Philosophy */}
       <section className="mt-20 border-t border-sand-border/80 pt-16">
         <div className="max-w-3xl mx-auto space-y-8">
           <div className="text-center">
@@ -127,10 +127,10 @@ export default function RetreatsPage() {
           <div className="space-y-4">
             <div className="rounded-2xl border border-sand-border bg-linen p-6 space-y-2">
               <h4 className="font-serif text-xl text-sage">
-                How are cohorts curated?
+                How are retreat groups curated?
               </h4>
               <p className="text-xs sm:text-sm text-sage/80 leading-relaxed">
-                Because KAI groups are limited to 12 to 14 guests, Kareena personally reviews every inquiry. We ensure a harmonious dynamic where all participants share an intention for rest, respect, and nervous system decompensation.
+                Because KAI retreat groups are limited to 12 to 14 guests, Kareena personally reviews every inquiry. We ensure a harmonious dynamic where all participants share an intention for rest, respect, and nervous system restoration.
               </p>
             </div>
 

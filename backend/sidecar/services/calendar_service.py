@@ -1,9 +1,8 @@
 import logging
 from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timezone, timedelta
 from sqlalchemy.orm import Session
-from backend.sidecar.models import CalendarEvent, StagingIntake
-from backend.config import settings
+from backend.sidecar.models import CalendarEvent
 
 logger = logging.getLogger("kai_calendar_service")
 
@@ -86,7 +85,7 @@ def get_all_calendar_events(
 
     # Add sample consultations and flight arrivals if none in DB
     if not any(ev.get("category") == "CONSULTATION" for ev in events):
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
         consult_time_1 = (now + timedelta(days=1)).replace(hour=14, minute=0, second=0)
         consult_time_2 = (now + timedelta(days=2)).replace(hour=16, minute=30, second=0)
         
@@ -194,7 +193,7 @@ def generate_ical_feed(events: List[Dict[str, Any]]) -> str:
         lines.extend([
             "BEGIN:VEVENT",
             f"UID:{e.get('id', 'event')}@kaiwellnessretreats.com",
-            f"DTSTAMP:{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}",
+            f"DTSTAMP:{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
             f"DTSTART:{dtstart}",
             f"DTEND:{dtend}",
             f"SUMMARY:{summary}",

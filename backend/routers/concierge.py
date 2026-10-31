@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from typing import List
 from backend.database import get_db
-from backend.models import FlightConciergeRequest
+from backend.models import FlightConciergeRequest, ActionDraft
 from backend.schemas import FlightRequestCreate, FlightRequestResponse
 from backend.services.email_service import send_flight_request_alert
+from backend.sidecar.routers.webhooks import verify_admin
 
 router = APIRouter(prefix="/concierge", tags=["Grand Travel & Cruise Flight Desk"])
 
@@ -80,6 +80,23 @@ def submit_flight_request(data: FlightRequestCreate, db: Session = Depends(get_d
             message_body=f"Grand Travel Flight Desk: VIP {data.cabinClass} request from {data.guestName} ({data.departureAirport.upper()}). Staged for itinerary review.",
             dispatch_type="OPERATIONAL_ALERT"
         )
+
+        # Stage ActionDraft for Grand Travel & Cruise Flight Desk routing
+        flight_draft = ActionDraft(
+            type="flight_coordination",
+            guest_name=data.guestName,
+            content=(
+                f"VIP Flight Coordination Request: {data.guestName}\n"
+                f"Departure Airport: {data.departureAirport.upper()} | Cabin: {data.cabinClass}\n"
+                f"Preferred Airline: {data.preferredAirline or 'Flexible / Host Agency Preferred'}\n"
+                f"Booking Ref: {data.bookingReference or 'Direct Air Request'}\n"
+                f"Special Requests: {data.specialRequests or 'Lie-flat seating & tarmac chauffeur meet'}\n\n"
+                f"Approving this draft dispatches the flight booking request to Grand Travel & Cruise (Funjet 500 Club volume desk)."
+            ),
+            status="pending_review"
+        )
+        db.add(flight_draft)
+        db.commit()
     except Exception as e:
         import logging
         logging.getLogger("kai_api").error(f"Error mirroring flight request to sidecar staging: {e}")
@@ -101,7 +118,7 @@ def submit_flight_request(data: FlightRequestCreate, db: Session = Depends(get_d
     )
 
 
-@router.get("/requests")
+@router.get("/requests", dependencies=[Depends(verify_admin)])
 def list_flight_requests(db: Session = Depends(get_db)):
     """Admin view of all active flight desk requests."""
     return db.query(FlightConciergeRequest).order_by(FlightConciergeRequest.created_at.desc()).all()

@@ -1,3 +1,9 @@
+# KAI Wellness Retreats - full stack
+#   cp .env.example .env   # then fill in every empty secret
+#   docker compose up --build
+# AI features need GROQ_API_KEY (free at https://console.groq.com/keys).
+# Site: http://localhost:3000   Founder portal: http://localhost:3000/portal   API: http://localhost:8000/docs
+# Host port busy? Set FRONTEND_PORT / BACKEND_PORT in .env (e.g. FRONTEND_PORT=3001).
 services:
   # ---------------------------------------------------------------------------
   # 1. KAI FastAPI Backend Sidecar & Clinical RAG Engine
@@ -7,17 +13,28 @@ services:
       context: .
       dockerfile: Dockerfile.backend
     container_name: kai-backend
-    ports:
-      - "8000:8000"
+    env_file:
+      - path: .env
+        required: false
     environment:
-      - PYTHONUNBUFFERED=1
-      - PORT=8000
-      - OLLAMA_BASE_URL=http://ollama:11434
-      - OLLAMA_MODEL=qwen2.5:7b
-      - CORS_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      DATABASE_URL: ${DATABASE_URL:-sqlite:////app/data/kai_sanctuary.db}
+      # SQLite: a single worker avoids concurrent init/migration races on startup.
+      UVICORN_WORKERS: ${UVICORN_WORKERS:-1}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?Set JWT_SECRET_KEY in .env}
+      TERN_WEBHOOK_SECRET: ${TERN_WEBHOOK_SECRET:?Set TERN_WEBHOOK_SECRET in .env}
+      EMAIL_WEBHOOK_SECRET: ${EMAIL_WEBHOOK_SECRET:?Set EMAIL_WEBHOOK_SECRET in .env}
+      CIRIUM_WEBHOOK_SECRET: ${CIRIUM_WEBHOOK_SECRET:?Set CIRIUM_WEBHOOK_SECRET in .env}
+      EXPEDIA_WEBHOOK_SECRET: ${EXPEDIA_WEBHOOK_SECRET:?Set EXPEDIA_WEBHOOK_SECRET in .env}
+      WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:?Set WHATSAPP_WEBHOOK_VERIFY_TOKEN in .env}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
     volumes:
-      - kai_sqlite_data:/app/backend/data
-      - ./backend/kai_sanctuary.db:/app/backend/kai_sanctuary.db
+      - kai_data:/app/data
     restart: unless-stopped
     networks:
       - kai-network
@@ -30,37 +47,29 @@ services:
       context: .
       dockerfile: Dockerfile.frontend
       args:
-        - NEXT_PUBLIC_SIDECAR_API_URL=http://localhost:8000/api/v1/sidecar
+        FASTAPI_BACKEND_URL: http://backend:8000
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-http://localhost:3000}
     container_name: kai-frontend
-    ports:
-      - "3000:3000"
+    env_file:
+      - path: .env
+        required: false
     environment:
-      - NODE_ENV=production
-      - PORT=3000
-      - NEXT_PUBLIC_SIDECAR_API_URL=http://localhost:8000/api/v1/sidecar
-    depends_on:
-      - backend
-    restart: unless-stopped
-    networks:
-      - kai-network
-
-  # ---------------------------------------------------------------------------
-  # 3. Local Ollama LLM Service (Qwen 2.5)
-  # ---------------------------------------------------------------------------
-  ollama:
-    image: ollama/ollama:latest
-    container_name: kai-ollama
+      NODE_ENV: production
+      FASTAPI_BACKEND_URL: http://backend:8000
+      # Portal gate (proxy.ts) and server-side admin calls; never exposed to the browser.
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
     ports:
-      - "11434:11434"
-    volumes:
-      - ollama_models:/root/.ollama
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - kai-network
 
 volumes:
-  kai_sqlite_data:
-  ollama_models:
+  kai_data:
 
 networks:
   kai-network:

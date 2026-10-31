@@ -299,7 +299,7 @@ export default function WhatsAppSimulatorModal({
             <span>📝 Add Companion Note</span>
           </button>
           <button
-            onClick={() => handleSendReply("Decline intake, cohort at strict 14 cap")}
+            onClick={() => handleSendReply("Decline intake, retreat group at strict 14 limit")}
             disabled={loading}
             className="px-2 py-1 rounded-full bg-slate-800 hover:bg-slate-700 text-red-300 whitespace-nowrap border border-red-900/50"
           >

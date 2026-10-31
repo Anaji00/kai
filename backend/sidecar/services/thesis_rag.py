@@ -1,4 +1,3 @@
-import json
 from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
 from backend.sidecar.models import SanctuaryKnowledge
@@ -66,18 +65,18 @@ SANCTUARY_KNOWLEDGE_SEEDS = [
         "content": (
             "Objection: 'I am not flexible / have never done breathwork / fear intense emotional release.' "
             "Clinical response: Kareena's registered nurse foundation ensures that all somatic practices are trauma-informed, "
-            "gentle, and medically supervised. Breathwork is titrated to individual nervous system capacity without forced hyperventilation."
+            "gentle, and medically supervised. Breathwork is gently adapted to your individual comfort without forced hyperventilation."
         ),
         "metadata_json": {"objection_type": "practice_intensity", "target_audience": "beginners"}
     },
     {
         "category": "business_operations",
-        "title": "Cohort Pricing, Deposits & Financial Terms",
+        "title": "Retreat Group Pricing, Deposits & Financial Terms",
         "content": (
             "All KAI Retreats operate on an all-inclusive pricing structure: Private Ocean Canopy Villas ($9,800 – $14,500 "
             "per traveler depending on sanctuary season) and Shared Ocean Pavilions ($6,800 – $8,200). "
             "Payment schedules: A 30% non-refundable reservation deposit is authorized natively through Tern CRM upon Founder review, "
-            "with the 70% balance due 45 days prior to cohort arrival. Strict 12–14 guest maximum per cohort."
+            "with the 70% balance due 45 days prior to retreat group arrival. Strict 12–14 guest maximum per retreat group."
         ),
         "metadata_json": {"deposit_percent": 30, "balance_due_days": 45, "pricing_tier_min": 6800, "pricing_tier_max": 14500}
     },
@@ -198,11 +197,11 @@ def generate_pre_call_thesis(
     talk_tracks = [
         {
             "phase": "Opening & Empathy",
-            "talking_point": f"Acknowledge {client_name}'s daily cognitive load: 'I saw your reflection on {clinical_profile.get('intentions', 'seeking calm')}. In my clinical practice, we see high achievers carrying nervous system tension long before physical symptoms appear.'"
+            "talking_point": f"Acknowledge {client_name}'s daily mental stress and executive demands: 'I saw your reflection on {clinical_profile.get('intentions', 'seeking calm')}. In my clinical practice, we see high achievers carrying nervous system tension long before physical symptoms appear.'"
         },
         {
-            "phase": "Cohort Exclusivity",
-            "talking_point": "Reassure cohort safety: 'We strictly cap this retreat at 12 to 14 guests. This ensures you never feel like part of a crowd, and every somatic session is dialed into your personal baseline.'"
+            "phase": "Intimate Group Exclusivity",
+            "talking_point": "Reassure small group safety: 'We strictly cap this retreat at 12 to 14 guests. This ensures you never feel like part of a crowd, and every somatic session is dialed into your personal baseline.'"
         },
         {
             "phase": "Grand Travel Logistics Ease",
@@ -218,7 +217,7 @@ def generate_pre_call_thesis(
         },
         {
             "objection": "Somatic / Breathwork Apprehension",
-            "clinical_script": "Reassure guest that as a Registered Nurse, Kareena titrates all sessions safely. There is no forced hyperventilation or extreme physical strain—everything is voluntary, gentle, and medically grounded."
+            "clinical_script": "Reassure guest that as a Registered Nurse, Kareena gently adapts all sessions safely. There is no forced hyperventilation or extreme physical strain—everything is voluntary, gentle, and medically grounded."
         },
         {
             "objection": "Private Villa vs Shared Ocean Pavilion",

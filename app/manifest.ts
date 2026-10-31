@@ -22,5 +22,21 @@ export default function manifest(): MetadataRoute.Manifest {
         type: "image/png",
       },
     ],
+    shortcuts: [
+      {
+        name: "My Retreat Hub",
+        short_name: "Companion",
+        description: "Access your somatic schedule, flight details, and sanctuary companion",
+        url: "/my-retreat",
+        icons: [{ src: "/icon.png", sizes: "192x192" }],
+      },
+      {
+        name: "Explore Sanctuaries",
+        short_name: "Sanctuaries",
+        description: "View upcoming luxury wellness retreats",
+        url: "/retreats",
+        icons: [{ src: "/icon.png", sizes: "192x192" }],
+      },
+    ],
   };
 }

@@ -1,7 +1,7 @@
 import time
 import httpx
 from typing import Dict, Any, Tuple, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 # 15-minute In-Memory TTL Cache: (lat, lon) -> (timestamp, forecast_dict)
 _WEATHER_CACHE: Dict[Tuple[float, float], Tuple[float, Dict[str, Any]]] = {}
@@ -103,7 +103,7 @@ def fetch_sanctuary_weather_sync(sanctuary_slug: str = "nosara") -> Dict[str, An
         "sunset_sound_bath_recommendation": sunset_win,
         "nurse_somatic_guidance": guidance,
         "cached": False,
-        "fetched_at": datetime.utcnow().strftime("%I:%M %p UTC")
+        "fetched_at": datetime.now(timezone.utc).strftime("%I:%M %p UTC")
     }
     _WEATHER_CACHE[cache_key] = (now, fallback_result)
     return fallback_result
@@ -153,7 +153,7 @@ async def fetch_sanctuary_weather(
 
     url = (
         f"https://api.open-meteo.com/v1/forecast"
-        f"?latitude={lat}&longitude={lon}"
+        f"?latitude={target_lat}&longitude={target_lon}"
         f"&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m"
         f"&daily=uv_index_max&timezone=auto"
     )
@@ -190,7 +190,7 @@ async def fetch_sanctuary_weather(
                     "sunset_sound_bath_recommendation": sunset_win,
                     "nurse_somatic_guidance": guidance,
                     "cached": False,
-                    "fetched_at": datetime.utcnow().strftime("%I:%M %p UTC")
+                    "fetched_at": datetime.now(timezone.utc).strftime("%I:%M %p UTC")
                 }
 
                 # Store in cache
@@ -220,7 +220,7 @@ async def fetch_sanctuary_weather(
         "sunset_sound_bath_recommendation": sunset_win,
         "nurse_somatic_guidance": guidance,
         "cached": False,
-        "fetched_at": datetime.utcnow().strftime("%I:%M %p UTC")
+        "fetched_at": datetime.now(timezone.utc).strftime("%I:%M %p UTC")
     }
 
     _WEATHER_CACHE[cache_key] = (now, fallback_result)

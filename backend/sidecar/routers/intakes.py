@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile
 from sqlalchemy.orm import Session
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
+import re
 
 from backend.database import get_db
 from backend.sidecar.models import StagingIntake
+from backend.models import ActionDraft
 from backend.sidecar.schemas import (
     StagingIntakeBase,
     StagingIntakeResponse,
@@ -12,12 +14,16 @@ from backend.sidecar.schemas import (
     PreCallThesisGenerateRequest,
     TernSyncRequest,
     TernSyncResponse,
-    SanctuaryCohortStatus
+    SanctuaryCohortStatus,
+    VoiceMemoRequest,
+    VoiceMemoResponse,
 )
 from backend.sidecar.services.thesis_rag import generate_pre_call_thesis, seed_sanctuary_knowledge
 from backend.sidecar.services.tern_client import tern_client
+from backend.sidecar.services.voice_transcriber import extract_entities_from_transcript
+from backend.sidecar.services.llm_service import transcribe_audio, LLMServiceError
 
-router = APIRouter(prefix="/intakes", tags=["Tern Sidecar: Staged Intakes & Pre-Call Thesis"])
+router = APIRouter(prefix="/intakes", tags=["Tern Sidecar: Guest Inquiries & Conversation Guides"])
 
 
 @router.post("", response_model=StagingIntakeResponse)
@@ -29,7 +35,12 @@ def create_staged_intake(
     Creates a new staged guest intake awaiting founder review and Tern CRM sync.
     MANDATORY GOVERNANCE: ZERO DIRECT AUTONOMOUS WRITES TO TERN CRM.
     """
-    existing = db.query(StagingIntake).filter(StagingIntake.email == str(payload.email)).first()
+    target_slug = payload.sanctuary_slug or "nosara"
+    existing = db.query(StagingIntake).filter(
+        StagingIntake.email == str(payload.email),
+        StagingIntake.sanctuary_slug == target_slug,
+        StagingIntake.status == "PENDING_APPROVAL"
+    ).first()
     if existing:
         return existing
 
@@ -43,13 +54,19 @@ def create_staged_intake(
         flight_request=payload.flight_request
     )
 
+    wellness_prof = payload.wellness_profile or {}
+    clin_prof = payload.clinical_profile or {}
+    screening_enabled = payload.clinical_screening_enabled or bool(clin_prof)
+
     intake = StagingIntake(
         client_name=payload.client_name,
         email=str(payload.email),
         phone=payload.phone,
         sanctuary_slug=payload.sanctuary_slug or "nosara",
         room_tier=payload.room_tier or "Private Ocean Canopy Villa",
-        clinical_profile=payload.clinical_profile or {},
+        wellness_profile=wellness_prof,
+        clinical_screening_enabled=screening_enabled,
+        clinical_profile=clin_prof,
         flight_request=payload.flight_request,
         consultation_thesis=thesis,
         status="PENDING_APPROVAL"
@@ -57,7 +74,117 @@ def create_staged_intake(
     db.add(intake)
     db.commit()
     db.refresh(intake)
+
+    # Push auto task to Action Drafts review queue
+    from backend.models import ActionDraft
+    draft = ActionDraft(
+        type="guest_intake",
+        guest_name=payload.client_name,
+        content=f"Restorative guest intake staged for {payload.client_name} ({payload.sanctuary_slug or 'nosara'}). Status: PENDING_APPROVAL. Awaiting founder review and Tern CRM synchronization."
+    )
+    db.add(draft)
+    db.commit()
+
     return intake
+
+
+MAX_VOICE_MEMO_BYTES = 20 * 1024 * 1024
+
+
+@router.post("/voice-memo/transcribe")
+async def transcribe_voice_memo(file: UploadFile = File(...)):
+    """
+    Transcribes a recorded founder voice memo with Groq Whisper.
+    Returns the transcript for review; staging happens only when it is submitted to /voice-memo.
+    """
+    audio = await file.read()
+    if not audio:
+        raise HTTPException(status_code=400, detail="The recording is empty.")
+    if len(audio) > MAX_VOICE_MEMO_BYTES:
+        raise HTTPException(status_code=413, detail="Recording is over 20 MB. Record a shorter note.")
+    try:
+        transcript = transcribe_audio(
+            audio,
+            filename=file.filename or "voice-memo.webm",
+            prompt="KAI Wellness Retreats founder voice note about a guest: names, retreat dates, rooms, flights, dietary needs.",
+        )
+    except LLMServiceError as e:
+        raise HTTPException(status_code=502, detail=f"{e.message} {e.diagnostic_hint}")
+    if not transcript:
+        raise HTTPException(status_code=422, detail="No speech was detected in the recording.")
+    return {"transcript": transcript}
+
+
+@router.post("/voice-memo", response_model=VoiceMemoResponse)
+def stage_intake_from_voice_memo(
+    payload: VoiceMemoRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Founder Superpowers: Kareena's AI Voice Note-to-Dossier Transcriber.
+    Parses natural language consultation dictation into structured StagingIntake,
+    generates pre-call thesis, and stages a personalized pre-arrival welcome email
+    in ActionDrafts with status pending_review (Zero Autonomous Writes).
+    """
+    if not payload.raw_transcript or not payload.raw_transcript.strip():
+        raise HTTPException(status_code=400, detail="Voice transcript cannot be empty.")
+
+    extracted = extract_entities_from_transcript(payload.raw_transcript)
+
+    # Ensure unique email if guest exists
+    existing = db.query(StagingIntake).filter(StagingIntake.email == extracted["email"]).first()
+    if existing:
+        import uuid
+        clean_name = re.sub(r'[^a-zA-Z0-9]+', '.', extracted['client_name'].lower()).strip('.')
+        extracted["email"] = f"{clean_name}.{uuid.uuid4().hex[:4]}@vip.kai"
+
+    seed_sanctuary_knowledge(db)
+
+    thesis = generate_pre_call_thesis(
+        client_name=extracted["client_name"],
+        sanctuary_slug=extracted["sanctuary_slug"],
+        room_tier=extracted["room_tier"],
+        clinical_profile=extracted["clinical_profile"],
+        flight_request=extracted["flight_request"]
+    )
+
+    intake = StagingIntake(
+        client_name=extracted["client_name"],
+        email=extracted["email"],
+        phone=extracted.get("phone", "+1 (312) 555-0199"),
+        sanctuary_slug=extracted["sanctuary_slug"],
+        room_tier=extracted["room_tier"],
+        wellness_profile=extracted["wellness_profile"],
+        clinical_screening_enabled=extracted["clinical_screening_enabled"],
+        clinical_profile=extracted["clinical_profile"],
+        flight_request=extracted["flight_request"],
+        consultation_thesis=thesis,
+        status="PENDING_APPROVAL"
+    )
+    db.add(intake)
+    db.commit()
+    db.refresh(intake)
+
+    # Zero Autonomous Writes: Stage ActionDraft for founder review
+    action_draft = ActionDraft(
+        type="guest_email_confirmation",
+        guest_name=extracted["client_name"],
+        content=extracted["welcome_email_draft"],
+        status="pending_review"
+    )
+    db.add(action_draft)
+    db.commit()
+    db.refresh(action_draft)
+
+    return VoiceMemoResponse(
+        success=True,
+        message=f"Voice memo transcribed and staged as StagingIntake for {extracted['client_name']}. Action draft #{action_draft.id} staged with pending_review.",
+        intake_id=intake.id,
+        action_draft_id=action_draft.id,
+        extracted_data=extracted,
+        status="PENDING_APPROVAL"
+    )
+
 
 
 @router.get("", response_model=List[StagingIntakeResponse])
@@ -128,7 +255,7 @@ def get_cohort_capacities(db: Session = Depends(get_db)):
 @router.post("/seed-demo", response_model=List[StagingIntakeResponse])
 def seed_demo_intakes(db: Session = Depends(get_db)):
     """
-    Seeds rich demonstration intakes into staging_intakes with pre-call theses,
+    Seeds rich demonstration intakes into staging_intakes with conversation guides,
     clinical profiles, and flight requests for operator cockpit testing.
     """
     seed_sanctuary_knowledge(db)
@@ -143,8 +270,8 @@ def seed_demo_intakes(db: Session = Depends(get_db)):
             "room_tier": "Private Villa Sanctuary",
             "clinical_profile": {
                 "movement_experience": "Gentle / Beginner",
-                "health_notes": "High cognitive overload, sympathetic nervous exhaustion, early morning waking / insomnia.",
-                "intentions": "Nervous system decompression, restorative vagal resetting, and unbroken delta sleep.",
+                "health_notes": "High mental burnout, chronic nervous system exhaustion, early morning waking / insomnia.",
+                "intentions": "Deep nervous system decompression, peaceful restorative renewal, and unbroken sleep.",
                 "passport_valid": "yes-valid-6mo"
             },
             "flight_request": {
@@ -224,7 +351,7 @@ def seed_demo_intakes(db: Session = Depends(get_db)):
             "reviewed_by": "Kareena Islam",
             "tern_trip_id": "tern_trp_demo9911",
             "tern_contact_id": "tern_cnt_demo4422",
-            "synced_at": datetime.utcnow()
+            "synced_at": datetime.now(timezone.utc)
         }
     ]
 
@@ -302,6 +429,10 @@ def update_staged_intake(
         intake.sanctuary_slug = payload.sanctuary_slug
     if payload.room_tier is not None:
         intake.room_tier = payload.room_tier
+    if payload.wellness_profile is not None:
+        intake.wellness_profile = payload.wellness_profile
+    if payload.clinical_screening_enabled is not None:
+        intake.clinical_screening_enabled = payload.clinical_screening_enabled
     if payload.clinical_profile is not None:
         intake.clinical_profile = payload.clinical_profile
     if payload.flight_request is not None:
@@ -395,7 +526,7 @@ def authorize_tern_crm_sync(
     intake.reviewed_by = payload.operator_name
     intake.tern_contact_id = sync_result["tern_contact_id"]
     intake.tern_trip_id = sync_result["tern_trip_id"]
-    intake.synced_at = datetime.utcnow()
+    intake.synced_at = datetime.now(timezone.utc)
     if payload.override_room_tier:
         intake.room_tier = payload.override_room_tier
 
@@ -404,7 +535,7 @@ def authorize_tern_crm_sync(
 
     return TernSyncResponse(
         success=True,
-        message=f"Successfully authorized and synchronized intake into Tern CRM with clinical tags.",
+        message="Successfully authorized and synchronized intake into Tern CRM with clinical tags.",
         intake_id=intake.id,
         tern_contact_id=sync_result["tern_contact_id"],
         tern_trip_id=sync_result["tern_trip_id"],

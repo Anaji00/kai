@@ -1,21 +1,15 @@
 import logging
-from datetime import datetime, timedelta
-from typing import Dict, Any, List
+from datetime import datetime, timezone, timedelta
+from typing import Dict, Any
 from sqlalchemy.orm import Session
 
 from backend.database import SessionLocal, init_db
+from backend.models import ActionDraft
 from backend.sidecar.models import (
     StagingIntake,
     VendorSupplierRecord,
     StagedLead,
     CalendarEvent,
-    CuratedDiningSpot,
-    DestinationReview,
-    SanctuaryRoute,
-    SomaticPointOfInterest,
-    SmsDispatch,
-    StagedEmail,
-    SanctuaryKnowledge
 )
 from backend.sidecar.services.thesis_rag import seed_sanctuary_knowledge, generate_pre_call_thesis
 from backend.sidecar.services.geo_routing_service import seed_default_routes_and_pois_if_empty
@@ -365,8 +359,8 @@ SYNTHETIC_CALENDAR_EVENTS = [
         "title": "Pre-Call Consultation: Frank Lucas (3-Night Custom Nosara)",
         "sanctuary_slug": "nosara",
         "category": "CONSULTATION",
-        "start_time": datetime.utcnow() + timedelta(days=1, hours=2),
-        "end_time": datetime.utcnow() + timedelta(days=1, hours=2, minutes=20),
+        "start_time": datetime.now(timezone.utc) + timedelta(days=1, hours=2),
+        "end_time": datetime.now(timezone.utc) + timedelta(days=1, hours=2, minutes=20),
         "guest_name": "Frank Lucas",
         "location": "Zoom Telehealth / Tern VIP Audio Bridge",
         "notes": "Review 3-night restorative immersion, Private Ocean Canopy Villa, 30% Tern deposit ($1,710), and private tarmac transfer."
@@ -375,8 +369,8 @@ SYNTHETIC_CALENDAR_EVENTS = [
         "title": "Pre-Call Consultation: Eleanor Vance (Nosara Nervous System Reset)",
         "sanctuary_slug": "nosara",
         "category": "CONSULTATION",
-        "start_time": datetime.utcnow() + timedelta(days=2, hours=4),
-        "end_time": datetime.utcnow() + timedelta(days=2, hours=4, minutes=20),
+        "start_time": datetime.now(timezone.utc) + timedelta(days=2, hours=4),
+        "end_time": datetime.now(timezone.utc) + timedelta(days=2, hours=4, minutes=20),
         "guest_name": "Eleanor Vance",
         "location": "Zoom Telehealth / Tern VIP Audio Bridge",
         "notes": "Address corporate burnout, sleep restoration protocols, and private lie-flat air desk routing via Grand Travel."
@@ -446,7 +440,7 @@ def seed_all_synthetic_data(db: Session, force_reset: bool = False) -> Dict[str,
                 status=itk["status"],
                 tern_contact_id=itk.get("tern_contact_id"),
                 tern_trip_id=itk.get("tern_trip_id"),
-                synced_at=datetime.utcnow() if itk["status"] == "SYNCED_TO_TERN" else None
+                synced_at=datetime.now(timezone.utc) if itk["status"] == "SYNCED_TO_TERN" else None
             )
             db.add(record)
             counts["intakes_created"] += 1
@@ -512,13 +506,105 @@ def seed_all_synthetic_data(db: Session, force_reset: bool = False) -> Dict[str,
             db.add(record)
             counts["calendar_events_created"] += 1
 
+    # 6. Synthetic Action Drafts (Founder Review Queue)
+    counts["drafts_created"] = 0
+    synthetic_drafts = [
+        {
+            "type": "flight_delay_chauffeur_update",
+            "guest_name": "Elena Rostova",
+            "content": "FLIGHT DELAY ALERT: Air France AF 066 into LIR delayed by 45 minutes (New ETA: 15:30). Grand Travel flight desk notified. Authorized action: Adjust private tarmac chauffeur suburban dispatch window to 15:45 and send SMS update to guest.",
+            "status": "pending_review"
+        },
+        {
+            "type": "flight_coordination",
+            "guest_name": "Frank Lucas",
+            "content": "Grand Travel 500 Club Lie-Flat Routing: Delta One JFK -> LIR (DL 1928), returning DL 1929. Negotiated corporate contract rate applied ($2,840 savings). Private 4WD tarmac Suburban transfer reserved.",
+            "status": "pending_review"
+        },
+        {
+            "type": "booking_hold",
+            "guest_name": "Eleanor Vance",
+            "content": "Booking Hold & Tern Sync: Eleanor Vance - Nosara Sacred Ocean Canopy Villa (6 Nights). 30% Deposit ($3,450) held pending client authorization. Tags: [KAI_GUEST, COHORT_2026_2027, VIP_RETREAT].",
+            "status": "pending_review"
+        },
+        {
+            "type": "sms_alert",
+            "guest_name": "Sarah Jenkins",
+            "content": "SMS Alert Staged: 'Hi Sarah, your private tarmac chauffeur Carlos is on site at LIR Terminal VIP exit with chilled organic coconut water. Flight AA 1244 gate meet confirmed.'",
+            "status": "pending_review"
+        },
+        {
+            "type": "campaign_broadcast",
+            "guest_name": "Camille Laurent",
+            "content": "Priority SMS Broadcast Staged (VIP Alumni): 'Dear Camille, private invitations for KAI Amalfi Coast May 2027 are now open. 12 suites total with direct Naples tarmac transfers. Reply RETREAT to reserve.'",
+            "status": "pending_review"
+        },
+        {
+            "type": "email_reply",
+            "guest_name": "Kenji Takahashi",
+            "content": "Concierge Email Staged: Confirmation of Balinese Sacred Water Purification and 528Hz acoustic sound entrainment sessions. Private Lotus chauffeur meet arranged at Denpasar (DPS).",
+            "status": "pending_review"
+        },
+        {
+            "type": "outreach",
+            "guest_name": "Dr. Camille Vance",
+            "content": "Partnership Proposal Staged: Clinical referral alliance between River Oaks Longevity & KAI Sanctuary. Includes reciprocal VIP client air benefits via Grand Travel & Cruise Funjet 500 Club.",
+            "status": "pending_review"
+        },
+        {
+            "type": "manifest_discrepancy",
+            "guest_name": "Nosara Manifest Audit",
+            "content": "Manifest Diff Audit: 1 unvouchered guest detected for Sacred Garden Suite (Arrival Nov 14). Grand Travel voucher GT-8812 requires reconciliation with Tern booking record.",
+            "status": "pending_review"
+        },
+        {
+            "type": "clinical_document_review",
+            "guest_name": "Sarah Jenkins",
+            "content": "Clinical Document Review: First trimester pregnancy intake flag. Heat therapy/cold plunge excluded from schedule; 432Hz gentle restorative somatics and maternal tea protocol cleared.",
+            "status": "pending_review"
+        },
+        {
+            "type": "guest_reflection",
+            "guest_name": "Sofia Rossi",
+            "content": "Guest Somatic Reflection (5/5 Stars): 'The acoustic immersion and private cenote stillness restored my parasympathetic tone completely. The seamless tarmac transfer made arrival effortless.' Pending publication to Destination Journal.",
+            "status": "pending_review"
+        },
+        {
+            "type": "priority_circle_welcome",
+            "guest_name": "Helena Berg",
+            "content": "Priority Circle Welcome: New subscriber Helena Berg (h.berg@stockholm-design.se). Staged welcome package with early 2027 retreat access and Grand Travel flight concierge introduction.",
+            "status": "pending_review"
+        },
+        {
+            "type": "post_retreat_integration",
+            "guest_name": "Frank Lucas",
+            "content": "Post-Retreat Integration Protocol: 14-day follow-up vagal integration schedule, telehealth session with Nurse Kareena, and 2027 private hold options via Grand Travel desk.",
+            "status": "pending_review"
+        }
+    ]
+
+    for d in synthetic_drafts:
+        existing = db.query(ActionDraft).filter(
+            ActionDraft.type == d["type"],
+            ActionDraft.guest_name == d["guest_name"]
+        ).first()
+        if not existing:
+            draft = ActionDraft(
+                type=d["type"],
+                guest_name=d["guest_name"],
+                content=d["content"],
+                status=d["status"]
+            )
+            db.add(draft)
+            counts["drafts_created"] += 1
+
     db.commit()
     logger.info(f"Synthetic data seeding completed successfully: {counts}")
     return {
         "status": "success",
         "message": "Comprehensive synthetic test data seeded into database.",
         "counts": counts,
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 

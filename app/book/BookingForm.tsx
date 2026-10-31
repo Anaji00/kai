@@ -84,7 +84,7 @@ export default function BookingForm() {
 
                 <div className="rounded-2xl bg-sand/60 p-3.5 border border-sand-border/70 space-y-1.5 text-xs text-sage/85">
                   <div className="flex justify-between items-center">
-                    <span className="text-sage/60">Cohort Limit:</span>
+                    <span className="text-sage/60">Group Limit (12–14 Guests):</span>
                     <span className="font-medium text-sage">{selectedRetreat.spotsTotal} guests max</span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -127,10 +127,10 @@ export default function BookingForm() {
         <div className="rounded-2xl border border-sand-border bg-sand/40 p-4 space-y-2 text-xs text-sage/80">
           <div className="flex items-center gap-2 font-medium text-sage">
             <ShieldCheck className="h-4 w-4 text-olive shrink-0" />
-            <span>Intimate Cohort Curation</span>
+            <span>Intimate Group Curation</span>
           </div>
           <p className="text-[11px] leading-relaxed text-sage/75">
-            Submitting this inquiry does not require immediate payment. Kareena personally contacts each applicant to ensure the cohort dynamic aligns with your personal restorative intentions.
+            Submitting this inquiry does not require immediate payment. Kareena personally contacts each applicant to ensure the group dynamic aligns with your personal restorative intentions.
           </p>
         </div>
       </div>
@@ -371,7 +371,7 @@ export default function BookingForm() {
                     id="healthNotes"
                     name="healthNotes"
                     rows={3}
-                    placeholder="e.g. Plant-based, gluten-free, joint sensitivity, or recovering from surgery. (All clinical notes are reviewed personally by Kareena Islam)."
+                    placeholder="e.g. Plant-based, gluten-free, joint sensitivity, or recovering from surgery. (All health and wellness notes are reviewed personally by Kareena Islam)."
                     className="w-full rounded-2xl border border-sand-border bg-sand/40 px-4 py-3 text-xs text-sage placeholder:text-sage/40 focus:border-olive focus:outline-none focus:ring-1 focus:ring-olive transition-colors resize-none"
                   />
                 </div>
@@ -410,7 +410,7 @@ export default function BookingForm() {
                 </button>
 
                 <p className="text-center text-[10px] text-sage/60">
-                  By submitting, you consent to receive direct travel and cohort coordination from Kareena Islam & Grand Travel & Cruise.
+                  By submitting, you consent to receive direct travel and retreat coordination from Kareena Islam & Grand Travel & Cruise.
                 </p>
               </form>
             </motion.div>

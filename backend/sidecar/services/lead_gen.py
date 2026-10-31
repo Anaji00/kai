@@ -2,6 +2,7 @@ import logging
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from backend.sidecar.models import StagedLead
+from backend.models import ActionDraft
 
 logger = logging.getLogger("kai_lead_gen")
 
@@ -103,10 +104,10 @@ def discover_and_stage_leads(
         outreach_thesis = (
             f"Target Partner: {item['business_name']} ({item['location']}). "
             f"Specialization: {item['focus']}. "
-            f"Collaboration Thesis: Co-curate an exclusive, private 12–14 guest immersion for their top-tier clientele. "
+            f"Partnership Vision: Co-curate an exclusive, private 12–14 guest immersion for their top-tier clientele. "
             f"KAI provides clinical nurse oversight by Kareena Islam, 4-7-8 vagal restoration protocols, and full VIP flight "
             f"and ground logistics coordinated by Grand Travel & Cruise. Studio founder receives co-host honorarium and "
-            f"customized cohort booking portal."
+            f"customized group booking portal."
         )
 
         lead = StagedLead(
@@ -122,6 +123,15 @@ def discover_and_stage_leads(
         )
         db.add(lead)
         staged_records.append(lead)
+
+        # Stage ActionDraft for B2B partner collaboration
+        draft = ActionDraft(
+            type="partner_outreach",
+            guest_name=item["business_name"],
+            content=f"PROPOSED PARTNER OUTREACH ({item['location']}):\n{outreach_thesis}\nContact: {item['contact_name']} ({item['email']})",
+            status="pending_review"
+        )
+        db.add(draft)
 
     db.commit()
     for rec in staged_records:

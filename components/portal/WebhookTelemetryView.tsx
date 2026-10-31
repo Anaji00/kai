@@ -132,7 +132,7 @@ export default function WebhookTelemetryView() {
             </span>
           </div>
           <p className="text-xs text-stone-400 mt-1">
-            Real-time webhooks and telemetry for Tern CRM, Expedia / Hotel PMS, Grand Travel Flight Desk, and WhatsApp.
+            Real-time webhooks and live status for Tern CRM, Expedia / Hotel PMS, Grand Travel Flight Desk, and WhatsApp.
           </p>
         </div>
 
@@ -261,7 +261,7 @@ export default function WebhookTelemetryView() {
         <div className="flex items-center justify-between px-1">
           <h2 className="text-sm font-semibold text-stone-100 flex items-center gap-2">
             <Code className="w-4 h-4 text-stone-400" />
-            Live Webhook Telemetry Logs
+            Live Webhook &amp; Connection Logs
           </h2>
           <span className="text-xs text-stone-500 font-mono">{logs.length} events logged</span>
         </div>

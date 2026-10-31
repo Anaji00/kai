@@ -1,18 +1,70 @@
 import logging
 import uuid
 from typing import List, Dict, Any, Optional
-from datetime import datetime
-from fastapi import APIRouter, Depends, HTTPException, Query
+from datetime import datetime, timezone
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.sidecar.models import WebhookEventLog
 from backend.sidecar.schemas import WebhookSimulateRequest, WebhookEventLogResponse
 from backend.sidecar.services.hospitality_client import hospitality_service
-from backend.sidecar.services.tern_client import tern_client
+from backend.models import ActionDraft
+from backend.config import settings
 
 logger = logging.getLogger("kai_webhooks_router")
 
-router = APIRouter(prefix="/webhooks", tags=["External Integrations & Webhooks"])
+import secrets
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
+
+security = HTTPBasic()
+
+def verify_admin(credentials: HTTPBasicCredentials = Depends(security)):
+    correct_username = secrets.compare_digest(credentials.username, settings.ADMIN_USERNAME)
+    correct_password = secrets.compare_digest(credentials.password, settings.ADMIN_PASSWORD)
+    if not (correct_username and correct_password):
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect admin username or password",
+            headers={"WWW-Authenticate": "Basic"},
+        )
+    return credentials.username
+
+
+def verify_webhook_secret(
+    x_webhook_secret: Optional[str] = Header(None, alias="X-Webhook-Secret"),
+    x_tern_signature: Optional[str] = Header(None, alias="X-Tern-Signature"),
+):
+    """
+    Validates inbound webhook secret.
+    Rejects invalid secrets across all environments.
+    In production: strictly enforces presence of settings.TERN_WEBHOOK_SECRET.
+    In development: allows missing secret with a logged security audit warning.
+    """
+    configured_secret = settings.TERN_WEBHOOK_SECRET
+    provided = x_webhook_secret or x_tern_signature
+
+    if provided:
+        if not secrets.compare_digest(provided, configured_secret):
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid webhook signature/secret header"
+            )
+        return True
+
+    if settings.ENVIRONMENT == "production":
+        raise HTTPException(
+            status_code=401,
+            detail="Missing required webhook signature/secret header"
+        )
+
+    logger.warning("Inbound webhook accepted without signature verification (development mode).")
+    return True
+
+
+router = APIRouter(
+    prefix="/webhooks",
+    tags=["External Integrations & Webhooks"]
+)
 
 INTEGRATION_PROVIDERS = [
     {
@@ -68,7 +120,7 @@ INTEGRATION_PROVIDERS = [
 ]
 
 
-@router.get("/providers")
+@router.get("/providers", dependencies=[Depends(verify_admin)])
 def get_provider_status():
     """
     Returns health status and connection metadata for all 5 external travel & communication providers.
@@ -76,11 +128,11 @@ def get_provider_status():
     return {
         "providers": INTEGRATION_PROVIDERS,
         "total_active": len(INTEGRATION_PROVIDERS),
-        "last_health_check": datetime.utcnow().isoformat()
+        "last_health_check": datetime.now(timezone.utc).isoformat()
     }
 
 
-@router.get("/events", response_model=List[WebhookEventLogResponse])
+@router.get("/events", response_model=List[WebhookEventLogResponse], dependencies=[Depends(verify_admin)])
 def list_webhook_events(
     provider: Optional[str] = Query(None, description="Filter by provider"),
     status: Optional[str] = Query(None, description="Filter by status (PROCESSED, PENDING, FAILED)"),
@@ -100,7 +152,7 @@ def list_webhook_events(
 
     # If DB is empty, provide realistic sample telemetry for display
     if not logs:
-        sample_time = datetime.utcnow()
+        sample_time = datetime.now(timezone.utc)
         return [
             WebhookEventLogResponse(
                 id="log_sample_tern_01",
@@ -142,61 +194,110 @@ def list_webhook_events(
     ]
 
 
-@router.post("/tern")
+@router.post("/tern", dependencies=[Depends(verify_webhook_secret)])
 def handle_tern_webhook(
     payload: Dict[str, Any],
+    x_event_id: Optional[str] = Header(None, alias="X-Event-ID"),
+    x_delivery_id: Optional[str] = Header(None, alias="X-Delivery-ID"),
     db: Session = Depends(get_db)
 ):
     """
     Handles native inbound Tern webhooks (e.g. public form submission, payment authorization).
+    Enforces idempotency deduplication and stages an action draft for operator confirmation.
     """
+    provider_event_id = x_event_id or x_delivery_id or payload.get("event_id") or payload.get("id")
+    if provider_event_id:
+        existing = db.query(WebhookEventLog).filter(WebhookEventLog.provider_event_id == str(provider_event_id)).first()
+        if existing:
+            logger.info(f"Duplicate Tern webhook ignored (idempotency key: {provider_event_id})")
+            return {
+                "success": True,
+                "duplicate": True,
+                "log_id": existing.id,
+                "provider": "tern_crm",
+                "message": f"Event {provider_event_id} already processed."
+            }
+
     event_type = payload.get("event_type", "tern.event")
     log_id = f"wh_tern_{uuid.uuid4().hex[:8]}"
 
     log = WebhookEventLog(
         id=log_id,
+        provider_event_id=str(provider_event_id) if provider_event_id else None,
         provider="tern_crm",
         event_type=event_type,
         payload_json=payload,
         headers_json={},
         status="PROCESSED",
-        processed_at=datetime.utcnow()
+        processed_at=datetime.now(timezone.utc)
     )
     db.add(log)
+
+    client_name = payload.get("client_name") or payload.get("client") or payload.get("guest_name") or "Tern Guest"
+    trip_id = payload.get("trip_id") or payload.get("tripId") or "TRIP-TERN"
+    amount = payload.get("amount_usd") or payload.get("amount") or "N/A"
+    
+    draft = ActionDraft(
+        type="tern_sync_review",
+        guest_name=client_name,
+        content=(
+            f"Tern CRM Webhook Event: {event_type}\n"
+            f"Client: {client_name} | Trip ID: {trip_id}\n"
+            f"Amount / Status: {amount} | Status: {payload.get('status', 'COMPLETED')}\n\n"
+            f"Approving this draft acknowledges Tern payment authorization and synchronizes guest booking records."
+        ),
+        status="pending_review"
+    )
+    db.add(draft)
     db.commit()
 
-    logger.info(f"Logged inbound Tern webhook: {event_type} ({log_id})")
+    logger.info(f"Logged inbound Tern webhook and staged draft: {event_type} ({log_id})")
     return {
         "success": True,
         "log_id": log_id,
         "provider": "tern_crm",
         "event_type": event_type,
-        "message": "Tern webhook processed successfully."
+        "message": "Tern webhook processed and staged for review."
     }
 
 
-@router.post("/hospitality")
+@router.post("/hospitality", dependencies=[Depends(verify_webhook_secret)])
 def handle_hospitality_webhook(
     payload: Dict[str, Any],
+    x_event_id: Optional[str] = Header(None, alias="X-Event-ID"),
     db: Session = Depends(get_db)
 ):
     """
-    Handles inbound Expedia EPS / Hotel PMS webhooks.
+    Handles inbound Expedia EPS / Hotel PMS webhooks with idempotency deduplication.
     """
     provider = payload.get("provider", "expedia_pms")
     event_type = payload.get("event_type", "hospitality.booking")
+    provider_event_id = x_event_id or payload.get("event_id") or payload.get("id")
+    if provider_event_id:
+        existing = db.query(WebhookEventLog).filter(WebhookEventLog.provider_event_id == str(provider_event_id)).first()
+        if existing:
+            logger.info(f"Duplicate hospitality webhook ignored (idempotency key: {provider_event_id})")
+            return {
+                "success": True,
+                "duplicate": True,
+                "log_id": existing.id,
+                "provider": existing.provider,
+                "message": f"Event {provider_event_id} already processed."
+            }
+
     log_id = f"wh_hosp_{uuid.uuid4().hex[:8]}"
 
     res = hospitality_service.handle_hotel_webhook(provider=provider, event_type=event_type, payload=payload)
 
     log = WebhookEventLog(
         id=log_id,
+        provider_event_id=str(provider_event_id) if provider_event_id else None,
         provider=provider,
         event_type=event_type,
         payload_json=payload,
         headers_json={},
         status="PROCESSED",
-        processed_at=datetime.utcnow()
+        processed_at=datetime.now(timezone.utc)
     )
     db.add(log)
     db.commit()
@@ -208,66 +309,144 @@ def handle_hospitality_webhook(
     }
 
 
-@router.post("/flight-desk")
+@router.post("/flight-desk", dependencies=[Depends(verify_webhook_secret)])
 def handle_flight_desk_webhook(
     payload: Dict[str, Any],
+    x_event_id: Optional[str] = Header(None, alias="X-Event-ID"),
     db: Session = Depends(get_db)
 ):
     """
     Handles inbound Cirium / Grand Travel flight tracking events.
+    When a delay or gate change occurs, stages an ActionDraft for tarmac chauffeur coordination.
     """
     event_type = payload.get("event_type", "flight.status_update")
+    provider_event_id = x_event_id or payload.get("event_id") or payload.get("id")
+    if provider_event_id:
+        existing = db.query(WebhookEventLog).filter(WebhookEventLog.provider_event_id == str(provider_event_id)).first()
+        if existing:
+            logger.info(f"Duplicate flight desk webhook ignored (idempotency key: {provider_event_id})")
+            return {
+                "success": True,
+                "duplicate": True,
+                "log_id": existing.id,
+                "provider": "cirium_flights",
+                "message": f"Event {provider_event_id} already processed."
+            }
+
     log_id = f"wh_flt_{uuid.uuid4().hex[:8]}"
 
     log = WebhookEventLog(
         id=log_id,
+        provider_event_id=str(provider_event_id) if provider_event_id else None,
         provider="cirium_flights",
         event_type=event_type,
         payload_json=payload,
         headers_json={},
         status="PROCESSED",
-        processed_at=datetime.utcnow()
+        processed_at=datetime.now(timezone.utc)
     )
     db.add(log)
+
+    guest_name = payload.get("passenger") or payload.get("guest_name") or "Marcus Aurelius"
+    flight_num = payload.get("flight") or payload.get("flight_number") or "DL 1928"
+    delay_mins = payload.get("delay_minutes", 45)
+    eta = payload.get("eta") or "16:15 UTC"
+
+    draft = ActionDraft(
+        type="flight_delay_chauffeur_update",
+        guest_name=guest_name,
+        content=(
+            f"URGENT Cirium Flight Telemetry Update: Flight {flight_num} for {guest_name}\n"
+            f"Event: {event_type} | Delay: +{delay_mins} mins | New ETA: {eta}\n\n"
+            f"Approving this draft coordinates with Grand Travel Flight Desk and dispatches an updated "
+            f"pickup schedule to the private tarmac chauffeur fleet."
+        ),
+        status="pending_review"
+    )
+    db.add(draft)
     db.commit()
 
-    logger.info(f"Logged inbound Cirium flight webhook: {event_type} ({log_id})")
+    logger.info(f"Logged inbound Cirium flight webhook & staged draft: {event_type} ({log_id})")
     return {
         "success": True,
         "log_id": log_id,
         "provider": "cirium_flights",
         "event_type": event_type,
-        "message": "Cirium flight status update recorded."
+        "message": "Cirium flight status update recorded and staged for chauffeur fleet review."
     }
 
 
-@router.post("/simulate")
+@router.post("/simulate", dependencies=[Depends(verify_admin)])
 def simulate_webhook(
     req: WebhookSimulateRequest,
     db: Session = Depends(get_db)
 ):
     """
     Simulates an incoming webhook from any external provider (Tern, Expedia, Cirium, WhatsApp, Resend).
-    Validates end-to-end telemetry resilience and logs the event.
+    Validates end-to-end telemetry resilience and stages ActionDrafts for Cirium & Tern events.
     """
+    provider_event_id = (req.payload or {}).get("event_id") or (req.payload or {}).get("id")
+    if provider_event_id:
+        existing = db.query(WebhookEventLog).filter(WebhookEventLog.provider_event_id == str(provider_event_id)).first()
+        if existing:
+            logger.info(f"Duplicate simulated webhook ignored (idempotency key: {provider_event_id})")
+            return {
+                "success": True,
+                "duplicate": True,
+                "log_id": existing.id,
+                "provider": req.provider,
+                "event_type": req.event_type,
+                "message": f"Event {provider_event_id} already processed."
+            }
+
     log_id = f"wh_sim_{uuid.uuid4().hex[:8]}"
     
     log = WebhookEventLog(
         id=log_id,
+        provider_event_id=str(provider_event_id) if provider_event_id else None,
         provider=req.provider,
         event_type=req.event_type,
-        payload_json=req.payload or {"simulated": True, "timestamp": datetime.utcnow().isoformat()},
+        payload_json=req.payload or {"simulated": True, "timestamp": datetime.now(timezone.utc).isoformat()},
         headers_json={},
         status="PROCESSED",
-        processed_at=datetime.utcnow()
+        processed_at=datetime.now(timezone.utc)
     )
     db.add(log)
+
+    # Bridge simulation into Action Review Queue
+    if req.provider == "cirium_flights":
+        guest = (req.payload or {}).get("passenger") or (req.payload or {}).get("guest_name") or "Eleanor Vance"
+        flight = (req.payload or {}).get("flight") or "AA 1244"
+        draft = ActionDraft(
+            type="flight_delay_chauffeur_update",
+            guest_name=guest,
+            content=(
+                f"Simulated Cirium Flight Delay ({flight}):\n"
+                f"Passenger: {guest} | Status: DELAYED (+45 mins)\n"
+                f"Requires private tarmac chauffeur schedule adjustment at Liberia Airport (LIR)."
+            ),
+            status="pending_review"
+        )
+        db.add(draft)
+    elif req.provider == "tern_crm":
+        guest = (req.payload or {}).get("client") or (req.payload or {}).get("client_name") or "Sarah Jenkins"
+        draft = ActionDraft(
+            type="tern_sync_review",
+            guest_name=guest,
+            content=(
+                f"Simulated Tern CRM Authorization ({req.event_type}):\n"
+                f"Client: {guest} | 30% Deposit Hold Authorized\n"
+                f"Tern native credit card processing confirmed. Ready to finalize room block."
+            ),
+            status="pending_review"
+        )
+        db.add(draft)
+
     db.commit()
 
     return {
         "success": True,
         "log_id": log_id,
-
         "provider": req.provider,
         "event_type": req.event_type,
         "status": "PROCESSED",

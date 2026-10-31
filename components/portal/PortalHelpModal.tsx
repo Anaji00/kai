@@ -35,7 +35,7 @@ const TOOL_ENTRIES = [
     title: "Founder Sanctuary Studio",
     subtitle: "Your Executive Home Base",
     icon: Compass,
-    layman: "Your serene central desk. Here you can see intimate retreat spaces, guest inquiries, urgent clinical questions, and today's schedule at a single glance.",
+    layman: "Your serene central desk. Here you can see intimate retreat spaces, guest inquiries, urgent guest questions, and today's schedule at a single glance.",
     why_it_matters: "Keeps your daily workflow clear and calm without complex spreadsheets or multiple software tabs."
   },
   {
@@ -59,7 +59,7 @@ const TOOL_ENTRIES = [
     title: "Nourishing Dining & Gut Health",
     subtitle: "Organic, Blue Zone & Dietary Harmony",
     icon: Utensils,
-    layman: "A curated guide to local farm-to-table dining, organic cafes, and Blue Zone restaurants near each retreat. Filter easily by gluten-free, dairy-free, Low-FODMAP, or Ayurvedic dietary needs with clinical RN digestion notes.",
+    layman: "A curated guide to local farm-to-table dining, organic cafes, and Blue Zone restaurants near each retreat. Filter easily by gluten-free, dairy-free, Low-FODMAP, or Ayurvedic dietary needs with wellness digestion notes.",
     why_it_matters: "Guarantees every meal honors guest dietary restrictions and supports restorative gut health."
   },
   {
@@ -83,7 +83,7 @@ const TOOL_ENTRIES = [
     title: "Guest Documents & Health Notes",
     subtitle: "Secure Intake PDF & Doctor Note Screening",
     icon: Paperclip,
-    layman: "A secure drop-zone for guest intake forms, doctor clearance letters, and travel manifests. Automatically screens for clinical contraindications (like cardiac history or pregnancy) and extracts key dates.",
+    layman: "A secure drop-zone for guest intake forms, doctor clearance letters, and travel manifests. Automatically screens for health considerations (like cardiac history or pregnancy) and extracts key dates.",
     why_it_matters: "Ensures Kareena Islam, BSN, RN never misses a critical health consideration before welcoming a guest."
   },
   {
@@ -91,31 +91,31 @@ const TOOL_ENTRIES = [
     title: "Tern Guest & Travel Planner",
     subtitle: "Itineraries & Zero-Liability Payments",
     icon: CreditCard,
-    layman: "Connects your guest details, custom restorative arcs, and flight itineraries directly with Tern CRM. All published proposals include Tern's native credit card authorizations and payment schedules.",
+    layman: "Connects your guest details, custom retreat itineraries, and flight itineraries directly with Tern CRM. All published proposals include Tern's native credit card authorizations and payment schedules.",
     why_it_matters: "You never have to handle credit card numbers or build payment gateways yourself. Tern manages client authorizations, terms waivers, and PCI security 100% natively."
   },
   {
     key: "founder_approval",
     title: "Personalized Founder Approval",
-    subtitle: "Zero Autonomous Writes Guarantee",
+    subtitle: "Founder Approval Guarantee (No Unapproved Messages)",
     icon: ShieldCheck,
     layman: "A protective safety shield ensuring no information or email is ever sent to external travel platforms or guests without your personal 1-click review and blessing.",
-    why_it_matters: "Protects your high-touch clinical reputation and ensures every guest communication reflects your personal care as a Registered Nurse."
+    why_it_matters: "Protects your high-touch reputation and ensures every guest communication reflects your personal care as a Expert Guide."
   },
   {
     key: "clinical_copilot",
-    title: "AI Clinical Copilot (KAI Brain)",
+    title: "AI Copilot (KAI Brain)",
     subtitle: "Your Chief of Staff & Nurse Guide",
     icon: Sparkles,
-    layman: "An intelligent companion for Kareena with 4 helpful modes: screens guest contraindications, drafts consultation emails, searches scenic road routes, checks live weather windows, finds Blue Zone dining spots, and ingests intake PDFs.",
-    why_it_matters: "Saves hours of preparation time before consultations and ensures every guest's clinical safety is reviewed thoroughly."
+    layman: "An intelligent companion for Kareena with 4 helpful modes: screens guest health considerations, drafts consultation emails, searches scenic road routes, checks live weather windows, finds Blue Zone dining spots, and ingests intake PDFs.",
+    why_it_matters: "Saves hours of preparation time before consultations and ensures every guest's guest safety is reviewed thoroughly."
   },
   {
     key: "retreat_calendar",
     title: "Retreat & Alignment Calendar",
-    subtitle: "Cohorts, Consultations & Smart Flights",
+    subtitle: "Retreat Groups, Consultations & Smart Flights",
     icon: Calendar,
-    layman: "A visual schedule of 6-day retreat cohort dates, 20-minute consultation calls, and airport flight arrivals with live Cirium flight tracking.",
+    layman: "A visual schedule of 6-day retreat group dates, 20-minute consultation calls, and airport flight arrivals with live Cirium flight tracking.",
     why_it_matters: "Includes a 1-click live calendar feed (.ics) that syncs automatically with your iPhone or Google Calendar so you never miss a guest alignment call."
   },
   {
@@ -129,7 +129,7 @@ const TOOL_ENTRIES = [
   {
     key: "guest_list_check",
     title: "Guest List & Booking Check",
-    subtitle: "Vouchers & Manifest Diffs Made Simple",
+    subtitle: "Vouchers & Manifest Check Made Simple",
     icon: FileSpreadsheet,
     layman: "Compares your website registrations with confirmed Tern traveler files to catch any missing dietary requirements, flight routing, or room tier mismatches.",
     why_it_matters: "Ensures every single guest is accounted for and well looked after before arrival."
@@ -147,13 +147,13 @@ const TOOL_ENTRIES = [
     title: "Grand Travel Flight Desk",
     subtitle: "VIP Air & Real-Time Flight Tracking",
     icon: Plane,
-    layman: "Coordinates preferred transcontinental airfare, lie-flat seat blocks, and live Cirium flight telemetry in partnership with Grand Travel & Cruise (Funjet 500 Club).",
+    layman: "Coordinates preferred transcontinental airfare, lie-flat seat blocks, and live Cirium flight radar in partnership with Grand Travel & Cruise (Funjet 500 Club).",
     why_it_matters: "If a flight is delayed, your private tarmac chauffeurs receive real-time alerts automatically so guests never feel stranded."
   },
   {
     key: "integrations_webhooks",
     title: "External Travel & Service Connections",
-    subtitle: "Multi-Provider Telemetry Hub",
+    subtitle: "Multi-Provider Integration Hub",
     icon: Globe2,
     layman: "A visual health center displaying live connections to Tern CRM, Expedia / Hotel PMS, Grand Travel Flight Desk, and WhatsApp Cloud.",
     why_it_matters: "Keeps your systems in harmony so updates flow quietly in the background without technical headaches."
@@ -167,7 +167,7 @@ const FAQS = [
   },
   {
     q: "Can the AI or system send emails or create bookings without my knowledge?",
-    a: "Absolutely not. KAI operates under a strict 'Zero Autonomous Writes' rule. Every draft email, itinerary sync, or WhatsApp card requires your direct 1-click review and authorization."
+    a: "Absolutely not. KAI operates under a strict 'Zero Unapproved Sends' rule. Every draft email, itinerary sync, or WhatsApp card requires your direct 1-click review and authorization."
   },
   {
     q: "How do I calculate driving routes and private chauffeur times for guests?",
@@ -179,19 +179,19 @@ const FAQS = [
   },
   {
     q: "How can I upload intake PDFs and health forms for automatic screening?",
-    a: "Open the AI Copilot (KAI Brain) in the bottom-right corner and click the paperclip attachment icon. Upload any guest intake PDF, doctor's note, or CSV manifest up to 10MB. The system immediately scans for clinical health considerations (like cardiac conditions, pregnancy, or epilepsy) and presents an executive summary."
+    a: "Open the AI Copilot (KAI Brain) in the bottom-right corner and click the paperclip attachment icon. Upload any guest intake PDF, doctor's note, or CSV manifest up to 10MB. The system immediately scans for health considerations (like cardiac conditions, pregnancy, or epilepsy) and presents an executive summary."
   },
   {
     q: "Can I use voice dictation instead of typing questions to the Copilot?",
     a: "Yes! Simply click the microphone icon inside the Copilot drawer. Speak naturally into your device, and your words will be transcribed directly into the prompt box."
   },
   {
-    q: "What is an intimate cohort cap and why is it 12–14 guests?",
-    a: "To protect the nervous system restoration of our guests and ensure individualized clinical attention from Kareena Islam (BSN, RN), every retreat cohort is strictly capped at 12 to 14 guests. The studio alerts you whenever a cohort is nearing full capacity."
+    q: "What is the intimate group limit and why is it 12–14 guests?",
+    a: "To protect the nervous system restoration of our guests and ensure individualized attention from Kareena Islam, every retreat group is strictly limited to 12 to 14 guests. The studio alerts you whenever a group is nearing full capacity."
   },
   {
     q: "How does the Retreat Calendar sync with my personal phone?",
-    a: "Navigate to the Retreat Calendar page and click 'Subscribe to iCal Feed'. You can paste that link into Apple Calendar (iPhone/Mac) or Google Calendar to have all cohorts, 20-min consults, and flight arrivals show up on your phone automatically."
+    a: "Navigate to the Retreat Calendar page and click 'Subscribe to iCal Feed'. You can paste that link into Apple Calendar (iPhone/Mac) or Google Calendar to have all retreat groups, 20-min consults, and flight arrivals show up on your phone automatically."
   }
 ];
 
@@ -334,8 +334,8 @@ export default function PortalHelpModal({ isOpen, onClose }: PortalHelpModalProp
                   },
                   {
                     step: "2",
-                    title: "Run Clinical Copilot Screening",
-                    text: "Click 'AI Clinical Copilot' in the lower corner to screen guest health considerations (e.g. breathwork contraindications or cold plunge readiness) and generate pre-call talking tracks."
+                    title: "Run AI Copilot Screening",
+                    text: "Click 'AI Copilot' in the lower corner to screen guest health considerations (e.g. breathwork contraindications or cold plunge readiness) and generate pre-call talking tracks."
                   },
                   {
                     step: "3",

@@ -1,6 +1,6 @@
 import logging
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from backend.database import get_db
@@ -130,8 +130,8 @@ def force_sync_vendor_to_tern(
     vendor.tern_supplier_id = sync_res["tern_supplier_id"]
     vendor.tern_deep_link = sync_res["tern_deep_link"]
     vendor.tern_sync_status = "SYNCED"
-    vendor.last_synced_at = datetime.utcnow()
-    vendor.updated_at = datetime.utcnow()
+    vendor.last_synced_at = datetime.now(timezone.utc)
+    vendor.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(vendor)
     invalidate_vendor_cache()

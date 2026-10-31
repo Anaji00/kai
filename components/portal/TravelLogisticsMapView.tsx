@@ -54,13 +54,12 @@ type ActiveTab = "routes" | "weather" | "dining" | "reviews" | "destination";
 export default function TravelLogisticsMapView() {
   const [selectedSlug, setSelectedSlug] = useState("nosara");
   const [activeTab, setActiveTab] = useState<ActiveTab>("routes");
-  const [viewMode, setViewMode] = useState<"client" | "clinical">("client");
-
+  
   useEffect(() => {
     const handleProposal = (prop: FormFillProposal) => {
       const f = prop.fields || prop.payload || {};
       if (f.sanctuary_slug) {
-        setSelectedSlug(f.sanctuary_slug.replace("-", "_"));
+        setSelectedSlug((f.sanctuary_slug as string).replace("-", "_"));
       }
       if (prop.form_type === "route_calculator") {
         setActiveTab("routes");
@@ -137,37 +136,7 @@ export default function TravelLogisticsMapView() {
               </div>
             </div>
 
-            {/* Dual Perspective Toggle */}
-            <div>
-              <label className="block text-[10px] uppercase font-bold text-[#5C6B5E] tracking-wider mb-1">
-                Perspective Mode
-              </label>
-              <div className="flex p-1 bg-white border border-[#E5DDD0] rounded-xl shadow-sm">
-                <button
-                  type="button"
-                  onClick={() => setViewMode("client")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${viewMode === "client"
-                      ? "bg-[#2D3E35] text-[#FAF7F2] shadow-sm font-semibold"
-                      : "text-[#5C6B5E] hover:text-[#2D3E35]"
-                    }`}
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-[#C07D63]" />
-                  <span>Client Care View</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setViewMode("clinical")}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${viewMode === "clinical"
-                      ? "bg-[#2D3E35] text-[#FAF7F2] shadow-sm font-semibold"
-                      : "text-[#5C6B5E] hover:text-[#2D3E35]"
-                    }`}
-                >
-                  <HeartPulse className="w-3.5 h-3.5 text-rose-400" />
-                  <span>Clinical RN View</span>
-                </button>
-              </div>
             </div>
-          </div>
         </div>
 
         {/* Selected Sanctuary Quick Context Bar */}
@@ -186,9 +155,7 @@ export default function TravelLogisticsMapView() {
           <div className="flex items-center gap-2 text-[11px] text-[#5C6B5E]">
             <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
             <span>
-              {viewMode === "client"
-                ? "Guest presentation ready — calming, hospitable language"
-                : "Clinical telemetry active — nervous system & gut safety filters"}
+              "Guest presentation ready — calming, hospitable language"
             </span>
           </div>
         </div>
@@ -260,19 +227,19 @@ export default function TravelLogisticsMapView() {
       {/* Tab Panels */}
       <div>
         {activeTab === "routes" && (
-          <TravelTransitTab sanctuarySlug={selectedSlug} viewMode={viewMode} />
+          <TravelTransitTab sanctuarySlug={selectedSlug} />
         )}
         {activeTab === "weather" && (
-          <MicroclimateWeatherTab sanctuarySlug={selectedSlug} viewMode={viewMode} />
+          <MicroclimateWeatherTab sanctuarySlug={selectedSlug} />
         )}
         {activeTab === "dining" && (
-          <CuratedDiningTab sanctuarySlug={selectedSlug} viewMode={viewMode} />
+          <CuratedDiningTab sanctuarySlug={selectedSlug} />
         )}
         {activeTab === "reviews" && (
-          <VerifiedReviewsTab sanctuarySlug={selectedSlug} viewMode={viewMode} />
+          <VerifiedReviewsTab sanctuarySlug={selectedSlug} />
         )}
         {activeTab === "destination" && (
-          <DestinationDossierTab sanctuarySlug={selectedSlug} viewMode={viewMode} />
+          <DestinationDossierTab sanctuarySlug={selectedSlug} />
         )}
       </div>
     </div>

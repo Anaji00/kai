@@ -1,6 +1,7 @@
 from typing import List, Optional, Dict, Any, Tuple
 from sqlalchemy.orm import Session
 from backend.sidecar.models import DestinationReview, generate_uuid_str
+from backend.models import ActionDraft
 
 
 def analyze_somatic_sentiment(text: str, rating: float = 5.0) -> Tuple[float, float, float, str]:
@@ -78,9 +79,25 @@ def process_inbound_review_webhook(
         review_text=comment,
         sentiment_label=label,
         source="WEBHOOK",
-        status="PUBLISHED"
+        status="PENDING_REVIEW"
     )
     db.add(review)
+
+    # Stage ActionDraft for founder review and 1-click publication
+    draft = ActionDraft(
+        type="guest_reflection",
+        guest_name=guest_name,
+        content=(
+            f"Inbound Guest Reflection ({sanctuary_slug.title()} Sanctuary):\n"
+            f"Guest: {guest_name} ({stay_dates}) | Rating: {rating}★ ({label})\n"
+            f"Scores: Deep Sleep {sleep_score}/100, Quietude {quiet_score}/100, Attentiveness {care_score}/100\n"
+            f"Reflection: \"{comment}\"\n\n"
+            f"Approving this draft authorizes publishing this reflection to the public website."
+        ),
+        status="pending_review"
+    )
+    db.add(draft)
+
     db.commit()
     db.refresh(review)
     return review

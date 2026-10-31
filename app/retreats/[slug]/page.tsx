@@ -179,7 +179,7 @@ export default async function RetreatDetailPage({ params }: PageProps) {
           <div className="rounded-2xl border border-sand-border bg-linen p-5 space-y-1 text-center sm:text-left">
             <div className="flex items-center justify-center sm:justify-start gap-2 text-olive text-xs font-medium">
               <Users className="h-4 w-4" />
-              <span>Cohort Capacity</span>
+              <span>Group Capacity</span>
             </div>
             <p className="font-serif text-lg text-sage font-normal">
               {retreat.spotsTotal} Guests Max
@@ -222,7 +222,7 @@ export default async function RetreatDetailPage({ params }: PageProps) {
               </p>
             </article>
 
-            {/* 2. Clinical Autonomic Focus */}
+            {/* 2. Nervous System Restorative Focus */}
             <section className="rounded-3xl border border-sand-border bg-sand/50 p-6 sm:p-10 space-y-6">
               <div className="space-y-2">
                 <span className="text-xs uppercase tracking-[0.2em] text-olive font-semibold flex items-center gap-1.5">
@@ -230,7 +230,7 @@ export default async function RetreatDetailPage({ params }: PageProps) {
                   Evidence-Based Grounding
                 </span>
                 <h3 className="font-serif text-2xl sm:text-3xl text-sage font-normal">
-                  The Clinical Science Behind This Journey
+                  The Restorative Science Behind This Journey
                 </h3>
               </div>
 
@@ -421,7 +421,7 @@ export default async function RetreatDetailPage({ params }: PageProps) {
                   href="/book?retreat=custom"
                   className="text-[11px] text-terracotta hover:underline font-medium"
                 >
-                  Inquire for private cohort or custom travel
+                  Inquire for private group or custom travel
                 </Link>
               </div>
             </div>

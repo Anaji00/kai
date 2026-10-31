@@ -1,6 +1,6 @@
 import logging
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 logger = logging.getLogger("kai_hospitality_client")
 
@@ -134,7 +134,7 @@ class HospitalityConnectorService:
             "success": True,
             "provider": provider,
             "event_type": event_type,
-            "processed_at": datetime.utcnow().isoformat(),
+            "processed_at": datetime.now(timezone.utc).isoformat(),
             "notification": f"Hotel webhook {event_type} from {provider} successfully logged."
         }
 

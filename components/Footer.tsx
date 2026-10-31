@@ -38,7 +38,7 @@ export default function Footer() {
             </p>
 
             <p className="text-xs leading-relaxed text-sage/75">
-              Immersive somatic sanctuaries thoughtfully curated by Kareena Islam. Rooted in clinical autonomic science, anatomical yoga, crystal sound resonance, and high-touch luxury travel.
+              Immersive somatic sanctuaries thoughtfully curated by Kareena Islam. Rooted in restorative wellness science, anatomical yoga, crystal sound resonance, and high-touch luxury travel.
             </p>
 
             {/* Social & Partner Badges */}
@@ -98,7 +98,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link href="/book?retreat=custom" className="hover:text-terracotta transition-colors">
-                  Private & Corporate Cohorts
+                  Private & Custom Groups
                 </Link>
               </li>
             </ul>
@@ -147,7 +147,7 @@ export default function Footer() {
           {/* Newsletter / Waitlist */}
           <div className="md:col-span-4 space-y-4">
             <h4 className="text-xs uppercase tracking-[0.2em] font-semibold text-olive">
-              Intimate Cohort Announcements
+              Intimate Retreat Announcements
             </h4>
             <p className="text-xs text-sage/75 leading-relaxed">
               Because our retreats maintain an intimate capacity of 12 to 14 guests, openings are released privately to our circle first.

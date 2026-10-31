@@ -101,21 +101,21 @@ export default function VendorSuppliersRegistry() {
       if (proposal.form_type === "vendor_supplier") {
         const fields = proposal.fields || proposal.payload || {};
         setFormData({
-          name: fields.name || "",
-          category: fields.category || "TRANSPORTATION_CHAUFFEUR",
-          sanctuary_slug: fields.sanctuary_slug || "nosara",
-          contact_name: fields.contact_name || "",
-          email: fields.email || "",
-          phone: fields.phone || "",
-          website: fields.website || "",
-          booking_url_or_code: fields.booking_url_or_code || "",
-          commission_rate: fields.commission_rate ?? 10.0,
-          commission_type: fields.commission_type || "PERCENTAGE",
-          payment_terms: fields.payment_terms || "Tern Native Client Card Auth",
-          lead_time_days: fields.lead_time_days ?? 7,
-          preferred_tier: fields.preferred_tier || "PREFERRED_PARTNER",
-          service_description: fields.service_description || "",
-          clinical_relevance: fields.clinical_relevance || ""
+          name: (fields.name as string) || "",
+          category: (fields.category as string) || "TRANSPORTATION_CHAUFFEUR",
+          sanctuary_slug: (fields.sanctuary_slug as string) || "nosara",
+          contact_name: (fields.contact_name as string) || "",
+          email: (fields.email as string) || "",
+          phone: (fields.phone as string) || "",
+          website: (fields.website as string) || "",
+          booking_url_or_code: (fields.booking_url_or_code as string) || "",
+          commission_rate: (fields.commission_rate as number) ?? 10.0,
+          commission_type: (fields.commission_type as string) || "PERCENTAGE",
+          payment_terms: (fields.payment_terms as string) || "Tern Native Client Card Auth",
+          lead_time_days: (fields.lead_time_days as number) ?? 7,
+          preferred_tier: (fields.preferred_tier as string) || "PREFERRED_PARTNER",
+          service_description: (fields.service_description as string) || "",
+          clinical_relevance: (fields.clinical_relevance as string) || ""
         });
         setModalSource("copilot");
         setIsModalOpen(true);
@@ -194,7 +194,7 @@ export default function VendorSuppliersRegistry() {
               Preferred Vendors & Suppliers
             </h1>
             <p className="text-sm text-[#6b6255] max-w-2xl mt-1">
-              Centralized supplier contracts, commission structures, and clinical certifications synced directly with 
+              Centralized supplier contracts, commission structures, and wellness certifications synced directly with 
               <span className="font-semibold text-[#1e2922]"> Tern Back Office → Suppliers</span>.
             </p>
           </div>
@@ -240,8 +240,8 @@ export default function VendorSuppliersRegistry() {
           <div className="flex items-start gap-2.5">
             <Sparkles className="w-4 h-4 text-[#829e86] shrink-0 mt-0.5" />
             <div>
-              <span className="font-semibold text-[#1e2922] block">Clinical Nervous System Screening</span>
-              <span className="text-[#6b6255]">Nurse Kareena's rationale ensuring quietude, somatic safety, and frictionless transit.</span>
+              <span className="font-semibold text-[#1e2922] block">Guest Nervous System Screening</span>
+              <span className="text-[#6b6255]">Founder Kareena's rationale ensuring quietude, somatic safety, and frictionless transit.</span>
             </div>
           </div>
         </div>
@@ -349,7 +349,7 @@ export default function VendorSuppliersRegistry() {
                   <div className="bg-[#faf8f5] border border-[#eee6db] rounded-xl p-3 mb-4">
                     <div className="flex items-center gap-1.5 text-[10px] font-semibold text-[#829e86] uppercase tracking-wide mb-1">
                       <Heart className="w-3 h-3" />
-                      Nurse Kareena Clinical Rationale
+                      Founder Kareena Rationale
                     </div>
                     <p className="text-[11px] text-[#554e42] leading-normal italic">
                       "{vendor.clinical_relevance}"
@@ -619,13 +619,13 @@ export default function VendorSuppliersRegistry() {
               </div>
 
               <div>
-                <label className="block font-semibold text-[#1e2922] mb-1">Nurse Kareena Clinical Relevance</label>
+                <label className="block font-semibold text-[#1e2922] mb-1">Founder Kareena Relevance</label>
                 <textarea
                   rows={2}
                   value={formData.clinical_relevance || ""}
                   onChange={e => setFormData({ ...formData, clinical_relevance: e.target.value })}
                   className="w-full px-3 py-2 rounded-xl border border-[#d6cfc4] bg-white text-xs focus:ring-2 focus:ring-[#829e86]/40 outline-none"
-                  placeholder="Explain why this partner protects autonomic calm, vagal tone, or emotional privacy."
+                  placeholder="Explain why this partner supports deep rest, peaceful quietude, or guest privacy."
                 />
               </div>
 

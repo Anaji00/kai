@@ -1,8 +1,9 @@
 import os
 import re
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any
 from sqlalchemy.orm import Session
 from backend.sidecar.models import UploadedDocumentRecord, generate_uuid_str
+from backend.models import ActionDraft
 
 MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024  # 10 MB limit
 ALLOWED_EXTENSIONS = {".pdf", ".txt", ".csv", ".json", ".png", ".jpg", ".jpeg"}
@@ -40,10 +41,38 @@ def parse_document_content(
         except Exception:
             text_content = ""
     elif ext == ".pdf":
-        # Safe basic text extraction without requiring heavy binary dependencies
-        # Extract ASCII strings from PDF stream
-        ascii_matches = re.findall(rb"[a-zA-Z0-9\s.,;:'\"()\-@/]{4,}", raw_bytes)
-        text_content = " ".join([m.decode("latin1", errors="ignore") for m in ascii_matches[:500]])
+        text_content = ""
+        try:
+            import io
+            from pypdf import PdfReader
+            reader = PdfReader(io.BytesIO(raw_bytes))
+            pages_text = []
+            for page in reader.pages:
+                extracted = page.extract_text()
+                if extracted:
+                    pages_text.append(extracted)
+            text_content = "\n".join(pages_text).strip()
+        except Exception as pdf_err:
+            import logging
+            logging.getLogger("kai_document_parser").warning(f"pypdf extraction notice: {pdf_err}. Attempting raw stream fallback.")
+
+        # Fallback to zlib & ascii extraction if pypdf produced empty output
+        if not text_content:
+            extracted_chunks = []
+            import zlib
+            for stream_match in re.finditer(rb"stream[\r\n]+(.*?)[\r\n]+endstream", raw_bytes, re.DOTALL):
+                stream_data = stream_match.group(1)
+                try:
+                    decompressed = zlib.decompress(stream_data)
+                    text_matches = re.findall(rb"\(([^\)]+)\)", decompressed)
+                    if text_matches:
+                        extracted_chunks.extend([t.decode("latin1", errors="ignore") for t in text_matches[:100]])
+                except Exception:
+                    pass
+
+            ascii_matches = re.findall(rb"[a-zA-Z0-9\s.,;:'\"()\-@/]{4,}", raw_bytes)
+            extracted_chunks.extend([m.decode("latin1", errors="ignore") for m in ascii_matches[:500]])
+            text_content = " ".join(extracted_chunks[:600])
     else:
         text_content = f"Binary attachment received: {filename}"
 
@@ -87,8 +116,8 @@ def parse_document_content(
     else:
         safety_status = "CLEARED"
         summary = (
-            f"Document safely processed and cleared. All details aligned with sanctuary wellness protocols. "
-            f"Your personal preferences have been saved to your sanctuary care dossier."
+            "Document safely processed and cleared. All details aligned with sanctuary wellness protocols. "
+            "Your personal preferences have been saved to your sanctuary care dossier."
         )
 
     return {
@@ -124,6 +153,24 @@ def store_uploaded_document(
         safety_clearance_status=parsed_info["safety_clearance_status"]
     )
     db.add(record)
+
+    # Stage ActionDraft if clinical contraindications or notes are detected
+    if parsed_info.get("safety_clearance_status") == "ATTENTION_NEEDED" or parsed_info.get("clinical_notes_found"):
+        flag_summary = ", ".join(parsed_info.get("clinical_notes_found", [])) or "Clinical contraindications flagged"
+        draft = ActionDraft(
+            type="clinical_document_review",
+            guest_name=guest_name or "Guest Document",
+            content=(
+                f"Clinical Document Review: {parsed_info['filename']}\n"
+                f"Guest: {guest_name or 'Associated Guest'} | Status: ATTENTION_NEEDED\n"
+                f"Flags Found: {flag_summary}\n"
+                f"Summary: {parsed_info['extracted_summary']}\n\n"
+                f"Approving this draft acknowledges clinical review, clears the document, and applies necessary retreat modality adaptations."
+            ),
+            status="pending_review"
+        )
+        db.add(draft)
+
     db.commit()
     db.refresh(record)
     return record

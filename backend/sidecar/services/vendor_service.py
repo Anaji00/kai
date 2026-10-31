@@ -1,7 +1,7 @@
 import time
 import logging
 from typing import List, Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from backend.sidecar.models import VendorSupplierRecord, generate_uuid_str
 from backend.sidecar.services.tern_client import tern_client
@@ -18,7 +18,7 @@ CACHE_TTL_SECONDS = 600  # 10 minutes
 
 def invalidate_vendor_cache():
     """Invalidate in-memory vendor cache upon write/update."""
-    global _VENDOR_CACHE, _VENDOR_CACHE_TIMESTAMP
+    global _VENDOR_CACHE_TIMESTAMP
     _VENDOR_CACHE.clear()
     _VENDOR_CACHE_TIMESTAMP = 0
     logger.debug("Vendor in-memory cache invalidated.")
@@ -215,7 +215,7 @@ def seed_default_vendors_if_empty(db: Session) -> None:
                 clinical_relevance=s.get("clinical_relevance"),
                 tern_deep_link=sync_res["tern_deep_link"],
                 tern_sync_status="SYNCED",
-                last_synced_at=datetime.utcnow(),
+                last_synced_at=datetime.now(timezone.utc),
                 status="ACTIVE"
             )
             db.add(rec)
@@ -233,7 +233,7 @@ def list_vendors(
     Retrieves vendors using tiered caching:
     Checks in-memory cache first; falls back to SQLite dual-storage persistent cache.
     """
-    global _VENDOR_CACHE, _VENDOR_CACHE_TIMESTAMP
+    global _VENDOR_CACHE_TIMESTAMP
     seed_default_vendors_if_empty(db)
 
     cache_key = f"{sanctuary_slug or 'all'}:{category or 'all'}"
@@ -313,7 +313,7 @@ def create_vendor(db: Session, data: Dict[str, Any]) -> VendorSupplierRecord:
         clinical_relevance=data.get("clinical_relevance"),
         tern_deep_link=sync_res["tern_deep_link"],
         tern_sync_status="SYNCED",
-        last_synced_at=datetime.utcnow(),
+        last_synced_at=datetime.now(timezone.utc),
         status="ACTIVE"
     )
     db.add(rec)
@@ -333,7 +333,7 @@ def update_vendor(db: Session, vendor_id: str, data: Dict[str, Any]) -> Optional
         if hasattr(rec, k) and v is not None:
             setattr(rec, k, v)
 
-    rec.updated_at = datetime.utcnow()
+    rec.updated_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(rec)
     invalidate_vendor_cache()
@@ -346,7 +346,7 @@ def delete_vendor(db: Session, vendor_id: str) -> bool:
     if not rec:
         return False
     rec.status = "INACTIVE"
-    rec.updated_at = datetime.utcnow()
+    rec.updated_at = datetime.now(timezone.utc)
     db.commit()
     invalidate_vendor_cache()
     return True

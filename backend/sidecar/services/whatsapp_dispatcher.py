@@ -1,7 +1,7 @@
 import logging
 import re
-from typing import Dict, Any, Optional
-from datetime import datetime
+from typing import Dict, Any
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from backend.config import settings
@@ -14,34 +14,44 @@ logger = logging.getLogger("kai_whatsapp_dispatcher")
 def build_interactive_intake_card(intake: StagingIntake) -> Dict[str, Any]:
     """
     Builds an interactive WhatsApp card payload for incoming guest intakes.
-    Formats clinical vitals, pre-call thesis, and quick-reply action buttons.
+    Emphasizes Restorative Wellness & Curated Travel as the base case,
+    with elevated clinical screening notes when enabled.
     """
     thesis = intake.consultation_thesis or {}
     flight = intake.flight_request or {}
     clinical = intake.clinical_profile or {}
+    wellness = getattr(intake, "wellness_profile", {}) or {}
 
     sanctuary_title = (intake.sanctuary_slug or "nosara").replace("-", " ").title()
     room_tier = intake.room_tier or "Private Villa Sanctuary"
     cabin_class = flight.get("cabin_class", "Business") if flight else "Standard"
     dep_airport = flight.get("departure_airport", "MIA") if flight else "N/A"
 
-    # Clinical highlights
-    flags = thesis.get("clinical_flags", ["HIGH_BURNOUT_RISK", "SYMPATHETIC_HYPERAROUSAL"])
-    hypothesis = thesis.get("sympathetic_tone_hypothesis", "Sympathetic overdrive with circadian sleep disruption.")
-    vagal_bullet = hypothesis[:120] + "..." if len(hypothesis) > 120 else hypothesis
-    sleep_bullet = clinical.get("health_notes", "Severe exhaustion, waking at 3:00 AM cortisol spike.")
+    primary_focus = wellness.get("primary_focus", "Deep Rest & Nervous System Reset")
+    intention = wellness.get("intention", "Restore circadian rhythm, quiet luxury hospitality.")
+
+    # Clinical highlights (elevated feature)
+    clinical_enabled = getattr(intake, "clinical_screening_enabled", False)
+    flags = thesis.get("clinical_flags", [])
+    if not flags and clinical_enabled:
+        flags = ["ELEVATED_SCREENING_ACTIVE"]
+
+    sleep_bullet = clinical.get("health_notes") or wellness.get("sleep_notes", "Circadian rest and unbroken sleep prioritized.")
 
     card_text = (
-        f"🌿 *KAI CONCIERGE DISPATCH*\n"
-        f"*Guest:* {intake.client_name} (Burnout Score: 9/10)\n"
+        f"🌿 *KAI CONCIERGE DISPATCH (WELLNESS & TRAVEL)*\n"
+        f"*Guest:* {intake.client_name} | *Focus:* {primary_focus}\n"
         f"*Sanctuary:* {sanctuary_title}\n"
         f"*Room:* {room_tier} | *VIP Air:* {cabin_class} ({dep_airport})\n\n"
-        f"📋 *PRE-CALL CLINICAL THESIS:*\n"
-        f"• {vagal_bullet}\n"
-        f"• Health Notes: {sleep_bullet}\n\n"
-        f"🏷️ *Tags:* {', '.join(flags[:3])}\n\n"
-        f"⚡ *Quick Operator Actions:*"
+        f"✨ *RESTIVE ITINERARY & WELLNESS INTENTION:*\n"
+        f"• Intention: {intention[:140]}\n"
+        f"• Rest Notes: {sleep_bullet[:120]}\n"
     )
+
+    if clinical_enabled and flags:
+        card_text += f"\n🛡️ *Elevated Clinical Safety Flags:* {', '.join(flags[:3])}\n"
+
+    card_text += "\n⚡ *Quick Operator Actions:*"
 
     interactive_buttons = [
         {"id": f"approve_sync_{intake.id}", "title": "⚡ Approve & Sync"},
@@ -68,7 +78,80 @@ def build_interactive_intake_card(intake: StagingIntake) -> Dict[str, Any]:
             "intake_id": intake.id,
             "client_name": intake.client_name,
             "sanctuary_slug": intake.sanctuary_slug,
-            "generated_at": datetime.utcnow().isoformat()
+            "clinical_screening_enabled": clinical_enabled,
+            "generated_at": datetime.now(timezone.utc).isoformat()
+        }
+    }
+
+
+def build_drafts_digest_card(pending_drafts: list) -> Dict[str, Any]:
+    """
+    Builds an interactive WhatsApp digest card summarizing pending action drafts.
+    Provides founder Kareena Islam with an instant snapshot of concierge actions,
+    VIP flight coordination, and routine guest communications.
+    """
+    total = len(pending_drafts)
+    by_category = {}
+    for d in pending_drafts:
+        dtype = getattr(d, "type", "")
+        by_category[dtype] = by_category.get(dtype, 0) + 1
+
+    travel_count = sum(v for k, v in by_category.items() if "flight" in k or "chauffeur" in k)
+    intake_count = sum(v for k, v in by_category.items() if "intake" in k or "booking" in k or "tern" in k)
+    routine_count = sum(v for k, v in by_category.items() if k in ("email_reply", "outreach", "priority_circle_welcome", "guest_email_confirmation"))
+    clinical_count = sum(v for k, v in by_category.items() if "clinical" in k)
+
+    summary_lines = []
+    if travel_count:
+        summary_lines.append(f"• ✈️ *Travel Logistics:* {travel_count} pending")
+    if intake_count:
+        summary_lines.append(f"• 🌿 *Guest Itineraries & CRM:* {intake_count} pending")
+    if routine_count:
+        summary_lines.append(f"• ✉️ *Routine Outreach & Replies:* {routine_count} pending")
+    if clinical_count:
+        summary_lines.append(f"• 🛡️ *Elevated Safety Reviews:* {clinical_count} pending")
+
+    breakdown_text = "\n".join(summary_lines) if summary_lines else "• All queues clear."
+
+    top_items = []
+    for d in pending_drafts[:3]:
+        gname = getattr(d, "guest_name", "Guest")
+        dtype = getattr(d, "type", "draft").replace("_", " ").title()
+        top_items.append(f"- *{gname}* ({dtype})")
+    top_items_text = "\n".join(top_items)
+
+    card_text = (
+        f"📱 *KAI FOUNDER CONCIERGE DIGEST*\n"
+        f"*{total} Action Drafts Pending Review*\n\n"
+        f"*Queue Overview:*\n{breakdown_text}\n\n"
+        f"*Priority Items:*\n{top_items_text}\n\n"
+        f"⚡ Tap below to approve routine outreach or open the Action Portal:"
+    )
+
+    interactive_buttons = [
+        {"id": "batch_approve_routine", "title": "⚡ Approve Routine"},
+        {"id": "open_portal", "title": "🌐 Open Portal"},
+    ]
+
+    return {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": settings.OPERATOR_NOTIFICATION_PHONE,
+        "type": "interactive",
+        "interactive": {
+            "type": "button",
+            "body": {"text": card_text},
+            "action": {
+                "buttons": [
+                    {"type": "reply", "reply": {"id": b["id"], "title": b["title"]}}
+                    for b in interactive_buttons
+                ]
+            }
+        },
+        "metadata": {
+            "total_pending": total,
+            "routine_count": routine_count,
+            "generated_at": datetime.now(timezone.utc).isoformat()
         }
     }
 
@@ -147,7 +230,7 @@ def handle_whatsapp_action(
         intake.tern_trip_id = sync_result["tern_trip_id"]
         intake.tern_contact_id = sync_result["tern_contact_id"]
         intake.reviewed_by = operator_name
-        intake.synced_at = datetime.utcnow()
+        intake.synced_at = datetime.now(timezone.utc)
         db.commit()
 
         receipt_text = (
@@ -212,3 +295,34 @@ def handle_whatsapp_action(
         }
 
     return {"success": False, "message": f"Unknown action ID: {action_id}"}
+
+
+def dispatch_whatsapp_cloud_api(payload: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Dispatches interactive card payload to Meta WhatsApp Cloud API
+    when credentials and ENABLE_LIVE_WHATSAPP_DISPATCH are configured.
+    """
+    is_live = (getattr(settings, "ENABLE_LIVE_WHATSAPP_DISPATCH", False) or settings.ENVIRONMENT == "production") and bool(settings.WHATSAPP_CLOUD_API_KEY and settings.WHATSAPP_PHONE_NUMBER_ID)
+    if is_live:
+        try:
+            import httpx
+            url = f"https://graph.facebook.com/v18.0/{settings.WHATSAPP_PHONE_NUMBER_ID}/messages"
+            headers = {
+                "Authorization": f"Bearer {settings.WHATSAPP_CLOUD_API_KEY}",
+                "Content-Type": "application/json"
+            }
+            resp = httpx.post(url, json=payload, headers=headers, timeout=10.0)
+            if resp.status_code in (200, 201):
+                res_data = resp.json()
+                logger.info(f"Successfully dispatched WhatsApp message via Meta Cloud API: {res_data}")
+                return {"success": True, "provider": "META_CLOUD_API", "data": res_data}
+            else:
+                logger.warning(f"Meta WhatsApp Cloud API returned status {resp.status_code}: {resp.text}")
+                return {"success": False, "provider": "META_CLOUD_API", "error": resp.text}
+        except Exception as e:
+            logger.error(f"Meta WhatsApp Cloud API error: {e}")
+            return {"success": False, "provider": "META_CLOUD_API", "error": str(e)}
+
+    logger.info("WhatsApp Cloud API simulation mode active (credentials not configured or live dispatch disabled).")
+    return {"success": True, "provider": "SIMULATED_CARRIER", "data": payload}
+

@@ -42,3 +42,16 @@ Thumbs.db
 .idea/
 .vscode/
 .gemini/
+
+# Secrets & local state (never bake into images; compose injects env at runtime)
+.env
+.env.*
+*.db
+*.db-shm
+*.db-wal
+scratch/
+.pytest_cache/
+.claude/
+*.tsbuildinfo
+Dockerfile.*
+docker-compose.yml

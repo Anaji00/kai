@@ -1,8 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Header
 from sqlalchemy.orm import Session
 from typing import List, Optional
+import secrets
+import logging
 
 from backend.database import get_db
+from backend.config import settings
 from backend.sidecar.models import StagedEmail
 from backend.sidecar.schemas import (
     StagedEmailIngest,
@@ -10,12 +13,46 @@ from backend.sidecar.schemas import (
     EmailActionApproveRequest
 )
 from backend.sidecar.services.email_agent import parse_and_stage_email
+from backend.sidecar.routers.webhooks import verify_admin
+
+logger = logging.getLogger("kai_email_in_router")
 
 router = APIRouter(prefix="/email-in", tags=["Tern Sidecar: Inbound Email Parsing Agent"])
 
 
-@router.post("", response_model=StagedEmailResponse, status_code=201)
-@router.post("/ingest", response_model=StagedEmailResponse, status_code=201)
+def verify_email_webhook_secret(
+    x_email_webhook_secret: Optional[str] = Header(None, alias="X-Email-Webhook-Secret"),
+    x_webhook_secret: Optional[str] = Header(None, alias="X-Webhook-Secret"),
+):
+    """
+    Validates inbound email ingestion webhook secret.
+    Rejects invalid secrets across all environments.
+    In production: strictly checks against settings.EMAIL_WEBHOOK_SECRET.
+    In development: allows missing secret with an audit warning.
+    """
+    configured = settings.EMAIL_WEBHOOK_SECRET
+    provided = x_email_webhook_secret or x_webhook_secret
+
+    if provided:
+        if not secrets.compare_digest(provided, configured):
+            raise HTTPException(
+                status_code=401,
+                detail="Invalid email webhook secret header"
+            )
+        return True
+
+    if settings.ENVIRONMENT == "production":
+        raise HTTPException(
+            status_code=401,
+            detail="Missing required email webhook secret header"
+        )
+
+    logger.warning("Inbound email ingestion accepted without secret verification (development mode).")
+    return True
+
+
+@router.post("", response_model=StagedEmailResponse, status_code=201, dependencies=[Depends(verify_email_webhook_secret)])
+@router.post("/ingest", response_model=StagedEmailResponse, status_code=201, dependencies=[Depends(verify_email_webhook_secret)])
 def ingest_and_parse_email(
     payload: StagedEmailIngest,
     db: Session = Depends(get_db)
@@ -36,7 +73,7 @@ def ingest_and_parse_email(
     return staged
 
 
-@router.get("", response_model=List[StagedEmailResponse])
+@router.get("", response_model=List[StagedEmailResponse], dependencies=[Depends(verify_admin)])
 def list_staged_emails(
     status: Optional[str] = Query(None),
     parsed_intent: Optional[str] = Query(None),
@@ -52,7 +89,7 @@ def list_staged_emails(
     return query.order_by(StagedEmail.created_at.desc()).all()
 
 
-@router.get("/{email_id}", response_model=StagedEmailResponse)
+@router.get("/{email_id}", response_model=StagedEmailResponse, dependencies=[Depends(verify_admin)])
 def get_staged_email(email_id: str, db: Session = Depends(get_db)):
     """Inspect parsed entities and suggested actions for a single email."""
     rec = db.query(StagedEmail).filter(StagedEmail.id == email_id).first()
@@ -61,7 +98,7 @@ def get_staged_email(email_id: str, db: Session = Depends(get_db)):
     return rec
 
 
-@router.post("/{email_id}/action", response_model=StagedEmailResponse)
+@router.post("/{email_id}/action", response_model=StagedEmailResponse, dependencies=[Depends(verify_admin)])
 def approve_email_action(
     email_id: str,
     payload: EmailActionApproveRequest,

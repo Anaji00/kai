@@ -21,9 +21,10 @@ import {
   Layers,
   CreditCard,
   ExternalLink,
-  PlusCircle,
   ShieldCheck,
   Database,
+  Calendar,
+  Mic,
   X
 } from "lucide-react";
 import {
@@ -38,10 +39,13 @@ import {
   seedSyntheticData,
   StagingIntake,
   SanctuaryCohortStatus,
+  generateGuestPortalToken,
 } from "@/lib/sidecar-api";
 import { onFormFill, getAndClearPendingFormFill, FormFillProposal } from "@/lib/portal-form-bus";
 import WhatsAppSimulatorModal from "@/components/portal/WhatsAppSimulatorModal";
 import TernEntityInspectorModal from "@/components/portal/TernEntityInspectorModal";
+import VoiceConsultationModal from "@/components/portal/VoiceConsultationModal";
+import ContinuityJourneyModal from "@/components/portal/ContinuityJourneyModal";
 
 export default function PortalDashboard() {
   const [intakes, setIntakes] = useState<StagingIntake[]>([]);
@@ -81,24 +85,26 @@ export default function PortalDashboard() {
     const bal = Number(f.balance_70) || (total - dep);
 
     setProposalFormData({
-      client_name: f.client_name || "Prospective Traveler",
-      email: f.email || `${String(f.client_name || "traveler").toLowerCase().replace(/\s+/g, ".")}@example.com`,
-      phone: f.phone || "+1 (555) 019-2834",
-      sanctuary_slug: f.sanctuary_slug || "nosara",
-      room_tier: f.room_tier || "Private Villa Sanctuary",
+      client_name: (f.client_name as string) || "Prospective Traveler",
+      email: (f.email as string) || `${String(f.client_name || "traveler").toLowerCase().replace(/\s+/g, ".")}@example.com`,
+      phone: (f.phone as string) || "+1 (555) 019-2834",
+      sanctuary_slug: (f.sanctuary_slug as string) || "nosara",
+      room_tier: (f.room_tier as string) || "Private Villa Sanctuary",
       nights: nights,
       total_amount: total,
       deposit_30: dep,
       balance_70: bal,
-      clinical_notes: f.clinical_notes || f.intentions || "Nervous system reset & restorative sleep",
+      clinical_notes: (f.clinical_notes as string) || (f.intentions as string) || "Nervous system reset & restorative sleep",
     });
   };
 
   // Modals state for WhatsApp dispatch & Tern Entity Inspector
   const [whatsappIntake, setWhatsappIntake] = useState<StagingIntake | null>(null);
   const [inspectorIntake, setInspectorIntake] = useState<StagingIntake | null>(null);
+  const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
+  const [continuityIntake, setContinuityIntake] = useState<StagingIntake | null>(null);
 
-  // Expanded cards state for Pre-Call Thesis drawer
+  // Expanded cards state for Personalized Conversation Guide drawer
   const [expandedIntakeId, setExpandedIntakeId] = useState<string | null>(null);
   const [generatingThesisId, setGeneratingThesisId] = useState<string | null>(null);
   const [syncingIntakeId, setSyncingIntakeId] = useState<string | null>(null);
@@ -219,7 +225,7 @@ export default function PortalDashboard() {
           deposit_30: Number(f.deposit_30),
           balance_70: Number(f.balance_70)
         },
-        flight_request: stagedProposal.fields?.flight_request || null
+        flight_request: stagedProposal.fields?.flight_request as any || null
       });
       setIntakes((prev) => [newIntake, ...prev.filter((i) => i.id !== newIntake.id)]);
       setExpandedIntakeId(newIntake.id);
@@ -241,7 +247,7 @@ export default function PortalDashboard() {
       setIntakes((prev) => prev.map((i) => (i.id === intakeId ? updated : i)));
     } catch (e) {
       console.error("Failed to generate thesis:", e);
-      alert("Failed to generate pre-call thesis");
+      alert("Failed to generate conversation guide");
     } finally {
       setGeneratingThesisId(null);
     }
@@ -281,6 +287,30 @@ export default function PortalDashboard() {
     }
   };
 
+  const [generatingHubId, setGeneratingHubId] = useState<string | null>(null);
+
+  const handleOpenGuestHub = async (intake: StagingIntake) => {
+    setGeneratingHubId(intake.id);
+    try {
+      const res = await generateGuestPortalToken(intake.id);
+      if (res.portal_url) {
+        if (navigator.clipboard) {
+          try {
+            await navigator.clipboard.writeText(res.portal_url);
+          } catch {
+            // clipboard access may be restricted
+          }
+        }
+        window.open(res.portal_url, "_blank");
+      }
+    } catch (e: unknown) {
+      alert(`Guest Companion Hub generation error: ${(e as Error).message || "Failed"}`);
+    } finally {
+      setGeneratingHubId(null);
+    }
+  };
+
+
   const handleRoomTierChange = async (intakeId: string, newTier: string) => {
     try {
       const updated = await updateStagedIntake(intakeId, { room_tier: newTier });
@@ -298,8 +328,7 @@ export default function PortalDashboard() {
 
   const pendingIntakesCount = intakes.filter((i) => i.status === "PENDING_APPROVAL").length;
   const syncedIntakesCount = intakes.filter((i) => i.status === "SYNCED_TO_TERN").length;
-  const [viewMode, setViewMode] = useState<"clinical" | "client">("client");
-
+  
   return (
     <div className="space-y-8">
       {/* Toast Alert Banner */}
@@ -330,6 +359,15 @@ export default function PortalDashboard() {
         </div>
 
         <div className="flex items-center gap-2.5 self-start md:self-auto">
+          <button
+            onClick={() => setIsVoiceModalOpen(true)}
+            title="Transcribe Founder Voice Consultation to Staged Dossier"
+            className="inline-flex items-center space-x-2 px-3.5 py-2 text-xs font-semibold text-neutral-950 bg-gradient-to-r from-amber-200 via-amber-100 to-amber-200 hover:from-amber-300 hover:to-amber-200 border border-amber-300 rounded-md transition-all shadow-xs cursor-pointer"
+          >
+            <Mic className="w-3.5 h-3.5 text-amber-900" />
+            <span>Dictate Voice Memo</span>
+          </button>
+
           <button
             onClick={handleSeedSyntheticData}
             disabled={seedingData || loading}
@@ -422,15 +460,15 @@ export default function PortalDashboard() {
         </div>
       </div>
 
-      {/* 2. Cohort Visual Capacity Monitor (12-14 Cap Enforcer) */}
+      {/* 2. Retreat Group Capacity & Size Monitor (12-14 Guests) */}
       <div className="bg-white rounded-xl border border-[#E5DDD0] p-5 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h2 className="font-serif text-lg font-bold text-[#2D3E35]">
-              Intimate Retreat Openings (12–14 Guests Max)
+              Intimate Retreat Groups (12–14 Guests Max)
             </h2>
             <p className="text-xs text-[#5C6B5E]">
-              Visual real-time monitor protecting intimate cohort safety and personal clinical guidance across all 4 sanctuaries.
+              Real-time availability protecting small group harmony, personalized care, and tranquility across all 4 sanctuaries.
             </p>
           </div>
           <span className="text-xs font-semibold px-2.5 py-1 bg-[#F2ECE4] border border-[#E5DDD0] rounded text-[#2D3E35]">
@@ -487,12 +525,12 @@ export default function PortalDashboard() {
         </div>
       </div>
 
-      {/* 3. Intake Review Queue Controls */}
+      {/* 3. Inquiry Review Queue Controls */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-[#E5DDD0] shadow-sm">
           <div className="flex items-center space-x-2">
             <span className="text-xs font-semibold text-[#2D3E35] uppercase tracking-wider">
-              Filter Intakes:
+              Filter Inquiries:
             </span>
             <div className="flex items-center space-x-1">
               {["ALL", "PENDING_APPROVAL", "SYNCED_TO_TERN"].map((st) => (
@@ -535,7 +573,7 @@ export default function PortalDashboard() {
               <div>
                 <div className="font-semibold text-sm">{syncFeedback.message}</div>
                 <div className="text-xs text-emerald-800 mt-1 flex flex-wrap gap-1.5 items-center">
-                  <span className="font-medium">Applied Clinical Tags in Tern CRM:</span>
+                  <span className="font-medium">Applied Guest Tags in Tern CRM:</span>
                   {syncFeedback.tags.map((t) => (
                     <span
                       key={t}
@@ -560,9 +598,9 @@ export default function PortalDashboard() {
         {intakes.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-xl border border-[#E5DDD0] shadow-sm">
             <Users className="w-8 h-8 text-[#5C6B5E] mx-auto mb-2 opacity-60" />
-            <div className="text-sm font-semibold text-[#2D3E35]">No staged intakes found</div>
+            <div className="text-sm font-semibold text-[#2D3E35]">No guest inquiries found</div>
             <p className="text-xs text-[#5C6B5E] mt-1 max-w-sm mx-auto">
-              Incoming bookings from /book or custom groups will appear here in PENDING_APPROVAL.
+              Incoming reservations from /book or custom groups will appear here awaiting founder review.
             </p>
           </div>
         ) : (
@@ -604,7 +642,7 @@ export default function PortalDashboard() {
                           {isPending ? (
                             <>
                               <AlertTriangle className="w-3 h-3 text-amber-700" />
-                              <span>PENDING OPERATOR APPROVAL</span>
+                              <span>AWAITING FOUNDER REVIEW</span>
                             </>
                           ) : (
                             <>
@@ -640,11 +678,20 @@ export default function PortalDashboard() {
 
                       <button
                         onClick={() => setInspectorIntake(intake)}
-                        className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold text-[#2D3E35] bg-[#F2ECE4] hover:bg-[#EBE3D8] border border-[#E5DDD0] rounded-md transition-colors shadow-2xs"
+                        className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold text-[#2D3E35] bg-[#F2ECE4] hover:bg-[#EBE3D8] border border-[#E5DDD0] rounded-md transition-colors shadow-2xs cursor-pointer"
                         title="Inspect Tern Contact & Trip Entities, and Native Payments"
                       >
                         <Layers className="w-3.5 h-3.5 text-[#C07D63]" />
                         <span>Tern Inspector</span>
+                      </button>
+
+                      <button
+                        onClick={() => setContinuityIntake(intake)}
+                        className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition-colors shadow-2xs cursor-pointer"
+                        title="Curate 30-Day Post-Sanctuary Continuity Care Journey"
+                      >
+                        <Calendar className="w-3.5 h-3.5 text-amber-700" />
+                        <span>30-Day Arc</span>
                       </button>
 
                       {isPending && (
@@ -677,6 +724,17 @@ export default function PortalDashboard() {
                       )}
 
                       <button
+                        onClick={() => handleOpenGuestHub(intake)}
+                        disabled={generatingHubId === intake.id}
+                        className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold text-teal-900 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-md transition-colors shadow-2xs cursor-pointer"
+                        title="Generate & Open Private Guest Sanctuary Companion Magic Link"
+                      >
+                        <Sparkles className="w-3.5 h-3.5 text-teal-600" />
+                        <span>{generatingHubId === intake.id ? "Generating..." : "Guest Hub"}</span>
+                      </button>
+
+
+                      <button
                         onClick={() => setExpandedIntakeId(isExpanded ? null : intake.id)}
                         className="p-1.5 text-[#5C6B5E] hover:text-[#2D3E35] hover:bg-[#F2ECE4] rounded-md transition-colors"
                         title={isExpanded ? "Collapse care plan" : "Expand clinical care plan"}
@@ -693,7 +751,7 @@ export default function PortalDashboard() {
                   {/* Clinical Quick Tags Bar */}
                   <div className="px-4 sm:px-5 py-2.5 bg-[#FAF7F2]/70 border-b border-[#E5DDD0]/60 flex flex-wrap items-center justify-between gap-2">
                     <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                      <span className="text-[#5C6B5E] font-medium text-[11px]">Clinical Tags:</span>
+                      <span className="text-[#5C6B5E] font-medium text-[11px]">Guest Tags:</span>
                       {thesis?.clinical_flags && thesis.clinical_flags.length > 0 ? (
                         thesis.clinical_flags.map((flag) => (
                           <span
@@ -705,7 +763,7 @@ export default function PortalDashboard() {
                         ))
                       ) : (
                         <span className="text-[10px] text-[#5C6B5E] italic">
-                          Awaiting thesis generation
+                          Awaiting conversation guide
                         </span>
                       )}
                     </div>
@@ -730,29 +788,49 @@ export default function PortalDashboard() {
                     </div>
                   </div>
 
-                  {/* Expanded Pre-Call Thesis RAG Dossier & Flight Desk Detail */}
+                  {/* Expanded Personalized Conversation Guide & Care Plan Dossier & Flight Desk Detail */}
                   {isExpanded && (
                     <div className="p-4 sm:p-6 space-y-6 bg-white animate-in fade-in duration-200">
                       {/* Guest Clinical Profile & Flight Inquiries Grid */}
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
                         <div className="p-3.5 rounded-lg border border-[#E5DDD0] bg-[#FAF7F2]/40 space-y-2">
-                          <div className="font-semibold text-sm text-[#2D3E35] flex items-center space-x-1.5">
-                            <HeartPulse className="w-4 h-4 text-[#C07D63]" />
-                            <span>Clinical Intake Responses</span>
+                          <div className="font-semibold text-sm text-[#2D3E35] flex items-center justify-between">
+                            <div className="flex items-center space-x-1.5">
+                              <HeartPulse className="w-4 h-4 text-[#C07D63]" />
+                              <span>Restorative Wellness Blueprint</span>
+                            </div>
+                            {intake.clinical_screening_enabled ? (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 flex items-center gap-1">
+                                <span>🛡️ Elevated Clinical Safety</span>
+                              </span>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                🌿 Standard Restorative Care
+                              </span>
+                            )}
                           </div>
                           <div>
-                            <span className="font-medium text-[#5C6B5E]">Movement Experience:</span>{" "}
-                            {intake.clinical_profile?.movement_experience || "All Levels"}
+                            <span className="font-medium text-[#5C6B5E]">Primary Focus:</span>{" "}
+                            {(intake.wellness_profile?.primary_focus as string) || (intake.clinical_profile?.intentions as string) || "Nervous system reset & circadian sleep restoration"}
                           </div>
                           <div>
-                            <span className="font-medium text-[#5C6B5E]">Health & Sleep Notes:</span>{" "}
-                            {intake.clinical_profile?.health_notes || "None provided"}
+                            <span className="font-medium text-[#5C6B5E]">Restorative Rhythm:</span>{" "}
+                            {(intake.wellness_profile?.preferred_rhythm as string) || (intake.clinical_profile?.movement_experience as string) || "Gentle sunrise somatic yoga, 432Hz acoustic grounding"}
                           </div>
                           <div>
-                            <span className="font-medium text-[#5C6B5E]">Primary Intention:</span>{" "}
-                            {intake.clinical_profile?.intentions || "Deep restorative reset"}
+                            <span className="font-medium text-[#5C6B5E]">Nutrition &amp; Botanicals:</span>{" "}
+                            {(intake.wellness_profile?.nutrition_preferences as string) || "Anti-inflammatory Blue Zone organic botanicals"}
                           </div>
+                          {intake.clinical_screening_enabled && (
+                            <div className="mt-1.5 pt-1.5 border-t border-rose-200/80 text-rose-900 bg-rose-50/50 p-2 rounded">
+                              <span className="font-semibold text-[11px] block text-rose-950 mb-0.5">Elevated Clinical Review:</span>
+                              <span className="text-[11px] leading-relaxed">
+                                {((intake.clinical_profile?.flags as string[]) || []).join(", ") || (intake.clinical_profile?.health_notes as string) || "Acute medical review active for hot/cold contrast & sound immersion protocols."}
+                              </span>
+                            </div>
+                          )}
                         </div>
+
 
                         <div className="p-3.5 rounded-lg border border-[#E5DDD0] bg-[#FAF7F2]/40 space-y-2">
                           <div className="font-semibold text-sm text-[#2D3E35] flex items-center space-x-1.5">
@@ -789,44 +867,18 @@ export default function PortalDashboard() {
                             </div>
                           )}
                         </div>
-                      </div>                      {/* RAG Pre-Call Thesis Dossier Card */}
+                      </div>                      {/* Personalized Conversation Guide & Care Plan Card */}
                       {thesis ? (
                         <div className="p-5 rounded-xl border border-[#E5DDD0] bg-[#FAF7F2]/30 space-y-5">
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E5DDD0] pb-3">
                             <div className="flex items-center space-x-2">
                               <Sparkles className="w-4 h-4 text-[#C07D63]" />
                               <h4 className="font-serif text-base font-bold text-[#2D3E35]">
-                                Guest Care Plan &amp; Pre-Call Guide
+                                Personalized Conversation Guide &amp; Care Plan
                               </h4>
                             </div>
 
                             <div className="flex items-center gap-2">
-                              {/* Perspective Toggle: Clinical RN View vs Client Care Plan View */}
-                              <div className="inline-flex rounded-lg border border-[#E5DDD0] bg-[#FAF7F2] p-0.5 text-[11px]">
-                                <button
-                                  type="button"
-                                  onClick={() => setViewMode("client")}
-                                  className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
-                                    viewMode === "client"
-                                      ? "bg-[#2D3E35] text-[#FAF7F2] shadow-xs"
-                                      : "text-[#5C6B5E] hover:text-[#2D3E35]"
-                                  }`}
-                                >
-                                  Client Care Plan View
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => setViewMode("clinical")}
-                                  className={`px-2.5 py-1 rounded-md font-medium transition-colors ${
-                                    viewMode === "clinical"
-                                      ? "bg-[#2D3E35] text-[#FAF7F2] shadow-xs"
-                                      : "text-[#5C6B5E] hover:text-[#2D3E35]"
-                                  }`}
-                                >
-                                  Clinical RN View
-                                </button>
-                              </div>
-
                               <button
                                 onClick={() => handleGenerateThesis(intake.id)}
                                 disabled={generatingThesisId === intake.id}
@@ -842,15 +894,14 @@ export default function PortalDashboard() {
                             </div>
                           </div>
 
-                          {/* Client Care Plan View (Plain English, Serene Language) */}
-                          {viewMode === "client" ? (
-                            <div className="space-y-4">
+                          {/* Care Plan View (Plain English, Serene Language) */}
+                          <div className="space-y-4">
                               <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] space-y-2">
                                 <div className="text-xs font-semibold text-[#5C6B5E] uppercase tracking-wider">
                                   Serene Journey Overview for {intake.client_name}
                                 </div>
                                 <p className="text-xs text-[#2D3E35] leading-relaxed">
-                                  A bespoke 6-day restorative pathway designed for {intake.client_name}. Addressing their personal intention: &ldquo;{intake.clinical_profile?.intentions || "Deep restorative reset and nervous system balance"}&rdquo;. Curated within our intimate 12–14 guest circle with personal guidance from Founder Kareena Islam, BSN, RN.
+                                  A bespoke 6-day restorative pathway designed for {intake.client_name}. Addressing their personal intention: &ldquo;{intake.clinical_profile?.intentions || "Deep restorative reset and nervous system balance"}&rdquo;. Curated within our intimate 12–14 guest circle with personal guidance from Founder Kareena Islam.
                                 </p>
                               </div>
 
@@ -865,51 +916,18 @@ export default function PortalDashboard() {
                                   </div>
                                 </div>
                                 <div className="p-3.5 bg-white rounded-lg border border-[#E5DDD0]">
-                                  <span className="font-semibold text-[#5C6B5E]">Daily Restorative Arc:</span>
+                                  <span className="font-semibold text-[#5C6B5E]">Daily Restorative Schedule:</span>
                                   <div className="text-[11px] text-[#2D3E35] mt-1 leading-normal">
                                     Gentle 4-7-8 calming breathwork &middot; 432Hz twilight sound immersion &middot; Farm-to-table coastal dining &middot; Deep restorative sleep
                                   </div>
                                 </div>
                               </div>
                             </div>
-                          ) : (
-                            /* Clinical RN View (Detailed Clinical Hypotheses & Biomarkers) */
-                            <div className="space-y-4">
-                              <div>
-                                <div className="text-xs font-semibold text-[#5C6B5E] uppercase tracking-wider mb-1">
-                                  Clinical Sympathetic Overdrive Hypothesis
-                                </div>
-                                <p className="text-xs text-[#2D3E35] leading-relaxed bg-white p-3 rounded-lg border border-[#E5DDD0]">
-                                  {thesis.sympathetic_tone_hypothesis}
-                                </p>
-                              </div>
 
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                                <div className="p-3 bg-white rounded-lg border border-[#E5DDD0]">
-                                  <span className="font-semibold text-[#5C6B5E]">Recommended Match:</span>{" "}
-                                  <div className="text-sm font-serif font-bold text-[#2D3E35] mt-0.5">
-                                    {thesis.recommended_sanctuary}
-                                  </div>
-                                  <div className="text-[#5C6B5E] mt-0.5">
-                                    Tier: {thesis.recommended_room_tier}
-                                  </div>
-                                </div>
-                                <div className="p-3 bg-white rounded-lg border border-[#E5DDD0]">
-                                  <span className="font-semibold text-[#5C6B5E]">
-                                    6-Day Circadian Progression:
-                                  </span>
-                                  <div className="text-[11px] text-[#2D3E35] mt-1 leading-normal">
-                                    {thesis.circadian_protocol}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Consultation Talk Tracks */}
+                          {/* Conversation Focus Points */}
                           <div>
                             <div className="text-xs font-semibold text-[#5C6B5E] uppercase tracking-wider mb-2">
-                              High-Converting Consultation Talk Tracks
+                              Conversation Focus Points &amp; Discussion Flow
                             </div>
                             <div className="space-y-2">
                               {thesis.consultation_talk_tracks?.map((tt, idx) => (
@@ -926,10 +944,10 @@ export default function PortalDashboard() {
                             </div>
                           </div>
 
-                          {/* Clinical Objection Handling */}
+                          {/* Helpful Guidance & Common Questions */}
                           <div>
                             <div className="text-xs font-semibold text-[#5C6B5E] uppercase tracking-wider mb-2">
-                              Clinical Objection Handling Scripts
+                              Helpful Guidance &amp; Common Questions
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                               {thesis.objection_scripts?.map((obj, idx) => (
@@ -949,10 +967,10 @@ export default function PortalDashboard() {
                             </div>
                           </div>
 
-                          {/* Draft Itinerary Activities Preview (Tern Entity format) */}
+                          {/* Proposed Retreat Itinerary */}
                           <div>
                             <div className="text-xs font-semibold text-[#5C6B5E] uppercase tracking-wider mb-2">
-                              Tern-Ready Activity Sequence (Draft Itinerary)
+                              Proposed Retreat Itinerary (Tern Itinerary Draft)
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
                               {thesis.tern_itinerary_draft?.map((act, idx) => (
@@ -1013,7 +1031,7 @@ export default function PortalDashboard() {
                       ) : (
                         <div className="p-6 text-center bg-[#FAF7F2]/40 rounded-xl border border-[#E5DDD0]">
                           <p className="text-xs text-[#5C6B5E] mb-3">
-                            No pre-call thesis generated yet for this guest.
+                            No conversation guide generated yet for this guest.
                           </p>
                           <button
                             onClick={() => handleGenerateThesis(intake.id)}
@@ -1024,7 +1042,7 @@ export default function PortalDashboard() {
                             <span>
                               {generatingThesisId === intake.id
                                 ? "Synthesizing Clinical RAG..."
-                                : "Generate Pre-Call Thesis"}
+                                : "Generate Conversation Guide"}
                             </span>
                           </button>
                         </div>
@@ -1079,7 +1097,23 @@ export default function PortalDashboard() {
         onClose={() => setInspectorIntake(null)}
       />
 
-      {/* 1-Click Founder Staged Intake Modal */}
+      {/* 30-Day Post-Sanctuary Continuity Care Journey Modal */}
+      <ContinuityJourneyModal
+        isOpen={!!continuityIntake}
+        intake={continuityIntake}
+        onClose={() => setContinuityIntake(null)}
+        onSuccess={loadData}
+      />
+
+      {/* Founder Voice Consultation Transcriber Modal */}
+      <VoiceConsultationModal
+        isOpen={isVoiceModalOpen}
+        onClose={() => setIsVoiceModalOpen(false)}
+        onSuccess={loadData}
+      />
+
+
+      {/* 1-Click Founder Staged Reservation Modal */}
       {stagedProposal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in">
           <div className="bg-[#FAF7F2] border border-[#E5DDD0] w-full max-w-xl rounded-2xl shadow-2xl overflow-hidden text-[#2D3E35]">
@@ -1093,7 +1127,7 @@ export default function PortalDashboard() {
                     {stagedProposal.form_title || "Review & Approve Guest Intake"}
                   </h3>
                   <p className="text-xs text-[#5C6B5E]">
-                    Founder Clinical Oversight · Zero Direct Autonomous Writes · Verified Data
+                    Founder Oversight · 100% Founder Approved · Verified Data
                   </p>
                 </div>
               </div>
@@ -1110,7 +1144,7 @@ export default function PortalDashboard() {
                 <div className="font-semibold text-amber-900 flex items-center justify-between text-xs">
                   <div className="flex items-center gap-1.5">
                     <ShieldCheck className="w-4 h-4 text-amber-600" />
-                    <span>Proposed by Clinical Copilot</span>
+                    <span>Proposed by AI Copilot</span>
                   </div>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
                     <CheckCircle2 className="w-3 h-3" /> Data Verified for Tern CRM Sync
@@ -1270,7 +1304,7 @@ export default function PortalDashboard() {
 
                 <div className="bg-white p-3.5 rounded-xl border border-[#E5DDD0]">
                   <label className="text-[10px] font-bold text-[#5C6B5E] uppercase tracking-wider block mb-1">
-                    Clinical & Operational Notes
+                    Guest & Operational Notes
                   </label>
                   <textarea
                     rows={2}

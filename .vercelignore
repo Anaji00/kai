@@ -1,0 +1,20 @@
+# Vercel hosts only the Next.js app. The FastAPI backend deploys separately as a container
+# (Dockerfile.backend), so keep Python sources out of the upload; otherwise the root main.py and
+# requirements.txt could be auto-detected as a Python app.
+backend/
+main.py
+requirements.txt
+*.py
+__pycache__/
+.pytest_cache/
+
+# Local state and container tooling
+*.db
+*.db-shm
+*.db-wal
+scratch/
+.claude/
+Dockerfile.*
+docker-compose.yml
+.env
+.env.*

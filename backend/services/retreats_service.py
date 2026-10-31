@@ -265,7 +265,7 @@ def get_all_retreats(db: Optional[Session] = None, year: Optional[int] = None) -
                 Booking.status.in_(["confirmed", "pending_review"])
             ).count()
         
-        dynamic_remaining = max(0, r["baseSpotsRemaining"] - spots_booked)
+        dynamic_remaining = max(0, r["spotsTotal"] - spots_booked)
         
         retreat_copy = dict(r)
         retreat_copy["spotsRemaining"] = dynamic_remaining
@@ -281,8 +281,9 @@ def get_all_retreats(db: Optional[Session] = None, year: Optional[int] = None) -
 
 
 def get_retreat_by_slug_or_id(slug_or_id: str, db: Optional[Session] = None) -> Optional[Dict[str, Any]]:
+    target = slug_or_id.lower().strip()
     for r in RETREATS_CATALOG:
-        if r["id"] == slug_or_id or r["slug"] == slug_or_id:
+        if r["id"] == target or r["slug"] == target or r["id"].startswith(target) or target in r["slug"]:
             spots_booked = 0
             if db:
                 spots_booked = db.query(Booking).filter(
@@ -290,7 +291,7 @@ def get_retreat_by_slug_or_id(slug_or_id: str, db: Optional[Session] = None) -> 
                     Booking.status.in_(["confirmed", "pending_review"])
                 ).count()
             
-            dynamic_remaining = max(0, r["baseSpotsRemaining"] - spots_booked)
+            dynamic_remaining = max(0, r["spotsTotal"] - spots_booked)
             retreat_copy = dict(r)
             retreat_copy["spotsRemaining"] = dynamic_remaining
             if dynamic_remaining == 0:

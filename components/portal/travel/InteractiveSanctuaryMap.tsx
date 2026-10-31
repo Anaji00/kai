@@ -9,11 +9,7 @@ import {
 } from "@/lib/sidecar-api";
 import {
   Compass,
-  Navigation,
-  Sparkles,
-  Maximize2,
-  RefreshCw,
-  Layers
+  Maximize2
 } from "lucide-react";
 
 interface InteractiveSanctuaryMapProps {
@@ -22,8 +18,6 @@ interface InteractiveSanctuaryMapProps {
   selectedRoute?: SanctuaryRoute | null;
   pois: SomaticPointOfInterest[];
   transfers: GroundTransfer[];
-  viewMode: "client" | "clinical";
-  onSelectRoute?: (route: SanctuaryRoute) => void;
 }
 
 // Sanctuary fallback center coordinates
@@ -40,14 +34,13 @@ export default function InteractiveSanctuaryMap({
   routes,
   selectedRoute,
   pois,
-  transfers,
-  viewMode,
-  onSelectRoute
+  transfers
 }: InteractiveSanctuaryMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapInstanceRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const layerGroupRef = useRef<any>(null);
-  const [mapReady, setMapReady] = useState(false);
   const [activeTileType, setActiveTileType] = useState<"voyager" | "satellite">("voyager");
 
   const center = SANCTUARY_CENTERS[sanctuarySlug.toLowerCase()] || SANCTUARY_CENTERS.nosara;
@@ -95,7 +88,6 @@ export default function InteractiveSanctuaryMap({
       const layerGroup = L.layerGroup().addTo(map);
       layerGroupRef.current = layerGroup;
       mapInstanceRef.current = map;
-      setMapReady(true);
     }
 
     initMap();
@@ -108,15 +100,18 @@ export default function InteractiveSanctuaryMap({
         layerGroupRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Update Tile Layer if toggled
   useEffect(() => {
     if (!mapInstanceRef.current) return;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const L = (window as any).L;
     if (!L) return;
 
     // Reset base layers
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mapInstanceRef.current.eachLayer((layer: any) => {
       if (layer instanceof L.TileLayer) {
         mapInstanceRef.current.removeLayer(layer);
@@ -259,7 +254,7 @@ export default function InteractiveSanctuaryMap({
             <div style="font-family: serif; padding: 2px;">
               <span style="font-size: 10px; font-weight: bold; color: #C07D63; text-transform: uppercase;">KAI Sanctuary Haven</span>
               <div style="font-size: 14px; font-weight: bold; color: #2D3E35;">${activeRoute.destination_name}</div>
-              <p style="font-size: 11px; color: #5C6B5E; margin-top: 2px;">Intimate restorative cohort & private somatic pavilion.</p>
+              <p style="font-size: 11px; color: #5C6B5E; margin-top: 2px;">Intimate restorative retreat group & private somatic pavilion.</p>
             </div>
           `)
           .addTo(layerGroup);
@@ -317,7 +312,7 @@ export default function InteractiveSanctuaryMap({
               ${poi.description}
             </p>
             <div style="background: #FAF7F2; padding: 6px; border-radius: 6px; border: 1px solid #E5DDD0; margin-top: 6px; font-size: 11px; color: #2D3E35;">
-              <strong style="color: #C07D63;">${viewMode === "client" ? "Nervous System Calm" : "Vagal Mechanism"}:</strong>
+              <strong style="color: #C07D63;">$"Nervous System Calm":</strong>
               <div style="margin-top: 2px;">${poi.vagus_nerve_benefit}</div>
             </div>
             <div style="font-size: 10px; color: #5C6B5E; margin-top: 5px;">
@@ -389,7 +384,7 @@ export default function InteractiveSanctuaryMap({
     }
 
     drawLayers();
-  }, [activeRoute, pois, transfers, viewMode]);
+  }, [activeRoute, pois, transfers]);
 
   const handleResetCenter = () => {
     if (mapInstanceRef.current) {

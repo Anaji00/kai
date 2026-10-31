@@ -276,7 +276,7 @@ export default function SoundAndBreathModal({
 
                 <div className="mt-6 max-w-xs space-y-1">
                   <p className="text-xs text-sage-muted">
-                    Clinical grounding: The 4-7-8 cadence stimulates the vagus nerve, immediately signaling the amygdala to down-regulate sympathetic cortisol response.
+                    Clinical grounding: The 4-7-8 cadence gently stimulates the vagus nerve, immediately signaling the brain to calm fight-or-flight stress and invite restful ease.
                   </p>
                   <p className="text-xs text-olive font-medium">
                     Cycles completed: {completedCycles}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Utensils,
   Leaf,
@@ -24,10 +24,9 @@ import {
 
 interface CuratedDiningTabProps {
   sanctuarySlug: string;
-  viewMode: "client" | "clinical";
 }
 
-export default function CuratedDiningTab({ sanctuarySlug, viewMode }: CuratedDiningTabProps) {
+export default function CuratedDiningTab({ sanctuarySlug }: CuratedDiningTabProps) {
   const [spots, setSpots] = useState<CuratedDiningSpot[]>([]);
   const [activeTag, setActiveTag] = useState<string>("ALL");
   const [loading, setLoading] = useState(true);
@@ -43,7 +42,7 @@ export default function CuratedDiningTab({ sanctuarySlug, viewMode }: CuratedDin
   const [priceTier, setPriceTier] = useState("$$$");
   const [adding, setAdding] = useState(false);
 
-  const loadDining = async () => {
+  const loadDining = useCallback(async () => {
     setLoading(true);
     try {
       const data = await fetchCuratedDining(sanctuarySlug, activeTag);
@@ -53,11 +52,11 @@ export default function CuratedDiningTab({ sanctuarySlug, viewMode }: CuratedDin
     } finally {
       setLoading(false);
     }
-  };
+  }, [sanctuarySlug, activeTag]);
 
   useEffect(() => {
     loadDining();
-  }, [sanctuarySlug, activeTag]);
+  }, [loadDining]);
 
   const handleCreateSpot = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,15 +110,9 @@ export default function CuratedDiningTab({ sanctuarySlug, viewMode }: CuratedDin
             <span className="p-1.5 rounded-md bg-[#C07D63]/10 text-[#C07D63]">
               <Utensils className="w-4 h-4" />
             </span>
-            <h2 className="font-serif text-lg font-bold text-[#2D3E35]">
-              {viewMode === "client" ? "Nourishing Dining & Organic Cafes" : "Curated Gastronomy & Blue Zone Nutrition Engine"}
-            </h2>
+            <h2 className="font-serif text-lg font-bold text-[#2D3E35]">Nourishing Dining & Organic Cafes</h2>
           </div>
-          <p className="text-xs text-[#5C6B5E] mt-1">
-            {viewMode === "client"
-              ? "Farm-to-table dining, wild herbal teas, and soothing anti-inflammatory meals supporting deep sleep and easy digestion."
-              : "Nutritional biochemical RAG curated for glycemic stabilization, vagal anti-inflammatory pathways, and zero gastrointestinal stress."}
-          </p>
+          <p className="text-xs text-[#5C6B5E] mt-1">Farm-to-table dining, wild herbal teas, and soothing anti-inflammatory meals supporting deep sleep and easy digestion.</p>
         </div>
 
         <div className="flex items-center space-x-2">
@@ -209,13 +202,11 @@ export default function CuratedDiningTab({ sanctuarySlug, viewMode }: CuratedDin
                 {spot.description}
               </p>
 
-              {/* Nurse Digestion & Gut Health Callout */}
+              {/* Wellness Digestion & Gut Health Callout */}
               <div className="p-3 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-xs space-y-1">
                 <div className="font-semibold text-[#C07D63] text-[11px] flex items-center space-x-1.5">
                   <HeartPulse className="w-3.5 h-3.5" />
-                  <span>
-                    {viewMode === "client" ? "Nurse Gut Health & Digestion Note" : "Biochemical Microbiome Optimization"}
-                  </span>
+                  <span>Wellness Gut Health & Digestion Note</span>
                 </div>
                 <p className="text-[11px] text-[#2D3E35] leading-normal">{spot.nurse_notes}</p>
               </div>

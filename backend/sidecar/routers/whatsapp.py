@@ -7,6 +7,7 @@ import logging
 from backend.database import get_db
 from backend.config import settings
 from backend.sidecar.models import StagingIntake
+from backend.sidecar.routers.webhooks import verify_admin
 from backend.sidecar.services.whatsapp_dispatcher import (
     build_interactive_intake_card,
     handle_whatsapp_action,
@@ -84,7 +85,7 @@ async def receive_whatsapp_event(request: Request, db: Session = Depends(get_db)
         return {"status": "ERROR", "detail": str(e)}
 
 
-@router.post("/simulate")
+@router.post("/simulate", dependencies=[Depends(verify_admin)])
 def simulate_whatsapp_interaction(
     payload: SimulateWhatsAppRequest,
     db: Session = Depends(get_db)

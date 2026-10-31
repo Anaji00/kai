@@ -18,12 +18,14 @@ import {
   Globe2,
   HelpCircle,
   Compass,
-  Briefcase
+  Briefcase,
+  Mic
 } from "lucide-react";
-import { fetchCohortCapacities, SanctuaryCohortStatus, seedDemoIntakes } from "@/lib/sidecar-api";
+import { fetchCohortCapacities, SanctuaryCohortStatus, seedDemoIntakes, fetchDraftStats } from "@/lib/sidecar-api";
 import TernFormsModal from "@/components/portal/TernFormsModal";
 import PortalHelpModal from "@/components/portal/PortalHelpModal";
 import ClinicalCopilotDrawer from "@/components/portal/ClinicalCopilotDrawer";
+import VoiceConsultationModal from "@/components/portal/VoiceConsultationModal";
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -33,6 +35,17 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const [isFormsOpen, setIsFormsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+  const [isVoiceOpen, setIsVoiceOpen] = useState(false);
+  const [pendingDraftsCount, setPendingDraftsCount] = useState<number>(0);
+
+  const loadDraftsCount = async () => {
+    try {
+      const stats = await fetchDraftStats();
+      setPendingDraftsCount(stats.total_pending);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const loadTelemetry = async () => {
     try {
@@ -49,15 +62,18 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       try {
         const data = await fetchCohortCapacities();
         if (active) setCohorts(data);
+        await loadDraftsCount();
       } catch (err) {
         console.error(err);
       }
     };
     fetchTelemetry();
-    const interval = setInterval(fetchTelemetry, 30000);
+    window.addEventListener("drafts-updated", loadDraftsCount);
+    const interval = setInterval(fetchTelemetry, 20000);
     return () => {
       active = false;
       clearInterval(interval);
+      window.removeEventListener("drafts-updated", loadDraftsCount);
     };
   }, []);
 
@@ -67,8 +83,10 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       await seedDemoIntakes();
       setSeedSuccess(true);
       await loadTelemetry();
+      await loadDraftsCount();
       setTimeout(() => setSeedSuccess(false), 3000);
       window.dispatchEvent(new Event("intakes-updated"));
+      window.dispatchEvent(new Event("drafts-updated"));
     } catch (e) {
       console.error("Seed error:", e);
     } finally {
@@ -78,6 +96,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   const navItems = [
     { href: "/portal", label: "Guest Inquiries", icon: Users, badge: "Staging" },
+    { 
+      href: "/portal/drafts", 
+      label: "Action Review Queue", 
+      icon: Send, 
+      badge: pendingDraftsCount > 0 ? `${pendingDraftsCount} Pending` : "Drafts" 
+    },
     { href: "/portal/calendar", label: "Retreat Calendar", icon: Calendar, badge: "Live Feed" },
     { href: "/portal/travel-logistics", label: "Travel & Destinations", icon: Compass, badge: "Routes & Guides" },
     { href: "/portal/vendors", label: "Vendors & Suppliers", icon: Briefcase, badge: "Tern Back Office" },
@@ -123,6 +147,15 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             {/* Right: Help Guide, Forms Hub, Seeder, Operator Profile */}
             <div className="flex items-center space-x-2">
               <button
+                onClick={() => setIsVoiceOpen(true)}
+                className="inline-flex items-center space-x-1.5 px-3 py-1 text-xs font-semibold text-[#2D3E35] bg-gradient-to-r from-amber-100 to-amber-50 hover:from-amber-200 hover:to-amber-100 border border-amber-300/80 rounded-md transition-all shadow-sm"
+                title="Transcribe Founder Voice Note to Guest Dossier"
+              >
+                <Mic className="w-3.5 h-3.5 text-amber-700" />
+                <span>Dictate Memo</span>
+              </button>
+
+              <button
                 onClick={() => setIsHelpOpen(true)}
                 className="inline-flex items-center space-x-1.5 px-2.5 py-1 text-xs font-semibold text-[#2D3E35] bg-[#F2ECE4] hover:bg-[#EBE3D8] border border-[#E5DDD0] rounded-md transition-colors"
                 title="Open Studio Orientation & Layman's Terms Guide"
@@ -157,7 +190,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                   </div>
                   <div className="text-[10px] text-[#5C6B5E] flex items-center justify-end space-x-1">
                     <HeartPulse className="w-3 h-3 text-[#C07D63]" />
-                    <span>Founder & Clinical Curator</span>
+                    <span>Founder & Restorative Curator</span>
                   </div>
                 </div>
               </div>
@@ -206,12 +239,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         </div>
       </header>
 
-      {/* Intimate Retreat Openings Enforcer (12-14 Cap across all 4 Sanctuaries) */}
+      {/* Intimate Retreat Groups (12-14 Guests Max across all 4 Sanctuaries) */}
       <section className="bg-[#F2ECE4] border-b border-[#E5DDD0] px-4 py-2 text-xs">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center space-x-2 font-medium text-[#2D3E35]">
             <span className="inline-block w-2 h-2 rounded-full bg-[#C07D63]"></span>
-            <span className="font-serif font-semibold text-sm">Intimate Retreat Openings (12–14 Guests Max)</span>
+            <span className="font-serif font-semibold text-sm">Intimate Retreat Groups (12–14 Guests Max)</span>
           </div>
 
           <div className="flex items-center space-x-3 overflow-x-auto py-1">
@@ -256,7 +289,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         {children}
       </main>
 
-      {/* Floating AI Clinical Copilot Trigger */}
+      {/* Floating AI Copilot Trigger */}
       <div className="fixed bottom-6 right-6 z-40">
         <button
           onClick={() => setIsCopilotOpen(true)}
@@ -267,7 +300,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             <Sparkles className="w-4 h-4 animate-pulse" />
           </div>
           <span className="text-xs font-semibold text-stone-100 font-serif">
-            AI Clinical Copilot
+            AI Copilot
           </span>
           <span className="text-[10px] font-sans px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium">
             KAI Brain
@@ -291,6 +324,14 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       <TernFormsModal isOpen={isFormsOpen} onClose={() => setIsFormsOpen(false)} />
       <PortalHelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
       <ClinicalCopilotDrawer isOpen={isCopilotOpen} onClose={() => setIsCopilotOpen(false)} />
+      <VoiceConsultationModal
+        isOpen={isVoiceOpen}
+        onClose={() => setIsVoiceOpen(false)}
+        onSuccess={() => {
+          window.dispatchEvent(new Event("intakes-updated"));
+          window.dispatchEvent(new Event("drafts-updated"));
+        }}
+      />
     </div>
   );
 }

@@ -1,10 +1,10 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 
 
 # -----------------------------------------------------------------------------
-# Staging Intakes & Clinical Pre-Call Thesis
+# Staging Intakes & Restorative Wellness Pre-Arrival Dossier
 # -----------------------------------------------------------------------------
 class StagingIntakeBase(BaseModel):
     client_name: str
@@ -12,6 +12,8 @@ class StagingIntakeBase(BaseModel):
     phone: Optional[str] = None
     sanctuary_slug: Optional[str] = None
     room_tier: Optional[str] = None
+    wellness_profile: Dict[str, Any] = Field(default_factory=dict)
+    clinical_screening_enabled: bool = False
     clinical_profile: Dict[str, Any] = Field(default_factory=dict)
     flight_request: Optional[Dict[str, Any]] = None
 
@@ -22,6 +24,8 @@ class StagingIntakeUpdate(BaseModel):
     phone: Optional[str] = None
     sanctuary_slug: Optional[str] = None
     room_tier: Optional[str] = None
+    wellness_profile: Optional[Dict[str, Any]] = None
+    clinical_screening_enabled: Optional[bool] = None
     clinical_profile: Optional[Dict[str, Any]] = None
     flight_request: Optional[Dict[str, Any]] = None
     consultation_thesis: Optional[Dict[str, Any]] = None
@@ -67,8 +71,7 @@ class StagingIntakeResponse(StagingIntakeBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TernSyncRequest(BaseModel):
@@ -159,8 +162,7 @@ class StagedLeadResponse(BaseModel):
     reviewed_by: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LeadApproveRequest(BaseModel):
@@ -207,8 +209,7 @@ class SmsDispatchResponse(BaseModel):
     authorized_by: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # -----------------------------------------------------------------------------
@@ -235,8 +236,7 @@ class StagedEmailResponse(BaseModel):
     reviewed_by: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class EmailActionApproveRequest(BaseModel):
@@ -259,12 +259,6 @@ class ManifestDiffRequest(BaseModel):
     diff_document_name: str = "ground_operator_manifest.csv"
 
 
-class LocationScrapeRequest(BaseModel):
-    location: str
-    sanctuary_slug: Optional[str] = None
-    persist: bool = True
-
-
 class GuestPresentationDossierResponse(BaseModel):
     location: str
     sanctuary_slug: str
@@ -275,77 +269,6 @@ class GuestPresentationDossierResponse(BaseModel):
     destination_guide: Dict[str, Any]
     guest_reflections: List[Dict[str, Any]]
     presentation_markdown: str
-
-
-# -----------------------------------------------------------------------------
-# Tern Back Office Preferred Supplier Schemas
-# -----------------------------------------------------------------------------
-class VendorSupplierCreateRequest(BaseModel):
-    name: str
-    category: str  # TRANSPORTATION_CHAUFFEUR, LODGING_VILLA, WELLNESS_SOMATIC, ORGANIC_CATERING, TOUR_EXCURSION, AIR_CHARTER, MEDICAL_EMERGENCY
-    sanctuary_slug: Optional[str] = "all"
-    contact_name: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    website: Optional[str] = None
-    booking_url_or_code: Optional[str] = None
-    commission_rate: Optional[float] = 10.0
-    commission_type: Optional[str] = "PERCENTAGE"  # PERCENTAGE, FLAT_FEE, NET_RATE_WHOLESALE, NON_COMMISSIONABLE
-    payment_terms: Optional[str] = "Tern Native Client Card Auth"
-    lead_time_days: Optional[int] = 7
-    preferred_tier: Optional[str] = "PREFERRED_PARTNER"  # PREFERRED_PARTNER, ACTIVE_SUPPLIER, VETTED_BACKUP
-    service_description: str
-    clinical_relevance: Optional[str] = None
-    sync_to_tern: Optional[bool] = True
-
-
-class VendorSupplierUpdateRequest(BaseModel):
-    name: Optional[str] = None
-    category: Optional[str] = None
-    sanctuary_slug: Optional[str] = None
-    contact_name: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    website: Optional[str] = None
-    booking_url_or_code: Optional[str] = None
-    commission_rate: Optional[float] = None
-    commission_type: Optional[str] = None
-    payment_terms: Optional[str] = None
-    lead_time_days: Optional[int] = None
-    preferred_tier: Optional[str] = None
-    service_description: Optional[str] = None
-    clinical_relevance: Optional[str] = None
-    status: Optional[str] = None
-    sync_to_tern: Optional[bool] = True
-
-
-class VendorSupplierResponse(BaseModel):
-    id: str
-    tern_supplier_id: Optional[str] = None
-    name: str
-    category: str
-    sanctuary_slug: str
-    contact_name: Optional[str] = None
-    email: Optional[str] = None
-    phone: Optional[str] = None
-    website: Optional[str] = None
-    booking_url_or_code: Optional[str] = None
-    commission_rate: float
-    commission_type: str
-    payment_terms: str
-    lead_time_days: int
-    preferred_tier: str
-    service_description: str
-    clinical_relevance: Optional[str] = None
-    tern_deep_link: Optional[str] = None
-    tern_sync_status: str
-    last_synced_at: Optional[datetime] = None
-    status: str
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class ManifestDiffResponse(BaseModel):
@@ -361,8 +284,7 @@ class ManifestDiffResponse(BaseModel):
     status: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # -----------------------------------------------------------------------------
@@ -465,8 +387,7 @@ class WebhookEventLogResponse(BaseModel):
     error_message: Optional[str] = None
     processed_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # -----------------------------------------------------------------------------
@@ -510,8 +431,7 @@ class SanctuaryRouteResponse(BaseModel):
     route_geometry: Optional[List[List[float]]] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SomaticPointOfInterestResponse(BaseModel):
@@ -526,8 +446,7 @@ class SomaticPointOfInterestResponse(BaseModel):
     ideal_visiting_time: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # -----------------------------------------------------------------------------
@@ -580,8 +499,7 @@ class CuratedDiningSpotResponse(BaseModel):
     lon: Optional[float] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CuratedDiningCreateRequest(BaseModel):
@@ -616,8 +534,7 @@ class DestinationReviewResponse(BaseModel):
     status: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class DestinationReviewCreateRequest(BaseModel):
@@ -656,8 +573,7 @@ class DestinationGuideResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # -----------------------------------------------------------------------------
@@ -670,6 +586,7 @@ class GroundTransferResponse(BaseModel):
     intake_id: Optional[str] = None
     pickup_location: str
     dropoff_location: str
+    chauffeur_notes: Optional[str] = None
     flight_number: Optional[str] = None
     pickup_time: datetime
     chauffeur_name: str
@@ -679,8 +596,7 @@ class GroundTransferResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class GroundTransferDispatchWebhook(BaseModel):
@@ -705,8 +621,7 @@ class UploadedDocumentResponse(BaseModel):
     safety_clearance_status: str
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 # -----------------------------------------------------------------------------
@@ -774,11 +689,62 @@ class VendorSupplierResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LocationScrapeRequest(BaseModel):
     sanctuary_slug: str
     location_query: Optional[str] = None
     target_sections: Optional[List[str]] = None
+
+
+class EmailSendRequest(BaseModel):
+    subject: str
+    body: str
+
+
+# -----------------------------------------------------------------------------
+# Founder Voice Consultation Transcriber
+# -----------------------------------------------------------------------------
+class VoiceMemoRequest(BaseModel):
+    raw_transcript: str = Field(..., description="Audio transcription text from Founder voice memo")
+    operator_name: Optional[str] = Field("Kareena Islam", description="Operating founder or concierge name")
+
+
+class VoiceMemoResponse(BaseModel):
+    success: bool
+    message: str
+    intake_id: str
+    action_draft_id: int
+    extracted_data: Dict[str, Any]
+    status: str
+
+
+# -----------------------------------------------------------------------------
+# 30-Day Post-Sanctuary Continuity of Care Journey
+# -----------------------------------------------------------------------------
+class ContinuityMilestone(BaseModel):
+    day: int
+    title: str
+    theme: str
+    scheduled_date: str
+    delivery_channel: str
+    content_preview: str
+    draft_id: Optional[int] = None
+
+
+class ContinuityArcGenerateRequest(BaseModel):
+    intake_id: str
+    departure_date: Optional[str] = Field(None, description="ISO date YYYY-MM-DD or None for today")
+    operator_name: Optional[str] = "Kareena Islam"
+
+
+class ContinuityArcResponse(BaseModel):
+    success: bool
+    intake_id: str
+    guest_name: str
+    departure_date: str
+    milestones: List[ContinuityMilestone]
+    staged_draft_count: int
+    message: str
+

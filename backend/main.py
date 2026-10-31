@@ -21,6 +21,7 @@ from backend.routers import (
     wellness,
     newsletter,
     testimonials,
+    drafts,
 )
 from backend.sidecar.routers import (
     intakes as sidecar_intakes,
@@ -35,7 +36,12 @@ from backend.sidecar.routers import (
     travel_maps as sidecar_travel,
     vendors as sidecar_vendors,
     system as sidecar_system,
+    continuity as sidecar_continuity,
+    guest_portal as sidecar_guest_portal,
 )
+
+from fastapi import Request
+from fastapi.responses import JSONResponse
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("kai_api")
@@ -43,9 +49,36 @@ logger = logging.getLogger("kai_api")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    if settings.ENVIRONMENT == "production":
+        insecure = settings.insecure_default_secrets()
+        if insecure:
+            # Fail closed: these defaults are public in the repository, so they authenticate nothing.
+            raise RuntimeError(
+                f"Refusing to start in production with default or empty secrets: {', '.join(insecure)}. "
+                "Set them in the environment."
+            )
+    else:
+        logger.warning(
+            f"ENVIRONMENT={settings.ENVIRONMENT}: unsigned webhooks are accepted and development default secrets are allowed. "
+            "Set ENVIRONMENT=production for any deployed instance."
+        )
+
     logger.info("Initializing KAI Sanctuary Database...")
     init_db()
     logger.info("Database initialized successfully.")
+
+    # Live Communications & Production Delivery Status Telemetry
+    email_status = "LIVE (Resend API)" if (settings.ENABLE_LIVE_EMAIL_DISPATCH and settings.RESEND_API_KEY) else "SIMULATED (Local Logs / Review Queue)"
+    whatsapp_status = "LIVE (Meta Cloud API)" if (settings.ENABLE_LIVE_WHATSAPP_DISPATCH and settings.WHATSAPP_CLOUD_API_KEY) else "SIMULATED (Interactive Sandbox)"
+    tern_status = "LIVE (Tern API)" if (settings.ENABLE_LIVE_TERN_API and settings.TERN_API_KEY) else "STAGED (Internal Review)"
+
+    logger.info(f"KAI Communications Dispatch Mode: Email={email_status} | WhatsApp={whatsapp_status} | Tern CRM={tern_status}")
+
+    if settings.ENVIRONMENT == "production":
+        if not settings.RESEND_API_KEY and settings.ENABLE_LIVE_EMAIL_DISPATCH:
+            logger.warning("Configuration warning: ENABLE_LIVE_EMAIL_DISPATCH is true but RESEND_API_KEY is missing.")
+        if not settings.WHATSAPP_CLOUD_API_KEY and settings.ENABLE_LIVE_WHATSAPP_DISPATCH:
+            logger.warning("Configuration warning: ENABLE_LIVE_WHATSAPP_DISPATCH is true but WHATSAPP_CLOUD_API_KEY is missing.")
     yield
     logger.info("Shutting down KAI Sanctuary API.")
 
@@ -77,8 +110,10 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
 )
+
+from backend.sidecar.routers.webhooks import verify_admin
+from fastapi import Depends
 
 # Mount Routers under /api/v1
 app.include_router(health.router, prefix=settings.API_V1_PREFIX)
@@ -88,20 +123,26 @@ app.include_router(concierge.router, prefix=settings.API_V1_PREFIX)
 app.include_router(wellness.router, prefix=settings.API_V1_PREFIX)
 app.include_router(newsletter.router, prefix=settings.API_V1_PREFIX)
 app.include_router(testimonials.router, prefix=settings.API_V1_PREFIX)
+app.include_router(drafts.router, prefix=settings.API_V1_PREFIX, dependencies=[Depends(verify_admin)])
 
 # Mount Tern CRM Intelligence Sidecar Routers
-app.include_router(sidecar_intakes.router, prefix=f"{settings.API_V1_PREFIX}/sidecar")
-app.include_router(sidecar_leads.router, prefix=f"{settings.API_V1_PREFIX}/sidecar")
-app.include_router(sidecar_messaging.router, prefix=f"{settings.API_V1_PREFIX}/sidecar")
-app.include_router(sidecar_reconciliation.router, prefix=f"{settings.API_V1_PREFIX}/sidecar")
+# Note: sidecar_email_in, sidecar_whatsapp, and sidecar_webhooks contain public/webhook endpoints with their own granular auth
+app.include_router(sidecar_intakes.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
+app.include_router(sidecar_leads.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
+app.include_router(sidecar_messaging.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
+app.include_router(sidecar_reconciliation.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
 app.include_router(sidecar_email_in.router, prefix=f"{settings.API_V1_PREFIX}/sidecar")
 app.include_router(sidecar_whatsapp.router, prefix=f"{settings.API_V1_PREFIX}/sidecar")
-app.include_router(sidecar_copilot.router, prefix=f"{settings.API_V1_PREFIX}/sidecar")
-app.include_router(sidecar_calendar.router, prefix=f"{settings.API_V1_PREFIX}/sidecar")
+app.include_router(sidecar_copilot.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
+app.include_router(sidecar_calendar.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
 app.include_router(sidecar_webhooks.router, prefix=f"{settings.API_V1_PREFIX}/sidecar")
-app.include_router(sidecar_travel.router, prefix=f"{settings.API_V1_PREFIX}/sidecar")
-app.include_router(sidecar_vendors.router, prefix=f"{settings.API_V1_PREFIX}/sidecar")
-app.include_router(sidecar_system.router, prefix=f"{settings.API_V1_PREFIX}/sidecar")
+app.include_router(sidecar_travel.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
+app.include_router(sidecar_vendors.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
+app.include_router(sidecar_system.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
+app.include_router(sidecar_continuity.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
+
+# Mount Guest Sanctuary Companion (Public — magic-link token auth, no admin credentials needed)
+app.include_router(sidecar_guest_portal.router, prefix=f"{settings.API_V1_PREFIX}/sidecar")
 
 
 @app.get("/", tags=["Root"])
@@ -115,3 +156,11 @@ def root():
         "redoc": "/redoc",
         "health": f"{settings.API_V1_PREFIX}/health"
     }
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(f"Global unhandled exception on {request.method} {request.url}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "An unexpected internal server error occurred.", "type": type(exc).__name__}
+    )

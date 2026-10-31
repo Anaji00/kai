@@ -15,13 +15,13 @@ export default function BookPage() {
       {/* Page Header */}
       <div className="text-center max-w-3xl mx-auto space-y-3">
         <span className="inline-block rounded-full bg-sand px-4 py-1 text-xs uppercase tracking-[0.25em] text-olive font-semibold border border-sand-border">
-          Intimate 12–14 Guest Cohorts
+          Intimate 12–14 Guest Retreat Groups
         </span>
         <h1 className="font-serif text-4xl sm:text-6xl text-sage font-light tracking-tight">
           Sanctuary Reservation
         </h1>
         <p className="text-sm sm:text-base text-sage/80 font-light leading-relaxed">
-          Begin your journey toward nervous system down-regulation and deep renewal. Each reservation inquiry is personally reviewed by founder Kareena Islam.
+          Begin your journey toward deep nervous system relaxation and renewal. Each reservation inquiry is personally reviewed by founder Kareena Islam.
         </p>
       </div>
 

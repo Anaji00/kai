@@ -69,7 +69,7 @@ export default function HomePage() {
             className="mx-auto mt-6 max-w-2xl text-base sm:text-lg text-sage/80 leading-relaxed font-light"
           >
             <em>Kai</em> means renewal in Japanese — a return to balance, to presence, to yourself. 
-            Immersive wellness sanctuaries grounded in acute care autonomic medicine, crystal sound resonance, and quiet luxury travel.
+            Immersive wellness sanctuaries grounded in restorative wellness and whole-body healing, crystal sound resonance, and quiet luxury travel.
           </motion.p>
 
           {/* CTAs */}
@@ -152,11 +152,11 @@ export default function HomePage() {
                     The Nurse
                   </h3>
                   <p className="text-xs text-olive font-medium mt-0.5">
-                    Acute Care & Autonomic Science
+                    Nurse-Led Care & Restorative Science
                   </p>
                 </div>
                 <p className="text-xs leading-relaxed text-sage/80">
-                  With deep clinical foundations in acute and surgical nursing across Texas medical centers (Memorial Hermann, HCA Healthcare, Texas A&M alumnus), Kareena grounds every retreat in physiological fact. We measure and target sympathetic nervous system decompensation, cortisol rhythm restoration, and systemic inflammation reduction.
+                  With deep clinical foundations in acute and surgical nursing across Texas medical centers (Memorial Hermann, HCA Healthcare, Texas A&M graduate), Kareena grounds every retreat in physiological science. We gently relieve chronic nervous system exhaustion, restore natural cortisol rhythms, and soothe full-body inflammation.
                 </p>
               </div>
 
@@ -310,7 +310,7 @@ export default function HomePage() {
               KAI Fall Retreat • Riviera Maya, Mexico
             </h3>
             <p className="text-xs text-sage/75 max-w-2xl">
-              October 1 – 4, 2026 at luxury adults-only El Dorado Seaside Palms. Rapid pre-holiday autonomic reset and oceanfront crystal bowl healing.
+              October 1 – 4, 2026 at luxury adults-only El Dorado Seaside Palms. Rapid pre-holiday nervous system reset and renewal with oceanfront crystal bowl healing.
             </p>
           </div>
 
@@ -394,7 +394,7 @@ export default function HomePage() {
                 White-Glove Airport & Flight Desk
               </p>
               <p className="text-xs text-sage/80 leading-relaxed">
-                Travel stress spikes sympathetic cortisol before a retreat begins. Our dedicated concierge manages flight routing, schedule change protections, tarmac meet-and-greets, and private chauffeured transfers straight to sanctuary gates.
+                Travel stress and fatigue elevate cortisol before a retreat begins. Our dedicated concierge manages flight routing, schedule change protections, tarmac meet-and-greets, and private chauffeured transfers straight to sanctuary gates.
               </p>
             </div>
             <div className="pt-3 border-t border-sand-border/60 text-[11px] text-sage/70 font-medium">
@@ -463,7 +463,7 @@ export default function HomePage() {
           </div>
 
           <blockquote className="font-serif text-2xl sm:text-4xl md:text-5xl font-light leading-snug text-linen">
-            &ldquo;In modern life, high achievers live trapped in chronic sympathetic overdrive — shallow breath, constant vigilance, and hidden systemic inflammation. True wellness is not a generic spa day; it is teaching your nervous system how to feel safe enough to rest.&rdquo;
+            &ldquo;In modern life, high achievers live trapped in chronic stress and daily exhaustion — shallow breath, constant urgency, and hidden fatigue. True wellness is not a generic spa day; it is teaching your nervous system how to feel safe enough to rest.&rdquo;
           </blockquote>
 
           <div className="pt-2">
@@ -482,7 +482,7 @@ export default function HomePage() {
                 Nervous System Shift
               </h4>
               <p className="text-xs text-sand-border/70 leading-relaxed">
-                Transitioning out of fight-or-flight into parasympathetic ventral vagal dominance through calibrated breath and silence.
+                Transitioning out of fight-or-flight into natural bodily calm and peaceful sleep through intentional breath and silence.
               </p>
             </div>
 

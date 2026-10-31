@@ -1,6 +1,5 @@
 "use client";
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Sun,
   CloudSun,
@@ -11,22 +10,22 @@ import {
   HeartPulse,
   RefreshCw,
   CheckCircle2,
-  ShieldCheck,
-  AlertCircle
+  ShieldCheck
 } from "lucide-react";
 import { WeatherForecast, fetchSanctuaryWeather } from "@/lib/sidecar-api";
 
 interface MicroclimateWeatherTabProps {
   sanctuarySlug: string;
-  viewMode: "client" | "clinical";
 }
 
-export default function MicroclimateWeatherTab({ sanctuarySlug, viewMode }: MicroclimateWeatherTabProps) {
+export default function MicroclimateWeatherTab({ sanctuarySlug }: MicroclimateWeatherTabProps) {
   const [weather, setWeather] = useState<WeatherForecast | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const loadWeather = async () => {
-    setLoading(true);
+  const loadWeather = useCallback(async (showSpinner: boolean = false) => {
+    if (showSpinner) {
+      setLoading(true);
+    }
     try {
       const data = await fetchSanctuaryWeather(sanctuarySlug);
       setWeather(data);
@@ -35,10 +34,24 @@ export default function MicroclimateWeatherTab({ sanctuarySlug, viewMode }: Micr
     } finally {
       setLoading(false);
     }
-  };
+  }, [sanctuarySlug]);
 
   useEffect(() => {
-    loadWeather();
+    let active = true;
+    fetchSanctuaryWeather(sanctuarySlug)
+      .then(data => {
+        if (active) {
+          setWeather(data);
+          setLoading(false);
+        }
+      })
+      .catch(e => {
+        console.error("Failed to fetch weather:", e);
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [sanctuarySlug]);
 
   return (
@@ -50,15 +63,9 @@ export default function MicroclimateWeatherTab({ sanctuarySlug, viewMode }: Micr
             <span className="p-1.5 rounded-md bg-amber-500/10 text-amber-700">
               <Sun className="w-4 h-4" />
             </span>
-            <h2 className="font-serif text-lg font-bold text-[#2D3E35]">
-              {viewMode === "client" ? "Sanctuary Weather & Sunshine" : "Microclimate Bioclimatology & Solar Radiance"}
-            </h2>
+            <h2 className="font-serif text-lg font-bold text-[#2D3E35]">Sanctuary Weather & Sunshine</h2>
           </div>
-          <p className="text-xs text-[#5C6B5E] mt-1">
-            {viewMode === "client"
-              ? "Real-time coastal microclimate, sunshine intensity, and nurse-curated breathwork windows."
-              : "Live Open-Meteo telemetry with in-memory TTL caching (15-min) and autonomic bioclimatic evaluation."}
-          </p>
+          <p className="text-xs text-[#5C6B5E] mt-1">Real-time coastal microclimate, sunshine intensity, and host-curated breathwork windows.</p>
         </div>
 
         <div className="flex items-center space-x-2">
@@ -69,7 +76,7 @@ export default function MicroclimateWeatherTab({ sanctuarySlug, viewMode }: Micr
             </span>
           )}
           <button
-            onClick={loadWeather}
+            onClick={() => loadWeather(true)}
             disabled={loading}
             className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-[#2D3E35] bg-[#F2ECE4] hover:bg-[#EBE3D8] border border-[#E5DDD0] rounded-md transition-all shadow-2xs"
           >
@@ -158,13 +165,11 @@ export default function MicroclimateWeatherTab({ sanctuarySlug, viewMode }: Micr
             </div>
           </div>
 
-          {/* Nurse Clinical Somatic Windows */}
+          {/* Restorative Somatic Windows */}
           <div className="space-y-3 pt-2">
             <h4 className="font-serif text-sm font-bold text-[#2D3E35] flex items-center space-x-2">
               <HeartPulse className="w-4 h-4 text-[#C07D63]" />
-              <span>
-                {viewMode === "client" ? "Nurse-Guided Restorative Windows" : "Bioclimatic Clinical Somatic Prescriptions"}
-              </span>
+              <span>Nurse-Guided Restorative Windows</span>
             </h4>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
@@ -189,12 +194,12 @@ export default function MicroclimateWeatherTab({ sanctuarySlug, viewMode }: Micr
               </div>
             </div>
 
-            {/* Nurse Guidance Callout */}
+            {/* Founder Guidance Callout */}
             <div className="p-4 rounded-xl bg-[#FAF7F2] border border-[#E5DDD0] flex items-start space-x-3 text-xs">
               <Sparkles className="w-5 h-5 text-[#C07D63] shrink-0 mt-0.5" />
               <div className="space-y-1">
                 <span className="font-bold text-[#2D3E35]">
-                  Founder Kareena Islam, BSN, RN &mdash; Clinical Somatic Guidance:
+                  Founder Kareena Islam &mdash; Clinical Somatic Guidance:
                 </span>
                 <p className="text-[#2D3E35] leading-relaxed">
                   {weather.nurse_somatic_guidance}

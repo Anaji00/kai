@@ -43,10 +43,9 @@ const InteractiveSanctuaryMap = dynamic(
 
 interface TravelTransitTabProps {
   sanctuarySlug: string;
-  viewMode: "client" | "clinical";
 }
 
-export default function TravelTransitTab({ sanctuarySlug, viewMode }: TravelTransitTabProps) {
+export default function TravelTransitTab({ sanctuarySlug }: TravelTransitTabProps) {
   const [routes, setRoutes] = useState<SanctuaryRoute[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<SanctuaryRoute | null>(null);
   const [pois, setPois] = useState<SomaticPointOfInterest[]>([]);
@@ -70,7 +69,6 @@ export default function TravelTransitTab({ sanctuarySlug, viewMode }: TravelTran
 
   useEffect(() => {
     let isMounted = true;
-    setLoading(true);
 
     Promise.all([
       fetchSanctuaryRoutes(sanctuarySlug),
@@ -182,15 +180,9 @@ export default function TravelTransitTab({ sanctuarySlug, viewMode }: TravelTran
             <span className="p-1.5 rounded-md bg-[#2D3E35]/10 text-[#2D3E35]">
               <Compass className="w-4 h-4" />
             </span>
-            <h2 className="font-serif text-lg font-bold text-[#2D3E35]">
-              {viewMode === "client" ? "Scenic Travel & Private Chauffeur" : "Dynamic Road Routing & Interactive Telemetry"}
-            </h2>
+            <h2 className="font-serif text-lg font-bold text-[#2D3E35]">Scenic Travel & Private Chauffeur</h2>
           </div>
-          <p className="text-xs text-[#5C6B5E] mt-1">
-            {viewMode === "client"
-              ? "Effortless travel from international runways to your villa door, guided by gentle pacing and private tarmac escorts."
-              : "Official road routing with real highway coordinates, terrain-adjusted transit velocity, and luxury fleet dispatch."}
-          </p>
+          <p className="text-xs text-[#5C6B5E] mt-1">Effortless travel from international runways to your villa door, guided by gentle pacing and private tarmac escorts.</p>
         </div>
 
         <div className="flex items-center space-x-2">
@@ -219,11 +211,8 @@ export default function TravelTransitTab({ sanctuarySlug, viewMode }: TravelTran
         selectedRoute={selectedRoute}
         pois={pois}
         transfers={transfers}
-        viewMode={viewMode}
-        onSelectRoute={(r) => setSelectedRoute(r)}
+        
       />
-
-      {/* 2. Dynamic Route Calculator Drawer */}
       {showCalculator && (
         <form
           onSubmit={handleCalculateRoute}
@@ -239,7 +228,10 @@ export default function TravelTransitTab({ sanctuarySlug, viewMode }: TravelTran
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
             <div className="space-y-1.5">
-              <label className="font-semibold text-[#2D3E35]">Departure Gateway / Airport</label>
+              <label className="font-semibold text-[#2D3E35] flex items-center space-x-1.5">
+                <MapPin className="w-3.5 h-3.5 text-[#C07D63]" />
+                <span>Departure Gateway / Airport</span>
+              </label>
               <input
                 type="text"
                 value={originName}
@@ -266,7 +258,10 @@ export default function TravelTransitTab({ sanctuarySlug, viewMode }: TravelTran
             </div>
 
             <div className="space-y-1.5">
-              <label className="font-semibold text-[#2D3E35]">Sanctuary Arrival Villa</label>
+              <label className="font-semibold text-[#2D3E35] flex items-center space-x-1.5">
+                <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Sanctuary Arrival Villa</span>
+              </label>
               <input
                 type="text"
                 value={destName}
@@ -341,9 +336,7 @@ export default function TravelTransitTab({ sanctuarySlug, viewMode }: TravelTran
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-              <h3 className="font-serif text-sm font-bold text-[#2D3E35]">
-                {viewMode === "client" ? "Private Chauffeur Arrival Status" : "Tarmac Transfer Dispatch Telemetry"}
-              </h3>
+              <h3 className="font-serif text-sm font-bold text-[#2D3E35]">Private Chauffeur Arrival Status</h3>
             </div>
             <span className="text-[11px] font-semibold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">
               {transfers[0].status.replace(/_/g, " ")}
@@ -397,9 +390,7 @@ export default function TravelTransitTab({ sanctuarySlug, viewMode }: TravelTran
 
       {/* 4. Scenic Routes List Grid */}
       <div className="space-y-3">
-        <h3 className="font-serif text-sm font-bold text-[#2D3E35] uppercase tracking-wider">
-          {viewMode === "client" ? "Curated Scenic Routes" : "Calculated Geodesic Route Registry"}
-        </h3>
+        <h3 className="font-serif text-sm font-bold text-[#2D3E35] uppercase tracking-wider">Curated Scenic Routes</h3>
 
         {routes.length === 0 ? (
           <div className="p-8 text-center bg-white rounded-xl border border-[#E5DDD0] text-xs text-[#5C6B5E]">
@@ -457,14 +448,8 @@ export default function TravelTransitTab({ sanctuarySlug, viewMode }: TravelTran
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h3 className="font-serif text-sm font-bold text-[#2D3E35] uppercase tracking-wider">
-              {viewMode === "client" ? "Tranquil Nature Waypoints" : "Somatic Points of Interest (Vagal Stimuli)"}
-            </h3>
-            <p className="text-xs text-[#5C6B5E]">
-              {viewMode === "client"
-                ? "Secret waterfalls, peaceful sunset bluffs, and sacred springs curated for deep natural relaxation."
-                : "Biophilic waypoints engineered for mammalian dive reflex activation and circadian melatonin synchronization."}
-            </p>
+            <h3 className="font-serif text-sm font-bold text-[#2D3E35] uppercase tracking-wider">Tranquil Nature Waypoints</h3>
+            <p className="text-xs text-[#5C6B5E]">Secret waterfalls, peaceful sunset bluffs, and sacred springs curated for deep natural relaxation.</p>
           </div>
           <span className="text-xs font-semibold px-2.5 py-1 bg-[#F2ECE4] border border-[#E5DDD0] rounded text-[#2D3E35]">
             {pois.length} Curated Waypoints
@@ -494,9 +479,7 @@ export default function TravelTransitTab({ sanctuarySlug, viewMode }: TravelTran
               <div className="p-2.5 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-xs text-[#2D3E35] space-y-1">
                 <div className="font-semibold text-[#C07D63] text-[11px] flex items-center space-x-1">
                   <Sparkles className="w-3 h-3" />
-                  <span>
-                    {viewMode === "client" ? "Nervous System Calming Benefit" : "Autonomic Vagal Mechanism"}
-                  </span>
+                  <span>Nervous System Calming Benefit</span>
                 </div>
                 <p className="text-[11px] text-[#2D3E35] leading-normal">{p.vagus_nerve_benefit}</p>
               </div>

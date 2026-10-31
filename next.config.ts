@@ -1,7 +1,15 @@
 import type { NextConfig } from "next";
 import path from "node:path";
 
+// On Vercel the /api/v1 rewrite target is baked in at build time, so a missing backend URL
+// would silently point production at localhost. Fail the build instead.
+if (process.env.VERCEL && !process.env.FASTAPI_BACKEND_URL) {
+  throw new Error("FASTAPI_BACKEND_URL must be set in the Vercel project (e.g. https://api.kaiwellnessretreats.com).");
+}
+
 const nextConfig: NextConfig = {
+  // Standalone output is for the Docker image; Vercel uses its own build output.
+  output: process.env.VERCEL ? undefined : "standalone",
   turbopack: {
     root: path.resolve(__dirname),
   },
@@ -40,7 +48,7 @@ const nextConfig: NextConfig = {
           },
           {
             key: "Permissions-Policy",
-            value: "camera=(), microphone=(), geolocation=()",
+            value: "camera=(), microphone=(self), geolocation=()",
           },
         ],
       },

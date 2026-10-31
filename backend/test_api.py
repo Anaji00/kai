@@ -61,7 +61,10 @@ def test_booking_workflow():
     print(f"[PASS] Booking creation passed (Ref: {ref})")
 
     # Lookup booking
-    res_lookup = client.get(f"/api/v1/bookings/{ref}")
+    assert client.get(f"/api/v1/bookings/{ref}").status_code == 422
+    assert client.get(f"/api/v1/bookings/{ref}?email=someone.else@example.com").status_code == 404
+
+    res_lookup = client.get(f"/api/v1/bookings/{ref}?email={payload['email']}")
     assert res_lookup.status_code == 200
     lookup_data = res_lookup.json()
     assert lookup_data["fullName"] == "Eleanor Vance"

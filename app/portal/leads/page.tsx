@@ -173,7 +173,7 @@ export default function LeadsQueuePage() {
 
           <div>
             <label className="block text-xs font-semibold text-[#5C6B5E] mb-1">
-              Modality / Partner Specialization
+              Practice Focus / Partner Specialization
             </label>
             <select
               value={selectedCategory}
@@ -321,7 +321,7 @@ export default function LeadsQueuePage() {
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-[#5C6B5E] uppercase tracking-wider">
-                      Tailored B2B Collaboration Thesis:
+                      Tailored Partnership Plan &amp; Talking Points:
                     </span>
                     {!isEditing && isPending && (
                       <button
@@ -332,7 +332,7 @@ export default function LeadsQueuePage() {
                         className="inline-flex items-center space-x-1 text-xs text-[#5C6B5E] hover:text-[#2D3E35]"
                       >
                         <Edit3 className="w-3 h-3" />
-                        <span>Edit Thesis</span>
+                        <span>Edit Partnership Plan</span>
                       </button>
                     )}
                   </div>
@@ -362,7 +362,7 @@ export default function LeadsQueuePage() {
                     </div>
                   ) : (
                     <p className="text-xs text-[#2D3E35] bg-[#FAF7F2]/60 p-3 rounded-lg border border-[#E5DDD0] leading-relaxed">
-                      {lead.outreach_thesis || "No outreach thesis formulated."}
+                      {lead.outreach_thesis || "No partnership plan formulated."}
                     </p>
                   )}
                 </div>

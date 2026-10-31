@@ -1,8 +1,9 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any, List
 from sqlalchemy.orm import Session
 from backend.sidecar.models import SmsDispatch
+from backend.models import ActionDraft
 from backend.config import settings
 
 logger = logging.getLogger("kai_messaging")
@@ -29,6 +30,16 @@ def stage_operational_alert(
     db.add(sms)
     db.commit()
     db.refresh(sms)
+
+    # Push auto task to Action Drafts review queue
+    draft = ActionDraft(
+        type="sms_alert",
+        guest_name=recipient_name,
+        content=f"Operational SMS Alert staged for {recipient_name} ({recipient_phone}): {message_body}"
+    )
+    db.add(draft)
+    db.commit()
+
     logger.info(f"Staged operational alert ping for {recipient_name} ({recipient_phone}): '{message_body[:60]}...'")
     return sms
 
@@ -59,11 +70,19 @@ def stage_campaign_broadcast(
             recipient_phone=c["phone"],
             recipient_name=c["name"],
             message_body=personalized_body,
-            dispatch_type="CAMPAIGN_BROADCAST",
+            dispatch_type="BROADCAST",
             status="PENDING_APPROVAL"
         )
         db.add(sms)
         staged_dispatches.append(sms)
+
+        # Push auto task to Action Drafts review queue
+        draft = ActionDraft(
+            type="campaign_broadcast",
+            guest_name=c["name"],
+            content=f"Campaign broadcast ({target_segment}) staged for {c['name']} ({c['phone']}): {personalized_body}"
+        )
+        db.add(draft)
 
     db.commit()
     for s in staged_dispatches:
@@ -115,7 +134,7 @@ def authorize_and_dispatch_sms(
 
     sms.status = "DISPATCHED"
     sms.authorized_by = operator_name
-    sms.dispatched_at = datetime.utcnow()
+    sms.dispatched_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(sms)
 

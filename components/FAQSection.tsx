@@ -15,7 +15,7 @@ const FAQS: FAQItem[] = [
     category: "Philosophy",
     question: "How does KAI differ from typical wellness or yoga retreats?",
     answer:
-      "Most retreats offer temporary escapes with generic classes. KAI was founded by Kareena Islam to treat the physiological root of modern burnout: autonomic nervous system dysregulation. Every schedule, breathwork cadence, Yin pose, and 432Hz crystal bowl frequency is clinical-grade and intentionally sequenced to shift your body from sympathetic hyper-vigilance into deep ventral vagal restoration.",
+      "Most retreats offer temporary escapes with generic classes. KAI was founded by Kareena Islam to treat the root of modern burnout: chronic nervous system stress and exhaustion. Every schedule, breathwork cadence, Yin pose, and 432Hz crystal bowl frequency is clinical-grade and intentionally sequenced to shift your body from chronic fight-or-flight tension into deep, restful peace.",
   },
   {
     category: "Experience",
@@ -25,9 +25,9 @@ const FAQS: FAQItem[] = [
   },
   {
     category: "Philosophy",
-    question: "Why are cohorts strictly limited to 12–14 participants?",
+    question: "Why are retreat groups strictly limited to 12–14 participants?",
     answer:
-      "True nervous system down-regulation requires psychological safety and genuine intimacy. Small cohorts allow Kareena to provide individualized somatic attention, ensure tranquil sanctuary grounds, and preserve the sacred stillness needed for profound restoration.",
+      "True nervous system relaxation and deep restoration require psychological safety and genuine intimacy. Small retreat groups allow Kareena to provide individualized somatic attention, ensure tranquil sanctuary grounds, and preserve the sacred stillness needed for profound rest.",
   },
   {
     category: "Travel & Logistics",
@@ -45,7 +45,7 @@ const FAQS: FAQItem[] = [
     category: "Travel & Logistics",
     question: "How does travel booking and flight coordination work?",
     answer:
-      "Through our direct backing by Grand Travel & Cruise (25+ years of host agency mastery), our dedicated travel desk manages every detail: optimal flight routing, schedule change protections, luggage handling, and private chauffeured VIP transfers directly to sanctuary gates. We eliminate travel friction entirely so your nervous system down-regulates the moment you leave home.",
+      "Through our direct backing by Grand Travel & Cruise (25+ years of host agency mastery), our dedicated travel desk manages every detail: optimal flight routing, schedule change protections, luggage handling, and private chauffeured VIP transfers directly to sanctuary gates. We eliminate travel friction entirely so your body unwinds and settles into ease the moment you leave home.",
   },
   {
     category: "Travel & Logistics",
@@ -79,7 +79,7 @@ export default function FAQSection() {
           Frequently Asked Questions
         </h2>
         <p className="text-xs sm:text-sm text-sage/80 leading-relaxed font-light">
-          Everything you need to know about our nurse-led sanctuaries, intimate cohort curation, and bespoke travel logistics.
+          Everything you need to know about our nurse-led sanctuaries, intimate group curation, and bespoke travel logistics.
         </p>
       </div>
 

@@ -23,10 +23,9 @@ import {
 
 interface VerifiedReviewsTabProps {
   sanctuarySlug: string;
-  viewMode: "client" | "clinical";
 }
 
-export default function VerifiedReviewsTab({ sanctuarySlug, viewMode }: VerifiedReviewsTabProps) {
+export default function VerifiedReviewsTab({ sanctuarySlug }: VerifiedReviewsTabProps) {
   const [reviews, setReviews] = useState<DestinationReview[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -37,13 +36,15 @@ export default function VerifiedReviewsTab({ sanctuarySlug, viewMode }: Verified
   // Form modal state
   const [showAddModal, setShowAddModal] = useState(false);
   const [guestName, setGuestName] = useState("");
-  const [stayDates, setStayDates] = useState("Recent Cohort");
+  const [stayDates, setStayDates] = useState("Recent Retreat Group");
   const [rating, setRating] = useState(5.0);
   const [reviewText, setReviewText] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const loadReviews = async () => {
-    setLoading(true);
+  const loadReviews = React.useCallback(async (isUserAction: boolean = false) => {
+    if (isUserAction) {
+      setLoading(true);
+    }
     try {
       const data = await fetchDestinationReviews(sanctuarySlug);
       setReviews(data);
@@ -52,10 +53,24 @@ export default function VerifiedReviewsTab({ sanctuarySlug, viewMode }: Verified
     } finally {
       setLoading(false);
     }
-  };
+  }, [sanctuarySlug]);
 
   useEffect(() => {
-    loadReviews();
+    let active = true;
+    fetchDestinationReviews(sanctuarySlug)
+      .then(data => {
+        if (active) {
+          setReviews(data);
+          setLoading(false);
+        }
+      })
+      .catch(e => {
+        console.error("Failed to fetch reviews:", e);
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
   }, [sanctuarySlug]);
 
   const handleSimulateWebhook = async () => {
@@ -63,7 +78,7 @@ export default function VerifiedReviewsTab({ sanctuarySlug, viewMode }: Verified
     setSimFeedback(null);
     try {
       const sampleReviews = [
-        "The utter silence of the villa shala allowed my nervous system to drop out of fight-or-flight within 24 hours. Slept eight unbroken hours every single night. Kareena's care was gentle, grounding, and deeply reassuring.",
+        "The utter silence of the villa shala allowed my body to completely unwind from daily stress within 24 hours. Slept eight unbroken hours every single night. Kareena's care was gentle, grounding, and deeply reassuring.",
         "As a surgeon with chronic sleep disturbances, this was the first time in ten years I woke up feeling truly restored. The organic coastal meals and dusk sound baths calmed my heart rate noticeably.",
         "Pure peace and stillness. Waking up to ocean breezes, practicing gentle 4-7-8 breathwork with Kareena, and walking barefoot on the sand reset my entire perspective."
       ];
@@ -71,8 +86,8 @@ export default function VerifiedReviewsTab({ sanctuarySlug, viewMode }: Verified
 
       const created = await simulateReviewWebhook({
         sanctuary_slug: sanctuarySlug,
-        guest_name: "Verified Cohort Guest",
-        stay_dates: "Current 2026 Cohort",
+        guest_name: "Verified Retreat Guest",
+        stay_dates: "Current 2026 Retreat Group",
         rating: 5.0,
         comment: randomText
       });
@@ -133,15 +148,9 @@ export default function VerifiedReviewsTab({ sanctuarySlug, viewMode }: Verified
             <span className="p-1.5 rounded-md bg-purple-50 text-purple-700">
               <MessageSquare className="w-4 h-4" />
             </span>
-            <h2 className="font-serif text-lg font-bold text-[#2D3E35]">
-              {viewMode === "client" ? "Guest Reflections & Reviews" : "Somatic Sentiment NLP & Verified Review Telemetry"}
-            </h2>
+            <h2 className="font-serif text-lg font-bold text-[#2D3E35]">Guest Reflections & Reviews</h2>
           </div>
-          <p className="text-xs text-[#5C6B5E] mt-1">
-            {viewMode === "client"
-              ? "Verified stories of deep sleep, acoustic quietude, and nursing care from previous retreat guests."
-              : "Post-retreat somatic sentiment evaluation tracking circadian down-regulation and parasympathetic recovery."}
-          </p>
+          <p className="text-xs text-[#5C6B5E] mt-1">Verified stories of deep sleep, acoustic quietude, and nursing care from previous retreat guests.</p>
         </div>
 
         <div className="flex items-center space-x-2">
@@ -161,7 +170,7 @@ export default function VerifiedReviewsTab({ sanctuarySlug, viewMode }: Verified
             <span>Add Reflection</span>
           </button>
           <button
-            onClick={loadReviews}
+            onClick={() => loadReviews(true)}
             disabled={loading}
             className="p-1.5 text-[#5C6B5E] hover:text-[#2D3E35] hover:bg-[#F2ECE4] rounded-md transition-colors"
           >
@@ -185,9 +194,7 @@ export default function VerifiedReviewsTab({ sanctuarySlug, viewMode }: Verified
             <Moon className="w-5 h-5" />
           </span>
           <div>
-            <span className="text-xs text-[#5C6B5E] font-medium block">
-              {viewMode === "client" ? "Deep Unbroken Sleep" : "Circadian Restoration Score"}
-            </span>
+            <span className="text-xs text-[#5C6B5E] font-medium block">Deep Unbroken Sleep</span>
             <div className="flex items-baseline space-x-1.5 mt-0.5">
               <span className="text-2xl font-serif font-bold text-[#2D3E35]">{avgSleep}%</span>
               <span className="text-[11px] text-emerald-700 font-medium">Verified by surveys</span>
@@ -200,9 +207,7 @@ export default function VerifiedReviewsTab({ sanctuarySlug, viewMode }: Verified
             <VolumeX className="w-5 h-5" />
           </span>
           <div>
-            <span className="text-xs text-[#5C6B5E] font-medium block">
-              {viewMode === "client" ? "Peaceful Acoustic Quietude" : "Soundscape Tranquility Index"}
-            </span>
+            <span className="text-xs text-[#5C6B5E] font-medium block">Peaceful Acoustic Quietude</span>
             <div className="flex items-baseline space-x-1.5 mt-0.5">
               <span className="text-2xl font-serif font-bold text-[#2D3E35]">{avgQuiet}%</span>
               <span className="text-[11px] text-emerald-700 font-medium">Protected by 12-14 cap</span>
@@ -215,9 +220,7 @@ export default function VerifiedReviewsTab({ sanctuarySlug, viewMode }: Verified
             <HeartHandshake className="w-5 h-5" />
           </span>
           <div>
-            <span className="text-xs text-[#5C6B5E] font-medium block">
-              {viewMode === "client" ? "Nurse Attentiveness & Care" : "Clinical Guide Compassion Score"}
-            </span>
+            <span className="text-xs text-[#5C6B5E] font-medium block">Host Attentiveness & Care</span>
             <div className="flex items-baseline space-x-1.5 mt-0.5">
               <span className="text-2xl font-serif font-bold text-[#2D3E35]">{avgCare}%</span>
               <span className="text-[11px] text-[#C07D63] font-medium">Founder Kareena, RN</span>
@@ -321,14 +324,29 @@ export default function VerifiedReviewsTab({ sanctuarySlug, viewMode }: Verified
               </div>
 
               <div className="space-y-1">
-                <label className="font-semibold text-[#2D3E35]">Stay Dates / Cohort</label>
+                <label className="font-semibold text-[#2D3E35]">Stay Dates / Retreat Group</label>
                 <input
                   type="text"
                   value={stayDates}
                   onChange={e => setStayDates(e.target.value)}
                   className="w-full bg-[#FAF7F2] border border-[#E5DDD0] rounded-md px-3 py-1.5 text-[#2D3E35] focus:outline-none"
-                  placeholder="e.g. November 2025 Sacred Water Cohort"
+                  placeholder="e.g. November 2025 Sacred Water Retreat Group"
                 />
+              </div>
+
+              <div className="space-y-1">
+                <label className="font-semibold text-[#2D3E35]">Overall Rating (1-5)</label>
+                <select
+                  value={rating}
+                  onChange={e => setRating(Number(e.target.value))}
+                  className="w-full bg-[#FAF7F2] border border-[#E5DDD0] rounded-md px-3 py-1.5 text-[#2D3E35] focus:outline-none"
+                >
+                  <option value={5.0}>5 - Transformational</option>
+                  <option value={4.0}>4 - Excellent</option>
+                  <option value={3.0}>3 - Good</option>
+                  <option value={2.0}>2 - Fair</option>
+                  <option value={1.0}>1 - Poor</option>
+                </select>
               </div>
 
               <div className="space-y-1">
@@ -339,7 +357,7 @@ export default function VerifiedReviewsTab({ sanctuarySlug, viewMode }: Verified
                   value={reviewText}
                   onChange={e => setReviewText(e.target.value)}
                   className="w-full bg-[#FAF7F2] border border-[#E5DDD0] rounded-md p-2.5 text-[#2D3E35] focus:outline-none"
-                  placeholder="Reflections on deep sleep, quietude, nervous system calming, or Nurse Kareena's care..."
+                  placeholder="Reflections on deep sleep, quietude, nervous system calming, or Founder Kareena's care..."
                 />
               </div>
 

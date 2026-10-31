@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, Text, DateTime, JSON, Integer, Float, Boolean
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 from backend.database import Base
 
@@ -8,9 +8,12 @@ def generate_uuid_str():
     return str(uuid.uuid4())
 
 
+def _utc_now():
+    return datetime.now(timezone.utc)
+
 class StagingIntake(Base):
     """
-    Staging table for client reservations & clinical inquiries.
+    Staging table for client reservations, wellness preferences, and clinical inquiries.
     MANDATORY GOVERNANCE: ZERO DIRECT AUTONOMOUS WRITES.
     Defaults to status = 'PENDING_APPROVAL'.
     Requires human operator review before syncing to Tern CRM.
@@ -24,6 +27,8 @@ class StagingIntake(Base):
     phone = Column(String(32), nullable=True)
     sanctuary_slug = Column(String(64), nullable=True)  # nosara, amalfi, bali, riviera-maya
     room_tier = Column(String(64), nullable=True)  # Private Villa Sanctuary, Shared Ocean Pavilion
+    wellness_profile = Column(JSON, nullable=True, default=dict)
+    clinical_screening_enabled = Column(Boolean, default=False, nullable=False)
     clinical_profile = Column(JSON, nullable=False, default=dict)
     flight_request = Column(JSON, nullable=True)
     consultation_thesis = Column(JSON, nullable=True)  # Generated Pre-Call Thesis RAG Dossier
@@ -34,8 +39,8 @@ class StagingIntake(Base):
     tern_group_trip_id = Column(String(64), nullable=True)
     tern_contact_id = Column(String(64), nullable=True)
     synced_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=_utc_now, onupdate=_utc_now, nullable=False)
 
 
 class StagedLead(Base):
@@ -56,7 +61,7 @@ class StagedLead(Base):
     outreach_thesis = Column(Text, nullable=True)  # AI-generated partnership proposal
     status = Column(String(32), default="PENDING_APPROVAL", index=True, nullable=False)
     reviewed_by = Column(String(64), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
 
 
 class SmsDispatch(Base):
@@ -74,7 +79,7 @@ class SmsDispatch(Base):
     status = Column(String(32), default="PENDING_APPROVAL", index=True, nullable=False)
     dispatched_at = Column(DateTime, nullable=True)
     authorized_by = Column(String(64), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
 
 
 class SanctuaryKnowledge(Base):
@@ -90,7 +95,7 @@ class SanctuaryKnowledge(Base):
     content = Column(Text, nullable=False)
     metadata_json = Column(JSON, nullable=False, default=dict)
     embedding_json = Column(JSON, nullable=True)  # Vector representation (float array)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
 
 
 class StagedEmail(Base):
@@ -111,7 +116,7 @@ class StagedEmail(Base):
     staging_intake_id = Column(String(36), nullable=True)
     status = Column(String(32), default="PENDING_APPROVAL", index=True, nullable=False)
     reviewed_by = Column(String(64), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
 
 
 class StagedVoucherDiff(Base):
@@ -132,7 +137,7 @@ class StagedVoucherDiff(Base):
     reconciliation_notes = Column(Text, nullable=True)
     status = Column(String(32), default="PENDING_APPROVAL", index=True, nullable=False)
     reviewed_by = Column(String(64), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
 
 
 class WebhookEventLog(Base):
@@ -143,13 +148,14 @@ class WebhookEventLog(Base):
     __tablename__ = "webhook_event_logs"
 
     id = Column(String(36), primary_key=True, default=generate_uuid_str, index=True)
+    provider_event_id = Column(String(128), unique=True, index=True, nullable=True)  # Idempotency deduplication key
     provider = Column(String(64), nullable=False, index=True)  # TERN, HOSPITALITY_EXPEDIA, FLIGHT_DESK, WHATSAPP, RESEND
     event_type = Column(String(64), nullable=False, index=True)  # trip.approved, payment.authorized, hotel.inventory, flight.delayed
     payload_json = Column(JSON, nullable=False, default=dict)
     headers_json = Column(JSON, nullable=False, default=dict)
     status = Column(String(32), default="VERIFIED", index=True, nullable=False)  # VERIFIED, PROCESSED, STAGED, FAILED
     processed_at = Column(DateTime, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
 
 
 class CalendarEvent(Base):
@@ -169,7 +175,7 @@ class CalendarEvent(Base):
     guest_name = Column(String(128), nullable=True)
     location = Column(String(128), nullable=True)
     notes = Column(Text, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
 
 
 class SanctuaryRoute(Base):
@@ -193,8 +199,8 @@ class SanctuaryRoute(Base):
     recommended_vehicle = Column(String(128), nullable=False)
     road_conditions = Column(String(64), default="Paved Coastal Highway")
     route_geometry = Column(JSON, nullable=True, default=list)  # List of [lat, lon] coordinates along real road
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=_utc_now, onupdate=_utc_now, nullable=False)
 
 
 class SomaticPointOfInterest(Base):
@@ -212,7 +218,7 @@ class SomaticPointOfInterest(Base):
     description = Column(Text, nullable=False)
     vagus_nerve_benefit = Column(Text, nullable=False)  # Gentle nervous system calm
     ideal_visiting_time = Column(String(64), default="Early Morning (Gentle Sun)")
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
 
 
 class GroundTransferRecord(Base):
@@ -227,14 +233,15 @@ class GroundTransferRecord(Base):
     intake_id = Column(String(36), nullable=True, index=True)
     pickup_location = Column(String(128), nullable=False)
     dropoff_location = Column(String(128), nullable=False)
+    chauffeur_notes = Column(Text, nullable=True)
     flight_number = Column(String(32), nullable=True)
     pickup_time = Column(DateTime, nullable=False)
     chauffeur_name = Column(String(128), nullable=False)
     vehicle_type = Column(String(64), nullable=False)  # Mercedes Sprinter VIP, Luxury 4WD Suburban, Private Boat
     status = Column(String(32), default="DISPATCHED", index=True, nullable=False)  # DISPATCHED, EN_ROUTE, ARRIVED_AT_TARMAC, COMPLETED
     chilled_amenities = Column(JSON, nullable=False, default=list)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=_utc_now, onupdate=_utc_now, nullable=False)
 
 
 class CuratedDiningSpot(Base):
@@ -255,7 +262,7 @@ class CuratedDiningSpot(Base):
     reservation_required = Column(String(32), default="CONCIERGE_HANDLED")
     lat = Column(Float, nullable=True)
     lon = Column(Float, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
 
 
 class DestinationReview(Base):
@@ -276,7 +283,7 @@ class DestinationReview(Base):
     sentiment_label = Column(String(32), default="DEEPLY_RESTORATIVE")  # DEEPLY_RESTORATIVE, PEACEFUL, RENEWING
     source = Column(String(32), default="VERIFIED_GUEST")  # VERIFIED_GUEST, POST_RETREAT_SURVEY, WEBHOOK
     status = Column(String(32), default="PUBLISHED", index=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
 
 
 class DestinationGuide(Base):
@@ -295,8 +302,8 @@ class DestinationGuide(Base):
     packing_checklist = Column(JSON, nullable=False, default=list)
     emergency_clinic_distance = Column(String(128), nullable=False)
     local_concierge_phone = Column(String(32), nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=_utc_now, onupdate=_utc_now, nullable=False)
 
 
 class UploadedDocumentRecord(Base):
@@ -315,7 +322,7 @@ class UploadedDocumentRecord(Base):
     clinical_notes_found = Column(JSON, nullable=False, default=list)
     travel_details_found = Column(JSON, nullable=False, default=list)
     safety_clearance_status = Column(String(32), default="CLEARED")  # CLEARED, ATTENTION_NEEDED
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
 
 
 class VendorSupplierRecord(Base):
@@ -345,9 +352,54 @@ class VendorSupplierRecord(Base):
     clinical_relevance = Column(Text, nullable=True)
     tern_deep_link = Column(String(256), nullable=True)
     tern_sync_status = Column(String(32), default="SYNCED", index=True, nullable=False)  # SYNCED, PENDING_SYNC, LOCAL_ONLY
-    last_synced_at = Column(DateTime, default=datetime.utcnow, nullable=True)
+    last_synced_at = Column(DateTime, default=_utc_now, nullable=True)
     status = Column(String(32), default="ACTIVE", index=True, nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=_utc_now, onupdate=_utc_now, nullable=False)
+
+
+class GuestPortalSession(Base):
+    """
+    Database-backed guest portal magic-link sessions.
+    Persists token hashes, guest metadata, and TTLs across server reboots.
+    Strict privacy boundary: zero internal notes or clinical contraindications stored here.
+    """
+    __tablename__ = "guest_portal_sessions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid_str, index=True)
+    token_hash = Column(String(64), unique=True, index=True, nullable=False)
+    intake_id = Column(String(36), index=True, nullable=True)
+    client_name = Column(String(128), nullable=False)
+    email = Column(String(128), index=True, nullable=False)
+    sanctuary_slug = Column(String(64), default="nosara", nullable=False)
+    room_tier = Column(String(64), default="Private Villa Sanctuary", nullable=False)
+    flight_request = Column(JSON, nullable=True, default=dict)
+    wellness_profile = Column(JSON, nullable=True, default=dict)
+    expires_at = Column(DateTime, nullable=False)
+    last_accessed_at = Column(DateTime, nullable=True)
+    is_revoked = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=_utc_now, onupdate=_utc_now, nullable=False)
+
+
+class GuestSomaticPulse(Base):
+    """
+    In-stay subjective somatic metrics reported by guests via the sanctuary companion.
+    Tracks sleep restoration, autonomic calm, and subjective vagus tone.
+    Feeds directly into the Clinical Copilot briefing and 30-day continuity arc.
+    """
+    __tablename__ = "guest_somatic_pulses"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid_str, index=True)
+    intake_id = Column(String(36), index=True, nullable=True)
+    guest_name = Column(String(128), nullable=False)
+    sanctuary_slug = Column(String(64), default="nosara", nullable=False)
+    day_number = Column(Integer, default=1, nullable=False)
+    phase = Column(String(32), default="MORNING_AWAKENING", nullable=False)  # MORNING_AWAKENING, EVENING_STILLNESS
+    restorative_sleep_score = Column(Integer, default=8, nullable=False)  # 1 - 10
+    nervous_system_ease = Column(Integer, default=8, nullable=False)  # 1 - 10
+    vagal_tone_descriptor = Column(String(64), nullable=True)  # e.g., "Calm & Grounded", "Open Heart", "Lingering Fatigue"
+    private_reflection_notes = Column(Text, nullable=True)
+    recorded_at = Column(DateTime, default=_utc_now, nullable=False)
 
 

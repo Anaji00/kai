@@ -48,7 +48,7 @@ export const RETREATS: Retreat[] = [
       {
         day: "Day 1",
         title: "Arrival & The Unwinding",
-        highlights: ["San Jose / Liberia VIP transfer", "Welcome botanical elixir & cohort orientation", "Gentle nervous system down-regulation Yin session", "Intimate welcome dinner under the canopy"]
+        highlights: ["San Jose / Liberia VIP transfer", "Welcome botanical elixir & group welcome orientation", "Gentle nervous system down-regulation Yin session", "Intimate welcome dinner under the canopy"]
       },
       {
         day: "Day 2",

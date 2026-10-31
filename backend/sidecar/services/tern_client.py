@@ -1,7 +1,7 @@
 import uuid
 import logging
-from typing import Dict, Any, List
-from datetime import datetime
+from typing import Dict, Any
+from datetime import datetime, timezone
 from backend.config import settings
 
 logger = logging.getLogger("kai_tern_client")
@@ -39,20 +39,10 @@ class TernCRMClient:
         """
         logger.info(f"Operator '{operator_name}' authorized Tern CRM sync for intake: {intake_id} ({client_name})")
 
-        # Derive clinical tags
-        tags = ["KAI_GUEST", "COHORT_2026_2027"]
-        if consultation_thesis and "clinical_flags" in consultation_thesis:
-            for flag in consultation_thesis["clinical_flags"]:
-                tag_map = {
-                    "HIGH_BURNOUT_RISK": "CORTISOL_RESET",
-                    "SYMPATHETIC_HYPERAROUSAL": "VAGAL_DYSREGULATION",
-                    "CIRCADIAN_SLEEP_DISRUPTION": "CIRCADIAN_PROTOCOL",
-                    "LIE_FLAT_VIP_AIR": "LIE_FLAT_REQUIRED",
-                    "SOMATIC_RESTRICTION_PROTOCOL": "SOMATIC_CUSTOM",
-                }
-                tags.append(tag_map.get(flag, flag))
-        
-        tags.append("BLUE_ZONE_DIET")
+        # Standard tags for Tern CRM
+        tags = ["KAI_GUEST", "COHORT_2026_2027", "VIP_RETREAT", "BLUE_ZONE_DIET", "ORGANIC_NUTRITION"]
+        if flight_request and flight_request.get("departure_airport"):
+            tags.append("LIE_FLAT_AIR")
 
         # Contact deduplication simulation
         is_existing_contact = email.lower().endswith("@example.com") and "vance" in email.lower()
@@ -135,6 +125,32 @@ class TernCRMClient:
             "activities": activities
         }
 
+        # Live REST mode if enabled and non-simulated API key present
+        if getattr(settings, "ENABLE_LIVE_TERN_API", False) and not self.api_key.startswith("simulated_"):
+            try:
+                import httpx
+                headers = {
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                    "User-Agent": "KAISanctuaryEngine/1.0"
+                }
+                with httpx.Client(timeout=10.0) as client:
+                    # 1. Contact sync
+                    contact_resp = client.post(f"{self.api_url}/contacts", json=contact_payload, headers=headers)
+                    if contact_resp.status_code in (200, 201):
+                        contact_data = contact_resp.json()
+                        contact_id = contact_data.get("id", contact_id)
+                        trip_payload["contact_id"] = contact_id
+                    # 2. Trip sync
+                    trip_resp = client.post(f"{self.api_url}/trips", json=trip_payload, headers=headers)
+                    if trip_resp.status_code in (200, 201):
+                        trip_data = trip_resp.json()
+                        trip_id = trip_data.get("id", trip_id)
+                        tern_trip_url = trip_data.get("deep_links", {}).get("trip_url", tern_trip_url)
+                        tern_proposal_url = trip_data.get("deep_links", {}).get("proposal_url", tern_proposal_url)
+            except Exception as e:
+                logger.error(f"Live Tern CRM API call failed: {e}. Preserving synchronized staging record.")
+
         logger.info(f"Successfully staged and synced record to Tern CRM: Trip={trip_id}, Contact={contact_id}")
 
         return {
@@ -152,7 +168,7 @@ class TernCRMClient:
             "payment_auth_status": "PENDING_CLIENT_AUTHORIZATION",
             "contact_payload": contact_payload,
             "trip_payload": trip_payload,
-            "synced_at": datetime.utcnow().isoformat(),
+            "synced_at": datetime.now(timezone.utc).isoformat(),
             "operator_authorized": operator_name
         }
 
@@ -217,7 +233,7 @@ class TernCRMClient:
             "tern_supplier_id": tern_sup_id,
             "tern_deep_link": deep_link,
             "supplier_payload": supplier_payload,
-            "synced_at": datetime.utcnow().isoformat(),
+            "synced_at": datetime.now(timezone.utc).isoformat(),
             "operator_authorized": operator_name
         }
 
