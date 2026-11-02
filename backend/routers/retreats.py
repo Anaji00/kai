@@ -70,7 +70,7 @@ def submit_custom_group_inquiry(data: CustomGroupCreate, db: Session = Depends(g
     db.refresh(inquiry)
 
     # Mirror into Sidecar Staging Intakes with Pre-Call Thesis RAG
-    # MANDATORY GOVERNANCE: ZERO DIRECT AUTONOMOUS WRITES TO TERN CRM
+    # MANDATORY GOVERNANCE: ZERO DIRECT AUTONOMOUS WRITES TO SANCTUARY CRM
     try:
         from backend.sidecar.models import StagingIntake
         from backend.sidecar.services.thesis_rag import generate_pre_call_thesis

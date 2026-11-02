@@ -4,7 +4,7 @@ Provides authenticated guest-facing portal data for confirmed travelers.
 Magic-link token authentication: no passwords, no friction.
 
 PRIVACY BOUNDARY: This service NEVER exposes clinical notes, internal operator
-comments, Tern CRM IDs, or financial calculations to the guest surface.
+comments, internal CRM IDs, or financial calculations to the guest surface.
 """
 
 import logging

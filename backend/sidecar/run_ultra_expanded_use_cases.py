@@ -230,7 +230,7 @@ def run_ultra_suite():
     log_banner(
         "3. Inbound Multichannel Telemetry Storm & Concurrent Write Resiliency",
         "Simulates a simultaneous telemetry burst of 20 rapid webhooks across 4 providers: "
-        "Cirium Flight Radar delays, Expedia PMS reservations, WhatsApp inbound pings, and Tern payment webhooks. "
+        "Cirium Flight Radar delays, Expedia PMS reservations, WhatsApp inbound pings, and Resend email webhooks. "
         "Verifies SQLite WAL concurrency handles all 20 writes without locks or contention."
     )
     t0 = time.time()
@@ -267,11 +267,11 @@ def run_ultra_suite():
                     "body": f"Checking arrival transfer details for group {idx}."
                 }
             else:
-                provider = "tern_crm"
+                provider = "cirium_flights"
                 event_type = "payment_auth.completed"
                 payload = {
                     "client": f"Storm Client {idx}",
-                    "trip_id": f"tern_trp_storm_{idx}",
+                    "trip_id": f"kai_trp_storm_{idx}",
                     "amount_usd": 7500.0,
                     "status": "AUTHORIZED"
                 }
@@ -543,7 +543,7 @@ def run_ultra_suite():
         lead_loc = lead.location
         lead_thesis = lead.outreach_thesis
 
-        # Register a Tier 1 Preferred Supplier Partner in Tern CRM Back Office Registry
+        # Register a Tier 1 Preferred Supplier Partner in Sanctuary CRM Back Office Registry
         partner_supplier = VendorSupplierRecord(
             name="Mayfair Somatic & Reformer Institute",
             category="WELLNESS_STUDIO_PARTNER",
@@ -553,7 +553,7 @@ def run_ultra_suite():
             phone="+44 20 7946 0881",
             commission_rate=15.0,
             commission_type="PERCENTAGE",
-            payment_terms="Tern Native Client Card Auth",
+            payment_terms="Sanctuary Native Client Card Auth",
             preferred_tier="PREFERRED_PARTNER",
             service_description="Exclusive Mayfair private reformer studio referring HNW clientele for European retreats.",
             clinical_relevance="Specializes in postural myofascial release and parasympathetic vagus nerve stimulation."

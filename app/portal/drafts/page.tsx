@@ -308,7 +308,7 @@ export default function DraftsQueuePage() {
         </div>
 
         <div className="bg-white rounded-2xl p-4 border border-[#E5DDD0] shadow-sm">
-          <p className="text-xs text-[#5C6B5E] font-medium uppercase tracking-wider">Tern CRM Intakes & Holds</p>
+          <p className="text-xs text-[#5C6B5E] font-medium uppercase tracking-wider">Sanctuary CRM Intakes & Holds</p>
           <p className="text-2xl font-serif font-bold text-indigo-800 mt-1">{stats.by_category.intake || 0}</p>
           <div className="flex items-center space-x-1 text-[11px] text-indigo-700 mt-1">
             <ShieldCheck className="w-3 h-3" />

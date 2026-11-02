@@ -46,7 +46,7 @@ export default function ReconciliationPage() {
         { name: "Camille Laurent", room: "Shared Ocean Pavilion" },
         { name: "Sarah Lin", room: "Private Villa Sanctuary" },
         { name: "Chloe Dupont", room: "Shared Ocean Pavilion" },
-        { name: "Guest Without Tern File", room: "VILLA-07" },
+        { name: "Unlinked Manifest Guest", room: "VILLA-07" },
       ],
       null,
       2
@@ -143,7 +143,7 @@ export default function ReconciliationPage() {
           Guest List &amp; Room Booking Check
         </h1>
         <p className="text-sm text-[#5C6B5E] mt-1">
-          Compare ground operator guest manifests with confirmed Tern bookings to ensure every traveler is accounted for.
+          Compare ground operator guest manifests with confirmed KAI Sanctuary bookings to ensure every traveler is accounted for.
         </p>
       </div>
 
@@ -335,8 +335,8 @@ export default function ReconciliationPage() {
                     <div className="font-bold text-base">{activeDiffResult.external_count}</div>
                   </div>
                   <div className="p-2 bg-white/80 rounded border border-black/5">
-                    <div className="text-[10px] text-[#5C6B5E]">Tern Staged</div>
-                    <div className="font-bold text-base">{activeDiffResult.tern_cohort_count}</div>
+                    <div className="text-[10px] text-[#5C6B5E]">CRM Confirmed</div>
+                    <div className="font-bold text-base">{activeDiffResult.crm_cohort_count}</div>
                   </div>
                   <div className="p-2 bg-white/80 rounded border border-black/5">
                     <div className="text-[10px] text-[#5C6B5E]">Group Limit</div>
@@ -407,7 +407,7 @@ export default function ReconciliationPage() {
                 <tr className="border-b border-[#E5DDD0] text-[#5C6B5E]">
                   <th className="py-2">Document</th>
                   <th className="py-2">Sanctuary</th>
-                  <th className="py-2">Counts (Ext / Tern / Cap)</th>
+                  <th className="py-2">Counts (Ext / CRM / Cap)</th>
                   <th className="py-2">Over Cap</th>
                   <th className="py-2">Status</th>
                   <th className="py-2">Audited At</th>
@@ -419,7 +419,7 @@ export default function ReconciliationPage() {
                     <td className="py-2.5 font-medium text-[#2D3E35]">{h.document_name}</td>
                     <td className="py-2.5 uppercase font-semibold">{h.sanctuary_slug}</td>
                     <td className="py-2.5 font-mono">
-                      {h.external_count} / {h.tern_cohort_count} / {h.cohort_cap}
+                      {h.external_count} / {(h as any).crm_cohort_count} / {h.cohort_cap}
                     </td>
                     <td className="py-2.5">
                       <span

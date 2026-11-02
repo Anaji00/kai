@@ -3,6 +3,23 @@ from sqlalchemy.orm import Session
 from backend.sidecar.models import CuratedDiningSpot, generate_uuid_str
 
 
+def normalize_sanctuary_slug(slug: Optional[str]) -> Optional[str]:
+    if not slug or slug.upper() == "ALL":
+        return None
+    s = slug.lower().strip().replace("_", "-")
+    if "puerto" in s or "vallarta" in s or "marival" in s:
+        return "puerto-vallarta"
+    if "nosara" in s:
+        return "nosara"
+    if "amalfi" in s:
+        return "amalfi"
+    if "bali" in s or "ubud" in s:
+        return "bali"
+    if "riviera" in s or "maya" in s:
+        return "riviera-maya"
+    return s
+
+
 def search_dining_spots(
     db: Session,
     sanctuary_slug: Optional[str] = None,
@@ -15,8 +32,9 @@ def search_dining_spots(
     """
     query = db.query(CuratedDiningSpot)
 
-    if sanctuary_slug and sanctuary_slug.upper() != "ALL":
-        query = query.filter(CuratedDiningSpot.sanctuary_slug == sanctuary_slug.lower())
+    norm_slug = normalize_sanctuary_slug(sanctuary_slug)
+    if norm_slug:
+        query = query.filter(CuratedDiningSpot.sanctuary_slug == norm_slug)
 
     if cuisine_type and cuisine_type.strip():
         query = query.filter(CuratedDiningSpot.cuisine_type.ilike(f"%{cuisine_type}%"))
@@ -65,10 +83,60 @@ def create_dining_spot(db: Session, data: Dict[str, Any]) -> CuratedDiningSpot:
 
 def seed_default_dining_if_empty(db: Session) -> None:
     """
-    Seeds baseline curated dining spots across all 4 retreats if table is empty.
+    Seeds baseline curated dining spots across all retreats.
+    Ensures Puerto Vallarta (2027 flagship) is always seeded.
     """
-    if db.query(CuratedDiningSpot).count() == 0:
-        default_spots = [
+    existing_slugs = set(s.sanctuary_slug for s in db.query(CuratedDiningSpot).all())
+    spots_to_add = []
+
+    if "puerto-vallarta" not in existing_slugs and "puerto-vallarta-2027" not in existing_slugs:
+        spots_to_add.extend([
+            CuratedDiningSpot(
+                id=generate_uuid_str(),
+                sanctuary_slug="puerto-vallarta",
+                name="Melange Armony Coastal Botanical Kitchen",
+                cuisine_type="Organic Farm-to-Table & Nayarit Harvest",
+                dietary_tags=["Gluten-Free", "Dairy-Free", "Organic", "Anti-Inflammatory", "Fresh Catch"],
+                distance_from_villa_km=0.1,
+                description="Located on-site at Marival Harmony overlooking Banderas Bay, featuring wild coastal red snapper, heirloom jicama, and avocado-leaf infused broths.",
+                nurse_notes="Rich in clean omega-3s and gut-soothing prebiotic fibers; ideal for supporting circadian renewal after afternoon ocean pranayama.",
+                price_tier="$$$",
+                reservation_required="CONCIERGE_HANDLED",
+                lat=20.7356,
+                lon=-105.3887
+            ),
+            CuratedDiningSpot(
+                id=generate_uuid_str(),
+                sanctuary_slug="puerto-vallarta",
+                name="Punta de Mita Blue Zone Catch & Harvest Table",
+                cuisine_type="Pacific Pescatarian & Anti-Inflammatory Hearth",
+                dietary_tags=["Gluten-Free", "Low-Histamine", "Organic", "Fresh Catch"],
+                distance_from_villa_km=2.5,
+                description="Breezy open-air terrace sourcing line-caught mahi-mahi and organic vegetables from family cooperatives in the Sierra de Vallejo.",
+                nurse_notes="Low-histamine preparation methods and mineral-dense sea greens reduce neuro-inflammation and promote deep delta-wave sleep.",
+                price_tier="$$$",
+                reservation_required="CONCIERGE_HANDLED",
+                lat=20.7720,
+                lon=-105.5260
+            ),
+            CuratedDiningSpot(
+                id=generate_uuid_str(),
+                sanctuary_slug="puerto-vallarta",
+                name="Sayulita Organic Adaptogen Herb & Cacao Hearth",
+                cuisine_type="Ayurvedic Botanical & Plant-Forward Cuisine",
+                dietary_tags=["Ayurvedic", "Gluten-Free", "Dairy-Free", "Plant-Forward", "Organic"],
+                distance_from_villa_km=14.2,
+                description="Serene jungle garden kitchen crafting stone-ground ceremonial cacao tonics, sprouted ancient grains, and golden turmeric broths.",
+                nurse_notes="Warm digestive spices balance Vata energy and gently calm the nervous system without sugar or caffeine spikes.",
+                price_tier="$$",
+                reservation_required="NO",
+                lat=20.8690,
+                lon=-105.4410
+            )
+        ])
+
+    if "nosara" not in existing_slugs:
+        spots_to_add.extend([
             CuratedDiningSpot(
                 id=generate_uuid_str(),
                 sanctuary_slug="nosara",
@@ -96,7 +164,11 @@ def seed_default_dining_if_empty(db: Session) -> None:
                 reservation_required="NO",
                 lat=9.9750,
                 lon=-85.6620
-            ),
+            )
+        ])
+
+    if "amalfi" not in existing_slugs:
+        spots_to_add.append(
             CuratedDiningSpot(
                 id=generate_uuid_str(),
                 sanctuary_slug="amalfi",
@@ -110,7 +182,11 @@ def seed_default_dining_if_empty(db: Session) -> None:
                 reservation_required="CONCIERGE_HANDLED",
                 lat=40.6350,
                 lon=14.6040
-            ),
+            )
+        )
+
+    if "bali" not in existing_slugs:
+        spots_to_add.append(
             CuratedDiningSpot(
                 id=generate_uuid_str(),
                 sanctuary_slug="bali",
@@ -124,7 +200,11 @@ def seed_default_dining_if_empty(db: Session) -> None:
                 reservation_required="CONCIERGE_HANDLED",
                 lat=-8.5020,
                 lon=115.2480
-            ),
+            )
+        )
+
+    if "riviera-maya" not in existing_slugs and "riviera_maya" not in existing_slugs:
+        spots_to_add.append(
             CuratedDiningSpot(
                 id=generate_uuid_str(),
                 sanctuary_slug="riviera-maya",
@@ -139,6 +219,8 @@ def seed_default_dining_if_empty(db: Session) -> None:
                 lat=20.2180,
                 lon=-87.4590
             )
-        ]
-        db.add_all(default_spots)
+        )
+
+    if spots_to_add:
+        db.add_all(spots_to_add)
         db.commit()

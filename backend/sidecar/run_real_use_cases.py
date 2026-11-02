@@ -179,7 +179,7 @@ def run_use_case_4_clinical_copilot_ai():
     )
 
 def run_use_case_5_whatsapp_operator_dispatch():
-    print_banner("Use Case 5: WhatsApp Mobile Dispatch & 1-Tap Tern CRM Sync")
+    print_banner("Use Case 5: WhatsApp Mobile Dispatch & 1-Tap Sanctuary CRM Commit")
     # 1. Get staged intake
     res_list = client.get("/api/v1/sidecar/intakes", headers=AUTH_HEADER)
     assert res_list.status_code == 200
@@ -214,7 +214,7 @@ def run_use_case_5_whatsapp_operator_dispatch():
     reply_data = res_reply.json()
     assert reply_data["success"] is True
 
-    # 4. 1-Tap Button Click: Authorize & Sync to Tern CRM
+    # 4. 1-Tap Button Click: Authorize & Commit to Sanctuary CRM
     res_click = client.post(
         "/api/v1/sidecar/webhook/whatsapp/simulate",
         json={
@@ -228,12 +228,12 @@ def run_use_case_5_whatsapp_operator_dispatch():
     assert res_click.status_code == 200
     click_data = res_click.json()
     assert click_data["success"] is True
-    assert click_data["updated_intake"]["status"] == "SYNCED_TO_TERN"
+    assert click_data["updated_intake"]["status"] == "CONFIRMED_IN_CRM"
 
     print_result(
-        "WhatsApp Mobile Interactive Handshake & Tern CRM Sync",
+        "WhatsApp Mobile Interactive Handshake & Sanctuary CRM Commit",
         "PASS",
-        f"Intake ID: {intake_id} ({target['client_name']})\nAction: Interactive WhatsApp Card -> Inline NLP Edits -> 1-Tap Authorization\nResult: Status synced to Tern CRM with Trip ID: {click_data['updated_intake']['tern_trip_id']}"
+        f"Intake ID: {intake_id} ({target['client_name']})\nAction: Interactive WhatsApp Card -> Inline NLP Edits -> 1-Tap Authorization\nResult: Status committed to Sanctuary CRM with Trip ID: {click_data['updated_intake']['crm_trip_id']}"
     )
 
 def run_use_case_6_travel_logistics_and_dossier():

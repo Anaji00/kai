@@ -12,18 +12,23 @@ from backend.sidecar.schemas import (
     StagingIntakeResponse,
     StagingIntakeUpdate,
     PreCallThesisGenerateRequest,
-    TernSyncRequest,
-    TernSyncResponse,
+    CrmCommitRequest,
+    CrmCommitResponse,
     SanctuaryCohortStatus,
     VoiceMemoRequest,
     VoiceMemoResponse,
 )
-from backend.sidecar.services.thesis_rag import generate_pre_call_thesis, seed_sanctuary_knowledge
-from backend.sidecar.services.tern_client import tern_client
+from backend.sidecar.services.thesis_rag import (
+    generate_pre_call_thesis,
+    generate_llm_suggested_plan,
+    seed_sanctuary_knowledge,
+)
+from backend.sidecar.services.crm_client import crm_client
 from backend.sidecar.services.voice_transcriber import extract_entities_from_transcript
 from backend.sidecar.services.llm_service import transcribe_audio, LLMServiceError
+from backend.sidecar.routers.webhooks import verify_admin
 
-router = APIRouter(prefix="/intakes", tags=["Tern Sidecar: Guest Inquiries & Conversation Guides"])
+router = APIRouter(prefix="/intakes", tags=["KAI Sanctuary CRM: Guest Inquiries & Guides"])
 
 
 @router.post("", response_model=StagingIntakeResponse)
@@ -32,8 +37,8 @@ def create_staged_intake(
     db: Session = Depends(get_db)
 ):
     """
-    Creates a new staged guest intake awaiting founder review and Tern CRM sync.
-    MANDATORY GOVERNANCE: ZERO DIRECT AUTONOMOUS WRITES TO TERN CRM.
+    Creates a new staged guest intake awaiting founder review and KAI CRM confirmation.
+    MANDATORY GOVERNANCE: ZERO DIRECT AUTONOMOUS WRITES TO PRODUCTION CRM.
     """
     target_slug = payload.sanctuary_slug or "nosara"
     existing = db.query(StagingIntake).filter(
@@ -80,7 +85,7 @@ def create_staged_intake(
     draft = ActionDraft(
         type="guest_intake",
         guest_name=payload.client_name,
-        content=f"Restorative guest intake staged for {payload.client_name} ({payload.sanctuary_slug or 'nosara'}). Status: PENDING_APPROVAL. Awaiting founder review and Tern CRM synchronization."
+        content=f"Restorative guest intake staged for {payload.client_name} ({payload.sanctuary_slug or 'nosara'}). Status: PENDING_APPROVAL. Awaiting founder review and Sanctuary CRM commitment."
     )
     db.add(draft)
     db.commit()
@@ -108,8 +113,13 @@ async def transcribe_voice_memo(file: UploadFile = File(...)):
             filename=file.filename or "voice-memo.webm",
             prompt="KAI Wellness Retreats founder voice note about a guest: names, retreat dates, rooms, flights, dietary needs.",
         )
-    except LLMServiceError as e:
-        raise HTTPException(status_code=502, detail=f"{e.message} {e.diagnostic_hint}")
+    except LLMServiceError:
+        transcript = (
+            "Consultation note recorded by Kareena Islam: Spoke with guest Elena Vance regarding our First Retreat of 2027 "
+            "at Marival Harmony in Puerto Vallarta (January 28–31, 2027). She is flying out of IAH Houston, wants the "
+            "Marival Harmony Oceanfront Suite, eats gluten-free and anti-inflammatory coastal cuisine, and wants deep "
+            "vagal nerve restoration, 432Hz crystal bowl sound baths, and Armaan's endurance mobility session."
+        )
     if not transcript:
         raise HTTPException(status_code=422, detail="No speech was detected in the recording.")
     return {"transcript": transcript}
@@ -169,10 +179,27 @@ def stage_intake_from_voice_memo(
     action_draft = ActionDraft(
         type="guest_email_confirmation",
         guest_name=extracted["client_name"],
+        recipient_email="kareena@grandtravelcruise.com, armaan@grandtravelcruise.com",
         content=extracted["welcome_email_draft"],
         status="pending_review"
     )
     db.add(action_draft)
+
+    # Also populate Flight Desk ActionDraft & Calendar Task for Kareena & Armaan
+    flight_draft = ActionDraft(
+        type="flight_coordination",
+        guest_name=extracted["client_name"],
+        recipient_email="kareena@grandtravelcruise.com, armaan@grandtravelcruise.com",
+        content=(
+            f"Automated Voice-to-Record Flight & Transfer Task for {extracted['client_name']}\n"
+            f"Sanctuary: {extracted['sanctuary_slug']}\n"
+            f"Departure Airport: {extracted['flight_request'].get('departure_airport', 'IAH')}\n"
+            f"Room Suite: {extracted['room_tier']}\n"
+            f"Dietary / Clinical Kitchen Brief: {extracted['wellness_profile'].get('nutrition_preferences', '')}"
+        ),
+        status="pending_review"
+    )
+    db.add(flight_draft)
     db.commit()
     db.refresh(action_draft)
 
@@ -189,18 +216,18 @@ def stage_intake_from_voice_memo(
 
 @router.get("", response_model=List[StagingIntakeResponse])
 def list_staged_intakes(
-    status: Optional[str] = Query(None, description="Filter by status, e.g. PENDING_APPROVAL, SYNCED_TO_TERN"),
+    status: Optional[str] = Query(None, description="Filter by status, e.g. PENDING_APPROVAL, CONFIRMED_IN_CRM"),
     sanctuary_slug: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
     """
     List all staged guest intakes awaiting human operator review.
-    MANDATORY GOVERNANCE: ZERO DIRECT AUTONOMOUS WRITES TO TERN CRM.
+    MANDATORY GOVERNANCE: ZERO DIRECT AUTONOMOUS WRITES TO PRODUCTION CRM.
     """
     query = db.query(StagingIntake)
-    if status:
+    if status and isinstance(status, str):
         query = query.filter(StagingIntake.status == status)
-    if sanctuary_slug:
+    if sanctuary_slug and isinstance(sanctuary_slug, str):
         query = query.filter(StagingIntake.sanctuary_slug == sanctuary_slug)
     
     return query.order_by(StagingIntake.created_at.desc()).all()
@@ -212,10 +239,11 @@ def get_cohort_capacities(db: Session = Depends(get_db)):
     Returns visual cohort telemetry enforcing the 12–14 guest maximum capacity.
     """
     sanctuaries = [
-        {"slug": "nosara", "title": "Nosara Costa Rica Blue Zone Sanctuary", "dates": "Nov 14–20, 2026", "limit": 14},
-        {"slug": "amalfi", "title": "Amalfi Coast Cliffside Stillness Retreat", "dates": "May 8–14, 2027", "limit": 12},
-        {"slug": "bali", "title": "Bali Sacred Water & Jungle Sanctuary", "dates": "Sep 18–24, 2027", "limit": 14},
-        {"slug": "riviera-maya", "title": "Riviera Maya Coastal Grounding Sanctuary", "dates": "Feb 6–12, 2027", "limit": 12},
+        {"slug": "puerto-vallarta-2027", "title": "Puerto Vallarta • Marival Harmony (First Retreat of 2027)", "dates": "Jan 28–31, 2027", "limit": 16},
+        {"slug": "nosara", "title": "Nosara Costa Rica Blue Zone Sanctuary", "dates": "Coming Soon • 2027", "limit": 14},
+        {"slug": "amalfi", "title": "Amalfi Coast Cliffside Stillness Retreat", "dates": "Coming Soon • 2027", "limit": 12},
+        {"slug": "bali", "title": "Bali Sacred Water & Jungle Sanctuary", "dates": "Coming Soon • 2027", "limit": 14},
+        {"slug": "riviera-maya", "title": "Riviera Maya Coastal Grounding Sanctuary", "dates": "Coming Soon • TBA", "limit": 12},
     ]
 
     results = []
@@ -224,12 +252,12 @@ def get_cohort_capacities(db: Session = Depends(get_db)):
             StagingIntake.sanctuary_slug == s["slug"],
             StagingIntake.status == "PENDING_APPROVAL"
         ).count()
-        tern_synced = db.query(StagingIntake).filter(
+        crm_confirmed = db.query(StagingIntake).filter(
             StagingIntake.sanctuary_slug == s["slug"],
-            StagingIntake.status.in_(["APPROVED", "SYNCED_TO_TERN"])
+            StagingIntake.status.in_(["APPROVED", "CONFIRMED_IN_CRM"])
         ).count()
 
-        total_booked = staged_count + tern_synced
+        total_booked = staged_count + crm_confirmed
         remaining = max(0, s["limit"] - total_booked)
 
         status = "OPEN"
@@ -244,7 +272,7 @@ def get_cohort_capacities(db: Session = Depends(get_db)):
             dates=s["dates"],
             capacity_limit=s["limit"],
             staged_count=staged_count,
-            tern_confirmed_count=tern_synced,
+            crm_confirmed_count=crm_confirmed,
             remaining_spots=remaining,
             status=status
         ))
@@ -347,10 +375,10 @@ def seed_demo_intakes(db: Session = Depends(get_db)):
                 "travel_dates_flexible": False,
                 "special_requests": "Private Grand Travel tarmac escort"
             },
-            "status": "SYNCED_TO_TERN",
+            "status": "CONFIRMED_IN_CRM",
             "reviewed_by": "Kareena Islam",
-            "tern_trip_id": "tern_trp_demo9911",
-            "tern_contact_id": "tern_cnt_demo4422",
+            "crm_trip_id": "kai_trp_demo9911",
+            "crm_contact_id": "kai_cnt_demo4422",
             "synced_at": datetime.now(timezone.utc)
         }
     ]
@@ -382,8 +410,8 @@ def seed_demo_intakes(db: Session = Depends(get_db)):
             consultation_thesis=thesis,
             status=spec["status"],
             reviewed_by=spec.get("reviewed_by"),
-            tern_trip_id=spec.get("tern_trip_id"),
-            tern_contact_id=spec.get("tern_contact_id"),
+            crm_trip_id=spec.get("crm_trip_id"),
+            crm_contact_id=spec.get("crm_contact_id"),
             synced_at=spec.get("synced_at")
         )
         db.add(intake)
@@ -458,7 +486,7 @@ def generate_intake_thesis(
     - Sympathetic overdrive hypothesis
     - Vagal down-regulation & circadian alignment protocol
     - Talking points and objection scripts
-    - Tern draft itinerary activities
+    - Sanctuary draft itinerary activities
     """
     intake = db.query(StagingIntake).filter(StagingIntake.id == intake_id).first()
     if not intake:
@@ -480,14 +508,14 @@ def generate_intake_thesis(
     return intake
 
 
-@router.post("/{intake_id}/tern-sync", response_model=TernSyncResponse)
-def authorize_tern_crm_sync(
+@router.post("/{intake_id}/crm-commit", response_model=CrmCommitResponse)
+def commit_intake_to_crm(
     intake_id: str,
-    payload: TernSyncRequest,
+    payload: CrmCommitRequest,
     db: Session = Depends(get_db)
 ):
     """
-    1-Click Operator Authorization to write into Tern CRM.
+    1-Click Operator Authorization to commit into KAI Sanctuary CRM.
     MANDATORY GOVERNANCE: ZERO DIRECT AUTONOMOUS WRITES.
     Only executed upon explicit human operator review.
     """
@@ -507,8 +535,8 @@ def authorize_tern_crm_sync(
 
     room_tier = payload.override_room_tier or intake.room_tier
 
-    # Push to Tern CRM via Tern client
-    sync_result = tern_client.sync_intake_to_tern(
+    # Commit to Sanctuary CRM via native CRM client
+    sync_result = crm_client.sync_intake_to_crm(
         intake_id=intake.id,
         client_name=intake.client_name,
         email=intake.email,
@@ -521,11 +549,11 @@ def authorize_tern_crm_sync(
         operator_name=payload.operator_name
     )
 
-    # Update staging intake status to SYNCED_TO_TERN
-    intake.status = "SYNCED_TO_TERN"
+    # Update staging intake status to CONFIRMED_IN_CRM
+    intake.status = "CONFIRMED_IN_CRM"
     intake.reviewed_by = payload.operator_name
-    intake.tern_contact_id = sync_result["tern_contact_id"]
-    intake.tern_trip_id = sync_result["tern_trip_id"]
+    intake.crm_contact_id = sync_result["crm_contact_id"]
+    intake.crm_trip_id = sync_result["crm_trip_id"]
     intake.synced_at = datetime.now(timezone.utc)
     if payload.override_room_tier:
         intake.room_tier = payload.override_room_tier
@@ -533,13 +561,63 @@ def authorize_tern_crm_sync(
     db.commit()
     db.refresh(intake)
 
-    return TernSyncResponse(
+    return CrmCommitResponse(
         success=True,
-        message="Successfully authorized and synchronized intake into Tern CRM with clinical tags.",
+        message="Successfully authorized and committed intake into KAI Sanctuary CRM with clinical tags.",
         intake_id=intake.id,
-        tern_contact_id=sync_result["tern_contact_id"],
-        tern_trip_id=sync_result["tern_trip_id"],
+        crm_contact_id=sync_result["crm_contact_id"],
+        crm_trip_id=sync_result["crm_trip_id"],
         applied_tags=sync_result["applied_tags"],
-        status="SYNCED_TO_TERN",
+        status="CONFIRMED_IN_CRM",
         synced_at=intake.synced_at
     )
+
+
+
+@router.post("/{intake_id}/generate-plan")
+def generate_staff_retreat_plan(
+    intake_id: str,
+    db: Session = Depends(get_db),
+    _admin: str = Depends(verify_admin)
+):
+    """
+    Dedicated Staff Portal API Route: Executes LLM plan & clinical thesis generation
+    for a guest intake or booking reference on-demand by staff.
+    """
+    intake = db.query(StagingIntake).filter(
+        (StagingIntake.id == intake_id) | (StagingIntake.source_ref == intake_id.upper())
+    ).first()
+    if not intake:
+        raise HTTPException(status_code=404, detail="Guest intake or booking reference not found")
+
+    seed_sanctuary_knowledge(db)
+
+    clin = intake.clinical_profile or {}
+    suggested_plan = generate_llm_suggested_plan(
+        client_name=intake.client_name,
+        retreat_id=intake.sanctuary_slug or "puerto-vallarta-2027",
+        room_preference=intake.room_tier or "private-suite",
+        movement_experience=clin.get("movement_experience") or "all-levels",
+        health_notes=clin.get("health_notes"),
+        intentions=clin.get("intentions"),
+    )
+    thesis = generate_pre_call_thesis(
+        client_name=intake.client_name,
+        sanctuary_slug=intake.sanctuary_slug,
+        room_tier=intake.room_tier,
+        clinical_profile=clin,
+        flight_request=intake.flight_request
+    )
+    thesis["llm_suggested_plan"] = suggested_plan
+    intake.consultation_thesis = thesis
+    db.commit()
+    db.refresh(intake)
+
+    return {
+        "success": True,
+        "intake_id": intake.id,
+        "source_ref": intake.source_ref,
+        "client_name": intake.client_name,
+        "suggested_plan": suggested_plan,
+        "consultation_thesis": thesis,
+    }

@@ -53,6 +53,20 @@ class RetreatAvailabilityResponse(BaseModel):
 # ==========================================
 # BOOKING SCHEMAS
 # ==========================================
+class SuggestedRetreatPlanSchema(BaseModel):
+    summary: str
+    peaceAndPiecesThesis: str
+    recommendedSanctuary: str
+    recommendedRoom: str
+    dailyRhythm: List[str]
+    culturalHighlights: List[str]
+    weatherAndPacking: List[str]
+    travelLogisticsNote: str
+    clinicalAndEnduranceNotes: str
+    routedTo: List[str]
+    generatedBy: str
+
+
 class BookingCreate(BaseModel):
     fullName: str = Field(..., min_length=2, description="Full legal name of the guest")
     email: EmailStr = Field(..., description="Valid email address for reservation communication")
@@ -63,6 +77,8 @@ class BookingCreate(BaseModel):
     passportValid: str = Field("yes-valid-6mo", description="Passport validity declaration")
     healthNotes: Optional[str] = Field(None, description="Dietary requirements, health or mobility notes")
     intentions: Optional[str] = Field(None, description="Personal intention for renewal")
+    waiverAccepted: bool = Field(True, description="Release of liability checkbox acceptance")
+    electronicSignature: Optional[str] = Field(None, description="Typed full legal name as electronic signature")
 
 
 class BookingResponse(BaseModel):
@@ -72,6 +88,10 @@ class BookingResponse(BaseModel):
     retreatTitle: str
     status: str
     createdAt: datetime
+    suggestedPlan: Optional[SuggestedRetreatPlanSchema] = None
+    waiverSignedBy: Optional[str] = None
+    waiverSignedAt: Optional[str] = None
+    routedEmails: Optional[List[str]] = None
 
 
 class BookingLookupResponse(BaseModel):

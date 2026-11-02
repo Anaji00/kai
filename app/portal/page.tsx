@@ -33,7 +33,7 @@ import {
   fetchStagedLeads,
   fetchSmsQueue,
   generateIntakeThesis,
-  authorizeTernSync,
+  commitIntakeToCrm,
   updateStagedIntake,
   createStagedIntake,
   seedSyntheticData,
@@ -43,7 +43,7 @@ import {
 } from "@/lib/sidecar-api";
 import { onFormFill, getAndClearPendingFormFill, FormFillProposal } from "@/lib/portal-form-bus";
 import WhatsAppSimulatorModal from "@/components/portal/WhatsAppSimulatorModal";
-import TernEntityInspectorModal from "@/components/portal/TernEntityInspectorModal";
+import CrmEntityInspectorModal from "@/components/portal/CrmEntityInspectorModal";
 import VoiceConsultationModal from "@/components/portal/VoiceConsultationModal";
 import ContinuityJourneyModal from "@/components/portal/ContinuityJourneyModal";
 
@@ -98,7 +98,7 @@ export default function PortalDashboard() {
     });
   };
 
-  // Modals state for WhatsApp dispatch & Tern Entity Inspector
+  // Modals state for WhatsApp dispatch & CRM Entity Inspector
   const [whatsappIntake, setWhatsappIntake] = useState<StagingIntake | null>(null);
   const [inspectorIntake, setInspectorIntake] = useState<StagingIntake | null>(null);
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
@@ -256,7 +256,7 @@ export default function PortalDashboard() {
   const handleAuthorizeSync = async (intake: StagingIntake) => {
     setSyncingIntakeId(intake.id);
     try {
-      const result = await authorizeTernSync(intake.id, intake.room_tier, "Kareena Islam");
+      const result = await commitIntakeToCrm(intake.id, intake.room_tier, "Kareena Islam");
       setSyncFeedback({
         id: intake.id,
         message: result.message,
@@ -269,9 +269,9 @@ export default function PortalDashboard() {
           i.id === intake.id
             ? {
                 ...i,
-                status: "SYNCED_TO_TERN",
-                tern_trip_id: result.tern_trip_id,
-                tern_contact_id: result.tern_contact_id,
+                status: "CONFIRMED_IN_CRM",
+                crm_trip_id: result.crm_trip_id,
+                crm_contact_id: result.crm_contact_id,
               }
             : i
         )
@@ -281,7 +281,7 @@ export default function PortalDashboard() {
       const updatedCohorts = await fetchCohortCapacities();
       setCohorts(updatedCohorts);
     } catch (e: unknown) {
-      alert(`Tern CRM Sync Error: ${(e as Error).message || "Failed to sync"}`);
+      alert(`KAI CRM Confirmation Error: ${(e as Error).message || "Failed to sync"}`);
     } finally {
       setSyncingIntakeId(null);
     }
@@ -327,7 +327,7 @@ export default function PortalDashboard() {
   };
 
   const pendingIntakesCount = intakes.filter((i) => i.status === "PENDING_APPROVAL").length;
-  const syncedIntakesCount = intakes.filter((i) => i.status === "SYNCED_TO_TERN").length;
+  const syncedIntakesCount = intakes.filter((i) => i.status === "CONFIRMED_IN_CRM").length;
   
   return (
     <div className="space-y-8">
@@ -351,10 +351,10 @@ export default function PortalDashboard() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="font-serif text-3xl font-bold text-[#2D3E35] tracking-tight">
-            Founder Sanctuary Studio
+            Staff Sanctuary Operations Studio
           </h1>
           <p className="text-sm text-[#5C6B5E] mt-1">
-            Guest Inquiries &middot; Care Plan &amp; Conversation Guide &middot; Tern Guest &amp; Travel Planner
+            Guest Inquiries &middot; Care Plan &amp; Conversation Guide &middot; Native Travel CRM &amp; Itinerary Planner
           </p>
         </div>
 
@@ -412,7 +412,7 @@ export default function PortalDashboard() {
         <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium text-[#5C6B5E] uppercase tracking-wider">
-              Confirmed on Tern
+              Confirmed in CRM
             </span>
             <span className="p-2 rounded-lg bg-emerald-50 text-emerald-700">
               <CheckCircle2 className="w-4 h-4" />
@@ -424,7 +424,7 @@ export default function PortalDashboard() {
             </span>
             <span className="text-xs text-emerald-700 font-medium">Published Itineraries</span>
           </div>
-          <div className="mt-2 text-[11px] text-[#5C6B5E]">Native Tern card authorizations active</div>
+          <div className="mt-2 text-[11px] text-[#5C6B5E]">Stored natively in database (crm_clients & crm_trips)</div>
         </div>
 
         <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] shadow-sm">
@@ -478,7 +478,7 @@ export default function PortalDashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {cohorts.map((c) => {
-            const totalBooked = c.tern_confirmed_count + c.staged_count;
+            const totalBooked = (c.crm_confirmed_count ?? 0) + c.staged_count;
             const pct = Math.min(100, Math.round((totalBooked / c.capacity_limit) * 100));
             const isFull = c.remaining_spots === 0;
             const isNearCap = c.remaining_spots <= 3 && c.remaining_spots > 0;
@@ -515,7 +515,7 @@ export default function PortalDashboard() {
                 </div>
 
                 <div className="flex justify-between text-[10px] text-[#5C6B5E] mt-1.5">
-                  <span>Confirmed: {c.tern_confirmed_count}</span>
+                  <span>Confirmed: {(c.crm_confirmed_count ?? 0)}</span>
                   <span>Staged: {c.staged_count}</span>
                   <span className="font-bold">Cap: {c.capacity_limit}</span>
                 </div>
@@ -533,7 +533,7 @@ export default function PortalDashboard() {
               Filter Inquiries:
             </span>
             <div className="flex items-center space-x-1">
-              {["ALL", "PENDING_APPROVAL", "SYNCED_TO_TERN"].map((st) => (
+              {["ALL", "PENDING_APPROVAL", "CONFIRMED_IN_CRM"].map((st) => (
                 <button
                   key={st}
                   onClick={() => setFilterStatus(st)}
@@ -573,7 +573,7 @@ export default function PortalDashboard() {
               <div>
                 <div className="font-semibold text-sm">{syncFeedback.message}</div>
                 <div className="text-xs text-emerald-800 mt-1 flex flex-wrap gap-1.5 items-center">
-                  <span className="font-medium">Applied Guest Tags in Tern CRM:</span>
+                  <span className="font-medium">Applied Guest Tags in Native CRM:</span>
                   {syncFeedback.tags.map((t) => (
                     <span
                       key={t}
@@ -608,7 +608,7 @@ export default function PortalDashboard() {
             {intakes.map((intake) => {
               const isExpanded = expandedIntakeId === intake.id;
               const isPending = intake.status === "PENDING_APPROVAL";
-              const isSynced = intake.status === "SYNCED_TO_TERN";
+              const isSynced = intake.status === "CONFIRMED_IN_CRM";
               const thesis = intake.consultation_thesis;
 
               return (
@@ -647,7 +647,7 @@ export default function PortalDashboard() {
                           ) : (
                             <>
                               <CheckCircle2 className="w-3 h-3 text-emerald-700" />
-                              <span>SYNCED TO TERN CRM</span>
+                              <span>SYNCED TO CRM DATABASE</span>
                             </>
                           )}
                         </span>
@@ -665,7 +665,7 @@ export default function PortalDashboard() {
                       </div>
                     </div>
 
-                    {/* Right: Actions, WhatsApp Dispatch, Tern Inspector & Drawer Toggle */}
+                    {/* Right: Actions, WhatsApp Dispatch, CRM Inspector & Drawer Toggle */}
                     <div className="flex flex-wrap items-center gap-2">
                       <button
                         onClick={() => setWhatsappIntake(intake)}
@@ -679,10 +679,10 @@ export default function PortalDashboard() {
                       <button
                         onClick={() => setInspectorIntake(intake)}
                         className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold text-[#2D3E35] bg-[#F2ECE4] hover:bg-[#EBE3D8] border border-[#E5DDD0] rounded-md transition-colors shadow-2xs cursor-pointer"
-                        title="Inspect Tern Contact & Trip Entities, and Native Payments"
+                        title="Inspect Native CRM Contact, Trip Entities, and Stored Payment Schedules"
                       >
                         <Layers className="w-3.5 h-3.5 text-[#C07D63]" />
-                        <span>Tern Inspector</span>
+                        <span>CRM Inspector</span>
                       </button>
 
                       <button
@@ -704,23 +704,20 @@ export default function PortalDashboard() {
                           <span>
                             {syncingIntakeId === intake.id
                               ? "Syncing..."
-                              : "1-Click Tern Sync"}
+                              : "1-Click CRM Sync"}
                           </span>
                         </button>
                       )}
 
                       {isSynced && (
-                        <a
-                          href={`https://app.tern.travel/trips/${intake.tern_trip_id}/payments`}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-medium text-emerald-800 bg-emerald-100/80 hover:bg-emerald-200/80 border border-emerald-300 rounded-md transition-colors"
-                          title="Open Native Tern Credit Card Authorization & Payments"
+                        <button
+                          onClick={() => setInspectorIntake(intake)}
+                          className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-medium text-emerald-800 bg-emerald-100/80 hover:bg-emerald-200/80 border border-emerald-300 rounded-md transition-colors cursor-pointer"
+                          title="View Native Credit Card Authorization & Payment Schedule"
                         >
                           <CreditCard className="w-3.5 h-3.5 text-emerald-700" />
-                          <span>Tern Payments</span>
-                          <ExternalLink className="w-3 h-3 ml-0.5" />
-                        </a>
+                          <span>Payment Schedule</span>
+                        </button>
                       )}
 
                       <button
@@ -970,10 +967,10 @@ export default function PortalDashboard() {
                           {/* Proposed Retreat Itinerary */}
                           <div>
                             <div className="text-xs font-semibold text-[#5C6B5E] uppercase tracking-wider mb-2">
-                              Proposed Retreat Itinerary (Tern Itinerary Draft)
+                              Proposed Retreat Itinerary (CRM Itinerary Draft)
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
-                              {thesis.tern_itinerary_draft?.map((act, idx) => (
+                              {thesis.itinerary_draft?.map((act, idx) => (
                                 <div
                                   key={idx}
                                   className="p-2.5 bg-white rounded border border-[#E5DDD0] space-y-0.5"
@@ -1053,7 +1050,7 @@ export default function PortalDashboard() {
                         <div className="pt-3 border-t border-[#E5DDD0] flex items-center justify-between">
                           <div className="text-xs text-[#5C6B5E]">
                             Authorization confirms room allocation and transmits standardized clinical
-                            tags to Tern CRM.
+                            tags to Native CRM Database.
                           </div>
                           <button
                             onClick={() => handleAuthorizeSync(intake)}
@@ -1063,8 +1060,8 @@ export default function PortalDashboard() {
                             <FileCheck className="w-4 h-4 text-[#FAF7F2]" />
                             <span>
                               {syncingIntakeId === intake.id
-                                ? "Pushing to Tern CRM..."
-                                : "Authorize & Sync to Tern CRM"}
+                                ? "Committing to Sanctuary CRM..."
+                                : "Authorize & Commit to Sanctuary CRM"}
                             </span>
                           </button>
                         </div>
@@ -1090,8 +1087,8 @@ export default function PortalDashboard() {
         }}
       />
 
-      {/* Tern CRM Entity & Payments Inspector Modal */}
-      <TernEntityInspectorModal
+      {/* KAI CRM Entity & Payments Inspector Modal */}
+      <CrmEntityInspectorModal
         isOpen={!!inspectorIntake}
         intake={inspectorIntake}
         onClose={() => setInspectorIntake(null)}
@@ -1147,7 +1144,7 @@ export default function PortalDashboard() {
                     <span>Proposed by AI Copilot</span>
                   </div>
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> Data Verified for Tern CRM Sync
+                    <CheckCircle2 className="w-3 h-3" /> Data Verified for KAI Sanctuary CRM
                   </span>
                 </div>
                 <p className="text-[11px] text-[#5C6B5E] leading-relaxed">
@@ -1285,7 +1282,7 @@ export default function PortalDashboard() {
                   <div className="grid grid-cols-2 gap-2">
                     <div>
                       <label className="text-[10px] font-bold text-[#5C6B5E] uppercase tracking-wider block mb-1">
-                        30% Tern Deposit
+                        30% Sanctuary Deposit
                       </label>
                       <div className="px-3 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-xs font-bold text-emerald-800">
                         ${proposalFormData.deposit_30.toLocaleString()}

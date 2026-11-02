@@ -13,7 +13,7 @@ from backend.sidecar.schemas import (
 )
 from backend.sidecar.services.lead_gen import discover_and_stage_leads
 
-router = APIRouter(prefix="/leads", tags=["Tern Sidecar: B2B Studio Lead Generation"])
+router = APIRouter(prefix="/leads", tags=["Sanctuary Sidecar: B2B Studio Lead Generation"])
 
 
 @router.get("", response_model=List[StagedLeadResponse])

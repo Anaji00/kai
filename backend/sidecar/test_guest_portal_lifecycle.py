@@ -3,7 +3,7 @@ KAI Wellness Retreats - Guest Companion & Portal Lifecycle Test Suite
 Verifies:
 1. DB persistence of magic-link sessions across reboots (GuestPortalSession)
 2. Token expiration and revocation enforcement
-3. Privacy boundary verification (zero clinical notes or Tern internal IDs exposed)
+3. Privacy boundary verification (zero clinical notes or internal CRM IDs exposed)
 4. Two-way guest flight update stages ActionDraft (Zero Autonomous Writes)
 5. Two-way culinary refinement stages ActionDraft for Nurse Kareena
 6. In-stay somatic pulse recording (restorative sleep and vagal tone)
@@ -121,8 +121,8 @@ class TestGuestPortalLifecycle:
         assert session["client_name"] == "Dr. Aris Thorne"
         assert session["sanctuary_slug"] == "nosara"
 
-    def test_03_privacy_boundary_zero_clinical_or_tern_leak(self, db: Session, sample_intake: StagingIntake):
-        """Verify the /me companion payload strictly exposes zero clinical flags or internal Tern IDs."""
+    def test_03_privacy_boundary_zero_clinical_or_crm_leak(self, db: Session, sample_intake: StagingIntake):
+        """Verify the /me companion payload strictly exposes zero clinical flags or internal CRM IDs."""
         token_data = generate_guest_magic_token(
             intake_id=sample_intake.id,
             client_name=sample_intake.client_name,
@@ -145,12 +145,12 @@ class TestGuestPortalLifecycle:
         assert "packing_list" in payload
         assert "wellness_focus" in payload
 
-        # Check strict privacy firewall: No clinical flags, no Tern IDs
+        # Check strict privacy firewall: No clinical flags, no internal CRM IDs
         assert "clinical_profile" not in payload
         assert "confidential_internal_flags" not in str(payload)
         assert "blood_pressure_history" not in str(payload)
-        assert "tern_trip_id" not in payload
-        assert "tern_contact_id" not in payload
+        assert "crm_trip_id" not in payload
+        assert "crm_contact_id" not in payload
 
     def test_04_guest_flight_update_stages_action_draft(self, db: Session, sample_intake: StagingIntake):
         """

@@ -27,7 +27,7 @@ SUITES = [
         "name": "Suite 1: Core Restorative Clinical Lifecycle",
         "file": os.path.join(REPO_ROOT, "backend", "sidecar", "run_real_use_cases.py"),
         "cases": 7,
-        "description": "Full lifecycle, RAG pre-call thesis, Tern trip sync, voice memo intake, SMS staging, document upload, and audit."
+        "description": "Full lifecycle, RAG pre-call thesis, CRM commit, voice memo intake, SMS staging, document upload, and audit."
     },
     {
         "name": "Suite 2: Full-System Architecture & Interceptor Gates",

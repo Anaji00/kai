@@ -82,7 +82,7 @@ export default function ClinicalCopilotDrawer({
   >([
     {
       sender: "copilot",
-      text: "**Welcome, Kareena.** I am your AI Chief of Staff & Wellness Concierge.\n\nI am here to support you with restorative wellness intentions, curated travel logistics, preferred Tern supplier partnerships, scenic chauffeur transit, microclimate sun windows, and pre-arrival guest itineraries. Clinical contraindication screening is an elevated safety module whenever specialized medical flags arise.\n\nAll operational actions and communications require your direct review and authorization."
+      text: "**Welcome, Kareena.** I am your AI Chief of Staff & Wellness Concierge.\n\nI am here to support you with restorative wellness intentions, curated travel logistics, preferred luxury supplier partnerships, scenic chauffeur transit, microclimate sun windows, and pre-arrival guest itineraries. Clinical contraindication screening is an elevated safety module whenever specialized medical flags arise.\n\nAll operational actions and communications require your direct review and authorization."
     }
   ]);
 
@@ -441,29 +441,28 @@ export default function ClinicalCopilotDrawer({
 
   const QUICK_PROMPTS: Record<string, string[]> = {
     wellness_safety: [
-      "Curate: Nervous system restorative protocol & sleep optimization",
-      "Review 4-7-8 vagal breathing & 432Hz acoustic grounding",
-      "Elevated Screen: Guest with epilepsy requesting rapid breathwork",
-      "Elevated Screen: Pregnant guest (1st trimester) requesting Finnish sauna"
+      "Scenario #21: Triage morning Somatic Pulse spike (Sleep 2/10, Ease 2/10)",
+      "Scenario #32: Post-plunge hypothermia & SpO2 88% hard lockout protocol",
+      "Scenario #7: Screen guest with SVT arrhythmia & nut anaphylaxis",
+      "Scenario #13: Mid-stay emergency medical freeze & Hospital Joya handover"
     ],
     clinical_safety: [
-      "Screen: Guest with epilepsy requesting rapid breathwork",
-      "Screen: Guest with Raynaud's syndrome requesting cold plunge",
-      "Screen: Pregnant guest (1st trimester) requesting Finnish sauna",
-      "Review clinical mechanism of 4-7-8 vagal breathing"
+      "Scenario #21: Triage morning Somatic Pulse spike (Sleep 2/10, Ease 2/10)",
+      "Scenario #32: Post-plunge hypothermia & SpO2 88% hard lockout protocol",
+      "Scenario #7: Screen guest with SVT arrhythmia & nut anaphylaxis",
+      "Scenario #13: Mid-stay emergency medical freeze & Hospital Joya handover"
     ],
     itinerary_curation: [
-      "Calculate scenic transit from airport to private villa",
-      "What is the microclimate weather and breathwork window today in Nosara?",
-      "Find nourishing Blue Zone and plant-forward dining in Nosara",
-      "Coordinate Grand Travel & Cruise air desk for lie-flat routing"
+      "Scenario #23: Cluster delayed PVR arrivals into Escalade/Sprinter waves (<=35m wait)",
+      "Scenario #26: Audit Gulfstream G650ER weight & FAA Part 135 14h crew duty",
+      "Scenario #28: Pivot outdoor beach pranayama to indoor Geodesic Sound Domes (95% rain)",
+      "Scenario #34: Check 180-day international passport validity gate"
     ],
     travel_concierge: [
-      "Show our active chauffeur partners in Nosara",
-      "Calculate scenic transit from airport to villa",
-      "What is the microclimate weather and breathwork window today in Nosara?",
-      "Find gluten-free and Blue Zone dining spots in Nosara",
-      "Search luxury pre-retreat hotels near Costa Rica (SJO/LIR)"
+      "Scenario #23: Cluster delayed PVR arrivals into Escalade/Sprinter waves (<=35m wait)",
+      "Scenario #26: Audit Gulfstream G650ER weight & FAA Part 135 14h crew duty",
+      "Scenario #28: Pivot outdoor beach pranayama to indoor Geodesic Sound Domes (95% rain)",
+      "Scenario #31: Provision $0 5-piece organic capsule wardrobe for lost luggage"
     ],
     concierge_prep: [
       "Draft restorative welcome email for Sarah Jenkins (Nosara Reset)",
@@ -480,7 +479,7 @@ export default function ClinicalCopilotDrawer({
     studio_ops: [
       "Show our registered preferred suppliers in Nosara",
       "Add a new vendor: Pacific Alchemy sound bowls in Nosara, 15% commission",
-      "Explain Tern Back Office Vendor & Supplier Registry",
+      "Explain KAI Vendor & Supplier Directory",
       "Explain Personalized Founder Approval (Zero Autonomous Writes)",
       "What is the status of our upcoming 12–14 guest retreat groups?"
     ]

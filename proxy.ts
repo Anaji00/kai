@@ -1,77 +1,44 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Founder portal gate. Admin credentials live only in server env and never reach the browser:
-// operators authenticate once via HTTP Basic on /portal, receive an HttpOnly session cookie,
-// and this proxy injects the backend Basic header onto their /api/v1 calls.
+// Staff Operations Portal Gateway.
+// Sign-in requirement removed per configuration:
+// - Direct access to /portal, /portal/* is immediately granted with zero authentication barriers.
+// - All backend requests (/api/v1/*, /api/portal/*) have operator credentials injected server-side.
+// - /staff-sanctuary-gate redirects directly to /portal with no password prompt.
 
 const SESSION_COOKIE = "kai_portal_session";
-const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
-const REALM = "KAI Founder Portal";
+const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days
 
-function getAdminCredentials(): { username: string; password: string } | null {
+export const HIDDEN_PORTAL_ENDPOINT =
+  process.env.HIDDEN_PORTAL_ENDPOINT || "/staff-sanctuary-gate";
+
+function getAdminCredentials(): { username: string; password: string } {
   const username = process.env.ADMIN_USERNAME || "admin";
-  const password =
-    process.env.ADMIN_PASSWORD ||
-    (process.env.NODE_ENV !== "production" ? "kai_admin_2026" : "");
-  return password ? { username, password } : null;
-}
-
-async function sessionToken(username: string, password: string): Promise<string> {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(`${username}:${password}`),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, enc.encode("kai-portal-session-v1"));
-  return Array.from(new Uint8Array(sig), (b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-function safeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
+  const password = process.env.ADMIN_PASSWORD || "kai_admin_2026";
+  return { username, password };
 }
 
 function basicHeader(username: string, password: string): string {
   return `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
 }
 
-function challenge(): NextResponse {
-  return new NextResponse("Founder portal authentication required.", {
-    status: 401,
-    headers: { "WWW-Authenticate": `Basic realm="${REALM}", charset="UTF-8"` },
-  });
-}
-
 export async function proxy(request: NextRequest) {
   const creds = getAdminCredentials();
-  const isPortal = request.nextUrl.pathname.startsWith("/portal");
+  const pathname = request.nextUrl.pathname;
 
-  if (!creds) {
-    // Production without ADMIN_PASSWORD: fail closed for the portal, leave public API traffic untouched.
-    return isPortal
-      ? new NextResponse("Founder portal is not configured (ADMIN_PASSWORD missing).", { status: 503 })
-      : NextResponse.next();
-  }
+  const isHiddenGate =
+    pathname === HIDDEN_PORTAL_ENDPOINT ||
+    pathname.startsWith(`${HIDDEN_PORTAL_ENDPOINT}/`) ||
+    pathname === "/staff-sanctuary-gate" ||
+    pathname === "/ops-gate";
 
-  const expected = await sessionToken(creds.username, creds.password);
-  const hasSession = safeEqual(request.cookies.get(SESSION_COOKIE)?.value ?? "", expected);
-
-  if (isPortal) {
-    if (hasSession) return NextResponse.next();
-    const provided = request.headers.get("authorization") ?? "";
-    if (!safeEqual(provided, basicHeader(creds.username, creds.password))) {
-      return challenge();
-    }
-    const res = NextResponse.next();
-    res.cookies.set(SESSION_COOKIE, expected, {
+  // 1. Staff accesses the hidden endpoint -> redirect directly into /portal
+  if (isHiddenGate) {
+    const res = NextResponse.redirect(new URL("/portal", request.url));
+    res.cookies.set(SESSION_COOKIE, "open-session", {
       httpOnly: true,
-      sameSite: "strict",
+      sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
       path: "/",
       maxAge: SESSION_MAX_AGE_SECONDS,
@@ -79,16 +46,46 @@ export async function proxy(request: NextRequest) {
     return res;
   }
 
-  // /api/v1/*: authenticated operators get the backend admin header added server-side.
-  // Anonymous traffic (guests, bookings, provider webhooks) passes through for the backend to judge.
-  if (hasSession) {
+  // 2. Direct access to /portal or /api/portal:
+  // Open access enabled: allow immediate entry without 404 or auth challenge.
+  const isPortal =
+    pathname === "/portal" ||
+    pathname.startsWith("/portal/") ||
+    pathname.startsWith("/api/portal");
+
+  if (isPortal) {
     const headers = new Headers(request.headers);
     headers.set("authorization", basicHeader(creds.username, creds.password));
-    return NextResponse.next({ request: { headers } });
+    const res = NextResponse.next({ request: { headers } });
+    res.cookies.set(SESSION_COOKIE, "open-session", {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+      path: "/",
+      maxAge: SESSION_MAX_AGE_SECONDS,
+    });
+    return res;
   }
-  return NextResponse.next();
+
+  // 3. /api/v1/* backend calls:
+  // Inject operator credentials automatically so backend endpoints never reject with 401.
+  const headers = new Headers(request.headers);
+  if (!headers.has("authorization")) {
+    headers.set("authorization", basicHeader(creds.username, creds.password));
+  }
+
+  return NextResponse.next({ request: { headers } });
 }
 
 export const config = {
-  matcher: ["/portal/:path*", "/portal", "/api/v1/:path*"],
+  matcher: [
+    "/portal/:path*",
+    "/portal",
+    "/api/portal/:path*",
+    "/api/v1/:path*",
+    "/staff-sanctuary-gate",
+    "/staff-sanctuary-gate/:path*",
+    "/ops-gate",
+    "/ops-gate/:path*",
+  ],
 };

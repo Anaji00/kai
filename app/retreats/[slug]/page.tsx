@@ -15,6 +15,7 @@ import {
   Compass,
   ChevronRight,
   Waves,
+  Globe2,
 } from "lucide-react";
 import { RETREATS, getRetreatBySlug } from "@/lib/retreats";
 
@@ -76,12 +77,14 @@ export default async function RetreatDetailPage({ params }: PageProps) {
     notFound();
   }
 
+  const isComingSoon = retreat.status === "coming-soon";
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "TouristTrip",
     name: retreat.title,
     description: retreat.description,
-    touristType: ["Wellness", "Health Tourism", "Yoga and Somatics"],
+    touristType: ["Wellness", "Health Tourism", "Yoga and Somatics", "Cultural Immersion"],
     itinerary: {
       "@type": "ItemList",
       itemListElement: retreat.schedule.map((day, idx) => ({
@@ -96,9 +99,9 @@ export default async function RetreatDetailPage({ params }: PageProps) {
       price: retreat.investmentStarting.replace(/[^0-9]/g, ""),
       priceCurrency: "USD",
       availability:
-        retreat.spotsRemaining > 0
+        !isComingSoon && retreat.spotsRemaining > 0
           ? "https://schema.org/InStock"
-          : "https://schema.org/SoldOut",
+          : "https://schema.org/PreOrder",
       url: `https://kaiwellnessretreats.com/book?retreat=${retreat.id}`,
     },
     provider: {
@@ -151,9 +154,15 @@ export default async function RetreatDetailPage({ params }: PageProps) {
               <span className="rounded-full bg-sand/90 backdrop-blur-md px-3.5 py-1 text-xs font-medium text-sage">
                 {retreat.duration}
               </span>
-              <span className="rounded-full bg-terracotta px-3.5 py-1 text-xs font-semibold text-linen shadow">
-                {retreat.spotsRemaining} of {retreat.spotsTotal} spots left
-              </span>
+              {isComingSoon ? (
+                <span className="rounded-full bg-sage-dark/90 px-3.5 py-1 text-xs font-semibold text-sand border border-sand/30 shadow">
+                  Coming Soon • Priority Waitlist Open
+                </span>
+              ) : (
+                <span className="rounded-full bg-terracotta px-3.5 py-1 text-xs font-semibold text-linen shadow">
+                  First Retreat of 2027 • {retreat.spotsRemaining} of {retreat.spotsTotal} spots left
+                </span>
+              )}
             </div>
 
             <h1 className="font-serif text-3xl sm:text-5xl lg:text-6xl text-linen font-light max-w-4xl leading-tight">
@@ -189,9 +198,9 @@ export default async function RetreatDetailPage({ params }: PageProps) {
           <div className="rounded-2xl border border-sand-border bg-linen p-5 space-y-1 text-center sm:text-left">
             <div className="flex items-center justify-center sm:justify-start gap-2 text-olive text-xs font-medium">
               <Sparkles className="h-4 w-4 text-terracotta" />
-              <span>Clinical Lead</span>
+              <span>Founding Leads</span>
             </div>
-            <p className="font-serif text-lg text-sage font-normal">Kareena Islam</p>
+            <p className="font-serif text-lg text-sage font-normal">Kareena & Armaan Islam</p>
           </div>
 
           <div className="rounded-2xl border border-sand-border bg-linen p-5 space-y-1 text-center sm:text-left">
@@ -212,7 +221,7 @@ export default async function RetreatDetailPage({ params }: PageProps) {
             {/* 1. Narrative & Essence */}
             <article className="space-y-4">
               <span className="text-xs uppercase tracking-[0.25em] text-terracotta font-semibold">
-                Sanctuary Philosophy
+                Where Your Peace Within Can Blend With The Pieces Around
               </span>
               <h2 className="font-serif text-3xl sm:text-4xl text-sage font-light">
                 The Essence of This Sanctuary
@@ -222,7 +231,37 @@ export default async function RetreatDetailPage({ params }: PageProps) {
               </p>
             </article>
 
-            {/* 2. Nervous System Restorative Focus */}
+            {/* 2. Cultural Integrations */}
+            {retreat.culturalIntegrations && retreat.culturalIntegrations.length > 0 && (
+              <section className="rounded-3xl border border-sand-border bg-linen p-6 sm:p-10 space-y-6">
+                <div className="space-y-2">
+                  <span className="text-xs uppercase tracking-[0.2em] text-terracotta font-semibold flex items-center gap-1.5">
+                    <Globe2 className="h-4 w-4 text-terracotta" />
+                    Authentic Cultural Integrations
+                  </span>
+                  <h3 className="font-serif text-2xl sm:text-3xl text-sage font-normal">
+                    Blending Inner Stillness With Regional Heritage
+                  </h3>
+                  <p className="text-xs sm:text-sm text-sage/75 font-light">
+                    At KAI Wellness Retreats, your peace within blends with the cultural, botanical, and ancestral pieces around you.
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {retreat.culturalIntegrations.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded-2xl border border-sand-border bg-sand/40 p-4 flex items-start gap-3 text-xs sm:text-sm text-sage/85"
+                    >
+                      <Compass className="h-4 w-4 text-terracotta shrink-0 mt-0.5" />
+                      <span className="leading-relaxed">{item}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* 3. Nervous System Restorative Focus */}
             <section className="rounded-3xl border border-sand-border bg-sand/50 p-6 sm:p-10 space-y-6">
               <div className="space-y-2">
                 <span className="text-xs uppercase tracking-[0.2em] text-olive font-semibold flex items-center gap-1.5">
@@ -230,7 +269,7 @@ export default async function RetreatDetailPage({ params }: PageProps) {
                   Evidence-Based Grounding
                 </span>
                 <h3 className="font-serif text-2xl sm:text-3xl text-sage font-normal">
-                  The Restorative Science Behind This Journey
+                  The Restorative & Endurance Science Behind This Journey
                 </h3>
               </div>
 
@@ -244,7 +283,7 @@ export default async function RetreatDetailPage({ params }: PageProps) {
               </ul>
             </section>
 
-            {/* 3. Somatic & Sound Healing Practices */}
+            {/* 4. Somatic & Sound Healing Practices */}
             <section className="space-y-6">
               <span className="text-xs uppercase tracking-[0.25em] text-terracotta font-semibold">
                 Somatic Immersion
@@ -268,7 +307,7 @@ export default async function RetreatDetailPage({ params }: PageProps) {
               </div>
             </section>
 
-            {/* 4. Photo Gallery Showcase */}
+            {/* 6. Photo Gallery Showcase */}
             <section className="space-y-6">
               <span className="text-xs uppercase tracking-[0.25em] text-olive font-semibold">
                 Visual Sanctuary
@@ -298,7 +337,7 @@ export default async function RetreatDetailPage({ params }: PageProps) {
               </p>
             </section>
 
-            {/* 5. Daily Schedule & Rhythm */}
+            {/* 7. Daily Schedule & Rhythm */}
             <section className="space-y-6">
               <div className="space-y-2">
                 <span className="text-xs uppercase tracking-[0.25em] text-terracotta font-semibold">
@@ -334,7 +373,7 @@ export default async function RetreatDetailPage({ params }: PageProps) {
               </div>
             </section>
 
-            {/* 6. Inclusions & Amenities */}
+            {/* 8. Inclusions & Amenities */}
             <section className="space-y-6">
               <span className="text-xs uppercase tracking-[0.25em] text-olive font-semibold">
                 Complete Transparency
@@ -356,7 +395,7 @@ export default async function RetreatDetailPage({ params }: PageProps) {
               </div>
             </section>
 
-            {/* 7. The Travel Insider Advantage */}
+            {/* 9. The Travel Insider Advantage */}
             <section className="rounded-3xl border border-sand-border bg-sand/40 p-6 sm:p-8 space-y-4">
               <div className="flex items-center gap-2 text-xs uppercase tracking-[0.2em] font-semibold text-olive">
                 <Compass className="h-4 w-4 text-terracotta" />
@@ -366,7 +405,7 @@ export default async function RetreatDetailPage({ params }: PageProps) {
                 Backed by 25+ Years of Host Agency Clout & Sacred Cultural Immersion
               </h3>
               <p className="text-xs sm:text-sm text-sage/80 leading-relaxed font-light">
-                This sanctuary is orchestrated through <strong>Grand Travel & Cruise</strong> (Funjet 500 Club) and curated by <strong>Kareena Islam</strong> (honored national <em>Future Leaders in Travel</em> advisor). Because of our 25+ year host agency volume, our guests enjoy the best negotiated deals in the industry, full private estate buyouts, and zero-friction travel logistics (optimal flight routing, schedule change protections, and chauffeured transit). Equally important, Kareena’s intimate relationships with local elders, priests, and artisans ensure authentic cultural reverence, sacred customs, and true regional immersion without tourist traps.
+                This sanctuary is orchestrated through <strong>Grand Travel & Cruise</strong> (Funjet 500 Club) and co-led by <strong>Kareena Islam, BSN, RN, RYT</strong> (national <em>Future Leaders in Travel</em> Honoree) and <strong>Armaan Islam</strong> (Ironman Athlete & Chief Business Officer). Because of our 25+ year host agency volume, our guests enjoy privileged resort access at <strong>Marival Armony (Harmony)</strong> and global sanctuaries, plus zero-friction flight routing and chauffeured airport transit. All inquiries route directly to <strong>kareena@grandtravelcruise.com</strong> & <strong>armaan@grandtravelcruise.com</strong> for personal consultation.
               </p>
             </section>
           </main>
@@ -376,7 +415,7 @@ export default async function RetreatDetailPage({ params }: PageProps) {
             <div className="rounded-3xl border border-sand-border bg-linen p-6 sm:p-8 space-y-6 shadow-md">
               <div className="border-b border-sand-border pb-5 space-y-2">
                 <span className="text-[10px] uppercase tracking-[0.2em] font-semibold text-olive">
-                  Reservation Investment
+                  {isComingSoon ? "Projected Investment" : "Reservation Investment"}
                 </span>
                 <div className="flex items-baseline gap-2">
                   <span className="font-serif text-3xl sm:text-4xl font-medium text-sage">
@@ -385,7 +424,9 @@ export default async function RetreatDetailPage({ params }: PageProps) {
                   <span className="text-xs text-sage/70 font-light">/ guest</span>
                 </div>
                 <p className="text-xs text-terracotta font-medium">
-                  {retreat.spotsRemaining} spots remaining • {retreat.spotsTotal} total guests
+                  {isComingSoon
+                    ? "Coming Soon Placeholder • Priority Waitlist Open"
+                    : `${retreat.spotsRemaining} spots remaining • ${retreat.spotsTotal} total guests`}
                 </p>
               </div>
 
@@ -408,14 +449,13 @@ export default async function RetreatDetailPage({ params }: PageProps) {
                 href={`/book?retreat=${retreat.id}`}
                 className="w-full flex items-center justify-center gap-2 rounded-full bg-sage px-6 py-4 text-xs font-semibold uppercase tracking-widest text-linen hover:bg-sage-dark transition-all shadow-md hover:shadow-lg"
               >
-                <span>Reserve Your Place</span>
+                <span>{isComingSoon ? "Join Priority Waitlist" : "Reserve Your Place"}</span>
                 <ArrowRight className="h-4 w-4" />
               </Link>
 
               <div className="border-t border-sand-border pt-4 text-center space-y-2">
                 <p className="text-[11px] text-sage/70 leading-relaxed font-light">
-                  Have questions before booking? Every inquiry is reviewed directly by Kareena
-                  Islam and our dedicated retreat concierge team.
+                  Every inquiry is routed directly to <strong>kareena@grandtravelcruise.com</strong> & <strong>armaan@grandtravelcruise.com</strong> for personal review and suite coordination.
                 </p>
                 <Link
                   href="/book?retreat=custom"
@@ -442,11 +482,11 @@ export default async function RetreatDetailPage({ params }: PageProps) {
                 </div>
               </div>
               <p className="text-[11px] text-sage/75 leading-relaxed">
-                Backed by 25+ years of host agency excellence and Funjet 500 Club status, our travel desk negotiates the best industry rates and private estate access. Enjoy white-glove flight routing, VIP airport transfers, and authentic cultural immersion with local guides and sacred traditions.
+                Backed by 25+ years of host agency excellence and Funjet 500 Club status, our travel desk negotiates the best industry rates and private estate access. Enjoy white-glove flight routing, VIP airport transfers, and authentic cultural immersion.
               </p>
               <div className="pt-2 border-t border-sand-border/60 flex flex-wrap gap-1.5 text-[10px] text-sage/70">
                 <span className="rounded-full bg-linen px-2 py-0.5 border border-sand-border/60">Zero-Friction Transit</span>
-                <span className="rounded-full bg-linen px-2 py-0.5 border border-sand-border/60">Local Elder Access</span>
+                <span className="rounded-full bg-linen px-2 py-0.5 border border-sand-border/60">Cultural Immersion</span>
                 <span className="rounded-full bg-linen px-2 py-0.5 border border-sand-border/60">Best Contract Rates</span>
               </div>
             </div>

@@ -3,7 +3,7 @@ Comprehensive End-to-End System Use Cases for KAI Sanctuary Platform.
 Validates all domains of the system:
 1. Somatic Restorative Science & Bioharmonic Lab (Frequencies, Breathwork, Autonomic Stress Assessment)
 2. B2B Wellness Studio Lead Generation & Collaboration Proposal Engine
-3. Preferred Vendor & Supplier Registry (Dual SQLite & Tern CRM Back Office Sync)
+3. Preferred Vendor & Supplier Registry (Dual SQLite & Sanctuary CRM Back Office Sync)
 4. Cirium Flight Radar Telemetry & Chauffeur Tarmac Update Ingestion
 5. Expedia EPS / Hotel PMS Gateway Hospitality Webhooks
 6. Ground Manifest Reconciliation & 12-14 Guest Capacity Ceiling Audit
@@ -152,7 +152,7 @@ def test_suite_3_vendor_registry():
     assert added["commission_rate"] == 12.5
 
     result_pass(
-        "Luxury Vendor Registry & Tern CRM Contract Sync",
+        "Luxury Vendor Registry & Sanctuary CRM Contract Sync",
         f"Total Vendors Active: {len(vendors) + 1}\n"
         f"Added Supplier: {added['name']} (ID: {added['id']})\n"
         f"Category: {added['category']} | Commission: {added['commission_rate']}% | Lead Time: {added['lead_time_days']} days"
@@ -160,7 +160,7 @@ def test_suite_3_vendor_registry():
 
 def test_suite_4_flight_radar_delay_webhook():
     banner("Aspect 4: Cirium Flight Delay Radar & Chauffeur Rescheduling")
-    settings.TERN_WEBHOOK_SECRET = "whsec_tern_kai_sanctuary_2026"
+    settings.WEBHOOK_SECRET = "whsec_kai_sanctuary_2026"
 
     # Ingest flight delay webhook
     delay_payload = {
@@ -176,7 +176,7 @@ def test_suite_4_flight_radar_delay_webhook():
     res_wh = client.post(
         "/api/v1/sidecar/webhooks/flight-desk",
         json=delay_payload,
-        headers={"X-Webhook-Secret": "whsec_tern_kai_sanctuary_2026"}
+        headers={"X-Webhook-Secret": "whsec_kai_sanctuary_2026"}
     )
     assert res_wh.status_code == 200
     wh_data = res_wh.json()
@@ -202,7 +202,7 @@ def test_suite_4_flight_radar_delay_webhook():
 
 def test_suite_5_hospitality_hotel_webhook():
     banner("Aspect 5: Expedia EPS / Hotel PMS Gateway Hospitality Ingestion")
-    settings.TERN_WEBHOOK_SECRET = "whsec_tern_kai_sanctuary_2026"
+    settings.WEBHOOK_SECRET = "whsec_kai_sanctuary_2026"
 
     hotel_payload = {
         "provider": "expedia_pms",
@@ -219,7 +219,7 @@ def test_suite_5_hospitality_hotel_webhook():
     res_hosp = client.post(
         "/api/v1/sidecar/webhooks/hospitality",
         json=hotel_payload,
-        headers={"X-Webhook-Secret": "whsec_tern_kai_sanctuary_2026"}
+        headers={"X-Webhook-Secret": "whsec_kai_sanctuary_2026"}
     )
     assert res_hosp.status_code == 200
     hosp_data = res_hosp.json()
@@ -429,7 +429,7 @@ def test_suite_11_layman_tool_guide():
     assert guide_data["total_tools"] >= 10
 
     # 2. Specific tool explanation
-    res_tool = client.get("/api/v1/sidecar/copilot/explain-tool/tern_crm_sync", headers=AUTH_HEADER)
+    res_tool = client.get("/api/v1/sidecar/copilot/explain-tool/founder_studio", headers=AUTH_HEADER)
     assert res_tool.status_code == 200
     tool_data = res_tool.json()
     assert "layman_summary" in tool_data
@@ -438,7 +438,7 @@ def test_suite_11_layman_tool_guide():
     result_pass(
         "Plain-English Layman Studio Guide",
         f"Total Tools Cataloged: {guide_data['total_tools']} tools with simple explanations\n"
-        f"Sample Tool ('Tern CRM Sync'): \"{tool_data['layman_summary']}\"\n"
+        f"Sample Tool ('Founder Studio'): \"{tool_data['layman_summary']}\"\n"
         f"Why It Matters: \"{tool_data['why_it_matters']}\""
     )
 

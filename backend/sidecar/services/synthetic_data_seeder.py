@@ -149,9 +149,9 @@ SYNTHETIC_INTAKES = [
             "travel_dates_flexible": True,
             "special_requests": "Arriving DPS, private Lotus chauffeur escort to Ubud jungle villa"
         },
-        "status": "SYNCED_TO_TERN",
-        "tern_contact_id": "tern_cnt_takahashi_007",
-        "tern_trip_id": "tern_trp_bali_7781"
+        "status": "CONFIRMED_IN_CRM",
+        "crm_contact_id": "kai_cnt_takahashi_007",
+        "crm_trip_id": "kai_trp_bali_7781"
     },
     {
         "source_ref": "KAI-ROSSI91",
@@ -177,9 +177,9 @@ SYNTHETIC_INTAKES = [
             "travel_dates_flexible": False,
             "special_requests": "Arriving CUN, private luxury suburban transfer to Riviera Maya villa"
         },
-        "status": "SYNCED_TO_TERN",
-        "tern_contact_id": "tern_cnt_rossi_091",
-        "tern_trip_id": "tern_trp_riviera_4412"
+        "status": "CONFIRMED_IN_CRM",
+        "crm_contact_id": "kai_cnt_rossi_091",
+        "crm_trip_id": "kai_trp_riviera_4412"
     }
 ]
 
@@ -195,13 +195,12 @@ SYNTHETIC_SUPPLIERS = [
         "booking_url_or_code": "VIP-KAI-NOSARA-4WD",
         "commission_rate": 10.0,
         "commission_type": "PERCENTAGE",
-        "payment_terms": "Tern Native Client Card Auth",
+        "payment_terms": "Direct Client Card Authorization",
         "lead_time_days": 3,
         "preferred_tier": "PREFERRED_PARTNER",
         "service_description": "Premier executive chauffeur fleet operating late-model Chevrolet Suburbans and Mercedes Sprinters with terrain suspension, chilled hydration, and flight-monitored tarmac meet-and-greets at Liberia Airport (LIR).",
         "clinical_relevance": "Eliminates arrival stress and road vibration fatigue through professional air-suspension driving, preserving parasympathetic tone from the moment guests land.",
-        "tern_sync_status": "SYNCED",
-        "tern_deep_link": "https://app.tern.travel/suppliers/guanacaste-chauffeur-01"
+        "dossier_url": "/portal/vendors/guanacaste-chauffeur-01"
     },
     {
         "name": "Amalfi Coast Exclusive Chauffeur & NCC Limousine",
@@ -214,13 +213,12 @@ SYNTHETIC_SUPPLIERS = [
         "booking_url_or_code": "AMALFI-VIP-KAI",
         "commission_rate": 12.0,
         "commission_type": "PERCENTAGE",
-        "payment_terms": "Tern Native Client Card Auth",
+        "payment_terms": "Direct Client Card Authorization",
         "lead_time_days": 5,
         "preferred_tier": "PREFERRED_PARTNER",
         "service_description": "Luxury Mercedes-Benz V-Class and S-Class private chauffeur transit between Naples Airport (NAP) and Amalfi cliffside sanctuaries, including private Riva speedboat transfers from Sorrento.",
         "clinical_relevance": "Scenic coastal transit avoiding public ferry congestion, maintaining emotional calm and acoustic quietude along the Mediterranean route.",
-        "tern_sync_status": "SYNCED",
-        "tern_deep_link": "https://app.tern.travel/suppliers/amalfi-ncc-02"
+        "dossier_url": "/portal/vendors/amalfi-ncc-02"
     },
     {
         "name": "Grand Travel & Cruise VIP Air Desk & Cirium Tracker",
@@ -233,13 +231,12 @@ SYNTHETIC_SUPPLIERS = [
         "booking_url_or_code": "GT-500CLUB-KAI",
         "commission_rate": 8.0,
         "commission_type": "PERCENTAGE",
-        "payment_terms": "Tern Direct Merchant Integration",
+        "payment_terms": "Sanctuary Direct Merchant Integration",
         "lead_time_days": 1,
         "preferred_tier": "PREFERRED_PARTNER",
         "service_description": "25+ year host agency air desk providing negotiated lie-flat contracts on Delta One, United Polaris, Lufthansa, and Emirates, with real-time Cirium flight delay tracking and tarmac chauffeur alerts.",
         "clinical_relevance": "Guarantees lie-flat sleep architecture for long-haul guests, mitigating trans-meridian jet lag and circadian disruption.",
-        "tern_sync_status": "SYNCED",
-        "tern_deep_link": "https://app.tern.travel/suppliers/grand-travel-airdesk"
+        "dossier_url": "/portal/vendors/grand-travel-airdesk"
     },
     {
         "name": "Nosara Hearth Organic Culinary & Farm Kitchen",
@@ -252,13 +249,12 @@ SYNTHETIC_SUPPLIERS = [
         "booking_url_or_code": "HEARTH-KAI-COHORT",
         "commission_rate": 10.0,
         "commission_type": "PERCENTAGE",
-        "payment_terms": "Tern Native Client Card Auth",
+        "payment_terms": "Direct Client Card Authorization",
         "lead_time_days": 7,
         "preferred_tier": "PREFERRED_PARTNER",
         "service_description": "100% organic, regenerative Nicoya Blue Zone farm-to-table culinary curation. Dedicated allergen isolation (celiac-certified gluten-free, A2/dairy-free, anti-inflammatory prebiotics).",
         "clinical_relevance": "Nutritional medicine optimizing the gut-brain axis, stimulating natural acetylcholine release, and reducing systemic inflammatory markers during somatic down-regulation.",
-        "tern_sync_status": "SYNCED",
-        "tern_deep_link": "https://app.tern.travel/suppliers/nosara-hearth-03"
+        "dossier_url": "/portal/vendors/nosara-hearth-03"
     },
     {
         "name": "Pacific Alchemy 432Hz Sound Bowls & Somatics",
@@ -271,13 +267,12 @@ SYNTHETIC_SUPPLIERS = [
         "booking_url_or_code": "ALCHEMY-432-KAI",
         "commission_rate": 15.0,
         "commission_type": "PERCENTAGE",
-        "payment_terms": "Tern Native Client Card Auth",
+        "payment_terms": "Direct Client Card Authorization",
         "lead_time_days": 4,
         "preferred_tier": "PREFERRED_PARTNER",
         "service_description": "Handcrafted pure quartz crystal singing bowls tuned precisely to 432Hz and 528Hz Solfeggio frequencies, providing bespoke binaural brainwave entrainment and acoustic sound baths.",
         "clinical_relevance": "Acoustic physical vibrations encourage alpha and theta brainwave synchronization, down-regulating sympathetic tone and deepening restorative non-REM sleep.",
-        "tern_sync_status": "SYNCED",
-        "tern_deep_link": "https://app.tern.travel/suppliers/pacific-alchemy-04"
+        "dossier_url": "/portal/vendors/pacific-alchemy-04"
     },
     {
         "name": "Clinica Medica de Urgencias Nosara (Paradise Medical)",
@@ -295,8 +290,7 @@ SYNTHETIC_SUPPLIERS = [
         "preferred_tier": "VETTED_BACKUP",
         "service_description": "24/7 bilingual urgent care, diagnostic ultrasound, IV hydration, cardiac monitoring, and medical helipad evacuation protocols located 12 minutes from the KAI Nosara sanctuary.",
         "clinical_relevance": "Provides instant medical safety backing for guest peace of mind, overseen by Nurse Kareena Islam's clinical triage standards.",
-        "tern_sync_status": "SYNCED",
-        "tern_deep_link": "https://app.tern.travel/suppliers/nosara-medical-clinic"
+        "dossier_url": "/portal/vendors/nosara-medical-clinic"
     }
 ]
 
@@ -362,8 +356,8 @@ SYNTHETIC_CALENDAR_EVENTS = [
         "start_time": datetime.now(timezone.utc) + timedelta(days=1, hours=2),
         "end_time": datetime.now(timezone.utc) + timedelta(days=1, hours=2, minutes=20),
         "guest_name": "Frank Lucas",
-        "location": "Zoom Telehealth / Tern VIP Audio Bridge",
-        "notes": "Review 3-night restorative immersion, Private Ocean Canopy Villa, 30% Tern deposit ($1,710), and private tarmac transfer."
+        "location": "Zoom Telehealth / VIP Telehealth Sanctuary Bridge",
+        "notes": "Review 3-night restorative immersion, Private Ocean Canopy Villa, 30% Sanctuary deposit ($1,710), and private tarmac transfer."
     },
     {
         "title": "Pre-Call Consultation: Eleanor Vance (Nosara Nervous System Reset)",
@@ -372,7 +366,7 @@ SYNTHETIC_CALENDAR_EVENTS = [
         "start_time": datetime.now(timezone.utc) + timedelta(days=2, hours=4),
         "end_time": datetime.now(timezone.utc) + timedelta(days=2, hours=4, minutes=20),
         "guest_name": "Eleanor Vance",
-        "location": "Zoom Telehealth / Tern VIP Audio Bridge",
+        "location": "Zoom Telehealth / VIP Telehealth Sanctuary Bridge",
         "notes": "Address corporate burnout, sleep restoration protocols, and private lie-flat air desk routing via Grand Travel."
     },
     {
@@ -391,7 +385,7 @@ SYNTHETIC_CALENDAR_EVENTS = [
 def seed_all_synthetic_data(db: Session, force_reset: bool = False) -> Dict[str, Any]:
     """
     Seeds comprehensive, realistic synthetic test data across the entire KAI Sanctuary
-    and Tern Sidecar database:
+    and KAI Sanctuary database:
     - Guest Intakes (Frank Lucas, Eleanor Vance, Marcus Reed, Sarah Jenkins, etc.)
     - Preferred Vendors & Suppliers (Chauffeurs, Air Desks, Caterers, Sound Healers)
     - Partner Leads & Medical Referrals
@@ -438,9 +432,9 @@ def seed_all_synthetic_data(db: Session, force_reset: bool = False) -> Dict[str,
                 flight_request=itk.get("flight_request"),
                 consultation_thesis=thesis,
                 status=itk["status"],
-                tern_contact_id=itk.get("tern_contact_id"),
-                tern_trip_id=itk.get("tern_trip_id"),
-                synced_at=datetime.now(timezone.utc) if itk["status"] == "SYNCED_TO_TERN" else None
+                crm_contact_id=itk.get("crm_contact_id"),
+                crm_trip_id=itk.get("crm_trip_id"),
+                synced_at=datetime.now(timezone.utc) if itk["status"] == "CONFIRMED_IN_CRM" else None
             )
             db.add(record)
             counts["intakes_created"] += 1
@@ -465,8 +459,8 @@ def seed_all_synthetic_data(db: Session, force_reset: bool = False) -> Dict[str,
                 preferred_tier=sup["preferred_tier"],
                 service_description=sup["service_description"],
                 clinical_relevance=sup["clinical_relevance"],
-                tern_sync_status=sup["tern_sync_status"],
-                tern_deep_link=sup["tern_deep_link"]
+                supplier_code=sup.get("id"),
+                dossier_url=sup.get("dossier_url", "/portal/vendors")
             )
             db.add(record)
             counts["suppliers_created"] += 1
@@ -524,7 +518,7 @@ def seed_all_synthetic_data(db: Session, force_reset: bool = False) -> Dict[str,
         {
             "type": "booking_hold",
             "guest_name": "Eleanor Vance",
-            "content": "Booking Hold & Tern Sync: Eleanor Vance - Nosara Sacred Ocean Canopy Villa (6 Nights). 30% Deposit ($3,450) held pending client authorization. Tags: [KAI_GUEST, COHORT_2026_2027, VIP_RETREAT].",
+            "content": "Booking Hold & Sanctuary CRM Sync: Eleanor Vance - Nosara Sacred Ocean Canopy Villa (6 Nights). 30% Deposit ($3,450) held pending client authorization. Tags: [KAI_GUEST, COHORT_2026_2027, VIP_RETREAT].",
             "status": "pending_review"
         },
         {
@@ -554,7 +548,7 @@ def seed_all_synthetic_data(db: Session, force_reset: bool = False) -> Dict[str,
         {
             "type": "manifest_discrepancy",
             "guest_name": "Nosara Manifest Audit",
-            "content": "Manifest Diff Audit: 1 unvouchered guest detected for Sacred Garden Suite (Arrival Nov 14). Grand Travel voucher GT-8812 requires reconciliation with Tern booking record.",
+            "content": "Manifest Diff Audit: 1 unvouchered guest detected for Sacred Garden Suite (Arrival Nov 14). Grand Travel voucher GT-8812 requires reconciliation with Sanctuary CRM booking record.",
             "status": "pending_review"
         },
         {

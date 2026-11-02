@@ -19,10 +19,11 @@ import {
   HelpCircle,
   Compass,
   Briefcase,
-  Mic
+  Mic,
+  Database
 } from "lucide-react";
 import { fetchCohortCapacities, SanctuaryCohortStatus, seedDemoIntakes, fetchDraftStats } from "@/lib/sidecar-api";
-import TernFormsModal from "@/components/portal/TernFormsModal";
+import NativeFormsModal from "@/components/portal/NativeFormsModal";
 import PortalHelpModal from "@/components/portal/PortalHelpModal";
 import ClinicalCopilotDrawer from "@/components/portal/ClinicalCopilotDrawer";
 import VoiceConsultationModal from "@/components/portal/VoiceConsultationModal";
@@ -96,6 +97,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   const navItems = [
     { href: "/portal", label: "Guest Inquiries", icon: Users, badge: "Staging" },
+    { href: "/portal/crm", label: "Travel CRM", icon: Database, badge: "Clients & Trips" },
     { 
       href: "/portal/drafts", 
       label: "Action Review Queue", 
@@ -104,7 +106,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     },
     { href: "/portal/calendar", label: "Retreat Calendar", icon: Calendar, badge: "Live Feed" },
     { href: "/portal/travel-logistics", label: "Travel & Destinations", icon: Compass, badge: "Routes & Guides" },
-    { href: "/portal/vendors", label: "Vendors & Suppliers", icon: Briefcase, badge: "Tern Back Office" },
+    { href: "/portal/vendors", label: "Vendors & Suppliers", icon: Briefcase, badge: "Sanctuary Directory" },
     { href: "/portal/leads", label: "Partner Studios", icon: Sparkles, badge: "Referrals" },
     { href: "/portal/campaigns", label: "Concierge Broadcasts", icon: Send, badge: "SMS" },
     { href: "/portal/reconciliation", label: "Guest List Check", icon: Scale, badge: "Manifest" },
@@ -125,22 +127,22 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                   KAI
                 </span>
                 <span className="text-[10px] font-semibold tracking-widest uppercase bg-[#2D3E35] text-[#FAF7F2] px-2 py-0.5 rounded">
-                  FOUNDER STUDIO
+                  STAFF STUDIO
                 </span>
               </Link>
               <span className="text-[#C07D63] text-sm">/</span>
               <span className="text-xs text-[#5C6B5E] hidden sm:inline-block font-medium">
-                Tern Guest & Travel Planner
+                Staff Operations & Travel Planner
               </span>
 
-              {/* Personalized Founder Approval Pill */}
+              {/* Staff Operator Active Pill */}
               <div className="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 font-medium">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Personalized Founder Approval</span>
+                <span>Staff Operator Active</span>
               </div>
             </div>
 
@@ -167,10 +169,10 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               <button
                 onClick={() => setIsFormsOpen(true)}
                 className="hidden sm:inline-flex items-center space-x-1.5 px-3 py-1 text-xs font-semibold text-[#2D3E35] bg-[#F2ECE4] hover:bg-[#EBE3D8] border border-[#E5DDD0] rounded-md transition-colors"
-                title="Open Tern Public Forms Hub (/responses/new)"
+                title="Open KAI Native Forms Hub"
               >
                 <FileText className="w-3.5 h-3.5 text-[#C07D63]" />
-                <span>Tern Forms Hub</span>
+                <span>Native Forms Hub</span>
               </button>
 
               <button
@@ -264,7 +266,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 >
                   <span className="font-semibold">{c.title.split(" ")[0]}:</span>
                   <span>
-                    {c.tern_confirmed_count + c.staged_count}/{c.capacity_limit} Booked
+                    {(c.crm_confirmed_count ?? 0) + c.staged_count}/{c.capacity_limit} Booked
                   </span>
                   <span
                     className={`text-[10px] px-1 rounded ${
@@ -315,13 +317,13 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
             KAI Wellness Retreats &copy; 2026–2027 &middot; Curated by Kareena Islam, BSN, RN &middot; Grand Travel & Cruise Host Agency
           </div>
           <div className="text-[11px] text-[#5C6B5E]/90 font-medium">
-            Founder Sanctuary Care Platform &middot; Tern Travel Partner Engine &middot; Grand Travel & Cruise Host Agency
+            Founder Sanctuary Care Platform &middot; KAI Travel CRM Platform &middot; Grand Travel & Cruise Host Agency
           </div>
         </div>
       </footer>
 
       {/* Modals and Drawers */}
-      <TernFormsModal isOpen={isFormsOpen} onClose={() => setIsFormsOpen(false)} />
+      <NativeFormsModal isOpen={isFormsOpen} onClose={() => setIsFormsOpen(false)} />
       <PortalHelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
       <ClinicalCopilotDrawer isOpen={isCopilotOpen} onClose={() => setIsCopilotOpen(false)} />
       <VoiceConsultationModal

@@ -214,10 +214,38 @@ def compute_custom_route(
 
 def seed_default_routes_and_pois_if_empty(db: Session) -> None:
     """
-    Seeds baseline sanctuary routes and somatic nature points of interest if the tables are empty.
+    Seeds baseline sanctuary routes and somatic nature points of interest across all retreats.
+    Ensures Puerto Vallarta (2027 flagship) is always seeded even if other retreats exist.
     """
-    if db.query(SanctuaryRoute).count() == 0:
-        default_routes = [
+    existing_slugs = set(r.sanctuary_slug for r in db.query(SanctuaryRoute).all())
+    
+    routes_to_add = []
+    if "puerto-vallarta" not in existing_slugs and "puerto-vallarta-2027" not in existing_slugs:
+        routes_to_add.append(
+            SanctuaryRoute(
+                id=generate_uuid_str(),
+                sanctuary_slug="puerto-vallarta",
+                origin_name="Licenciado Gustavo Díaz Ordaz International Airport (PVR)",
+                origin_lat=20.6801,
+                origin_lon=-105.2542,
+                destination_name="KAI Marival Harmony Sanctuary, Banderas Bay",
+                destination_lat=20.7356,
+                destination_lon=-105.3887,
+                distance_km=28.4,
+                estimated_minutes=35,
+                scenic_description="Serene 35-minute coastal drive skirting Banderas Bay into Punta de Mita with panoramic Pacific ocean vistas, private tarmac greeting, and chilled coconut water on board.",
+                recommended_vehicle="Mercedes-Benz Sprinter VIP Lounge or Luxury Suburban with Chilled Eucalyptus Towels",
+                road_conditions="Paved Federal Coastal Highway",
+                route_geometry=[
+                    [20.6801, -105.2542],
+                    [20.7010, -105.2950],
+                    [20.7250, -105.3400],
+                    [20.7356, -105.3887]
+                ]
+            )
+        )
+    if "nosara" not in existing_slugs:
+        routes_to_add.append(
             SanctuaryRoute(
                 id=generate_uuid_str(),
                 sanctuary_slug="nosara",
@@ -239,7 +267,10 @@ def seed_default_routes_and_pois_if_empty(db: Session) -> None:
                     [10.1500, -85.6200],
                     [9.9806, -85.6667]
                 ]
-            ),
+            )
+        )
+    if "amalfi" not in existing_slugs:
+        routes_to_add.append(
             SanctuaryRoute(
                 id=generate_uuid_str(),
                 sanctuary_slug="amalfi",
@@ -260,7 +291,10 @@ def seed_default_routes_and_pois_if_empty(db: Session) -> None:
                     [40.7300, 14.4900],
                     [40.6340, 14.6027]
                 ]
-            ),
+            )
+        )
+    if "bali" not in existing_slugs:
+        routes_to_add.append(
             SanctuaryRoute(
                 id=generate_uuid_str(),
                 sanctuary_slug="bali",
@@ -281,7 +315,10 @@ def seed_default_routes_and_pois_if_empty(db: Session) -> None:
                     [-8.5800, 115.2400],
                     [-8.5069, 115.2625]
                 ]
-            ),
+            )
+        )
+    if "riviera-maya" not in existing_slugs and "riviera_maya" not in existing_slugs:
+        routes_to_add.append(
             SanctuaryRoute(
                 id=generate_uuid_str(),
                 sanctuary_slug="riviera-maya",
@@ -303,12 +340,52 @@ def seed_default_routes_and_pois_if_empty(db: Session) -> None:
                     [20.2114, -87.4654]
                 ]
             )
-        ]
-        db.add_all(default_routes)
+        )
+    if routes_to_add:
+        db.add_all(routes_to_add)
         db.commit()
 
-    if db.query(SomaticPointOfInterest).count() == 0:
-        default_pois = [
+    # Seed POIs ensuring Puerto Vallarta is represented
+    existing_poi_slugs = set(p.sanctuary_slug for p in db.query(SomaticPointOfInterest).all())
+    pois_to_add = []
+    if "puerto-vallarta" not in existing_poi_slugs and "puerto-vallarta-2027" not in existing_poi_slugs:
+        pois_to_add.extend([
+            SomaticPointOfInterest(
+                id=generate_uuid_str(),
+                sanctuary_slug="puerto-vallarta",
+                name="Marival Harmony Melange Spa Hydrotherapy Circuit",
+                category="HOT_SPRINGS",
+                lat=20.7356,
+                lon=-105.3887,
+                description="Thermal hydrotherapy contrast circuit with vitality vitality pools, steam grotto, and oceanview acoustic serenity.",
+                vagus_nerve_benefit="Vagus nerve stimulation: Alternating thermal and ocean-mineral immersion stimulates autonomic tone and accelerates post-flight cellular decompression.",
+                ideal_visiting_time="Afternoon (2:00 PM – 4:30 PM)"
+            ),
+            SomaticPointOfInterest(
+                id=generate_uuid_str(),
+                sanctuary_slug="puerto-vallarta",
+                name="Banderas Bay Humpback Whale Observation Bluff",
+                category="SUNSET_BLUFF",
+                lat=20.7310,
+                lon=-105.3920,
+                description="Quiet elevated coastal headland overlooking Banderas Bay with migrating humpback whale pods in late January.",
+                vagus_nerve_benefit="Vagus nerve stimulation: Expansive natural horizon viewing down-regulates visual stress and initiates pineal melatonin release at twilight.",
+                ideal_visiting_time="Twilight Golden Hour (5:15 PM – 6:15 PM)"
+            ),
+            SomaticPointOfInterest(
+                id=generate_uuid_str(),
+                sanctuary_slug="puerto-vallarta",
+                name="Wixárika (Huichol) Ancestral Cacao & Copal Circle",
+                category="SACRED_WATER",
+                lat=20.7380,
+                lon=-105.3850,
+                description="Indigenous ceremonial pavilion under native parota trees, honoring ancestral Jalisco storytelling and raw ceremonial cacao.",
+                vagus_nerve_benefit="Vagus nerve stimulation: Copal resin aromatherapeutics and communal somatic chanting stimulate the ventral vagal social engagement system.",
+                ideal_visiting_time="Morning Awakening (7:00 AM – 8:30 AM)"
+            )
+        ])
+    if "nosara" not in existing_poi_slugs:
+        pois_to_add.extend([
             SomaticPointOfInterest(
                 id=generate_uuid_str(),
                 sanctuary_slug="nosara",
@@ -317,7 +394,7 @@ def seed_default_routes_and_pois_if_empty(db: Session) -> None:
                 lat=9.9880,
                 lon=-85.6420,
                 description="Secluded freshwater basin enveloped by virgin jungle canopy and singing cicadas.",
-                vagus_nerve_benefit="Stimulates vagus nerve activation via the mammalian dive reflex, immediately lowering heart rate and down-regulating sympathetic overdrive.",
+                vagus_nerve_benefit="Vagus nerve stimulation: Stimulates vagus nerve activation via the mammalian dive reflex, immediately lowering heart rate and down-regulating sympathetic overdrive.",
                 ideal_visiting_time="Early Morning (Gentle Sun & High Negative Ions)"
             ),
             SomaticPointOfInterest(
@@ -328,37 +405,16 @@ def seed_default_routes_and_pois_if_empty(db: Session) -> None:
                 lat=9.9833,
                 lon=-85.6720,
                 description="Gentle coastal promontory offering 180-degree unobstructed Pacific horizon views.",
-                vagus_nerve_benefit="Activates vagus nerve parasympathetic pathways; viewing natural sunset amber wavelengths signals pineal melatonin production, restoring disrupted circadian sleep rhythms.",
+                vagus_nerve_benefit="Vagus nerve stimulation: Activates vagus nerve parasympathetic pathways; viewing natural sunset amber wavelengths signals pineal melatonin production, restoring disrupted circadian sleep rhythms.",
                 ideal_visiting_time="Twilight (5:15 PM - 6:00 PM)"
-            ),
-            SomaticPointOfInterest(
-                id=generate_uuid_str(),
-                sanctuary_slug="amalfi",
-                name="Valle delle Ferriere Moss Grotto",
-                category="FOREST_BATHING",
-                lat=40.6410,
-                lon=14.5950,
-                description="Ancient fern canyon with continuous mountain stream mist and microclimate shade.",
-                vagus_nerve_benefit="Forest phytoncides and ambient acoustic stream frequencies stimulate vagus nerve tone, inducing deep parasympathetic relaxation and calm breathing.",
-                ideal_visiting_time="Morning Shade (9:00 AM - 11:30 AM)"
-            ),
-            SomaticPointOfInterest(
-                id=generate_uuid_str(),
-                sanctuary_slug="bali",
-                name="Tirta Empul Holy Springs (Private Blessing)",
-                category="SACRED_WATER",
-                lat=-8.4150,
-                lon=115.3150,
-                description="Centuries-old crystalline spring water channeled through 11 purification spouts.",
-                vagus_nerve_benefit="Mindful sensory immersion in natural spring waters provides vagus nerve stimulation, relieving somatic tension and restoring emotional equanimity.",
-                ideal_visiting_time="Sunrise (6:30 AM before public opening)"
             )
-        ]
-        db.add_all(default_pois)
+        ])
+    if pois_to_add:
+        db.add_all(pois_to_add)
         db.commit()
-    else:
-        # Ensure existing POIs have vagus nerve keyword for consistency
-        for poi in db.query(SomaticPointOfInterest).all():
-            if "vagus" not in poi.vagus_nerve_benefit.lower():
-                poi.vagus_nerve_benefit = f"Vagus nerve stimulation: {poi.vagus_nerve_benefit}"
-        db.commit()
+
+    # Ensure all POIs contain vagus nerve keyword
+    for poi in db.query(SomaticPointOfInterest).all():
+        if "vagus" not in poi.vagus_nerve_benefit.lower():
+            poi.vagus_nerve_benefit = f"Vagus nerve stimulation: {poi.vagus_nerve_benefit}"
+    db.commit()

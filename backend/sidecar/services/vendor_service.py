@@ -4,7 +4,7 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from backend.sidecar.models import VendorSupplierRecord, generate_uuid_str
-from backend.sidecar.services.tern_client import tern_client
+from backend.sidecar.services.crm_client import crm_client
 
 logger = logging.getLogger("kai_vendor_service")
 
@@ -25,7 +25,7 @@ def invalidate_vendor_cache():
 
 
 # -----------------------------------------------------------------------------
-# Pre-Seeded Preferred Luxury Suppliers (Tern Back Office Aligned)
+# Pre-Seeded Preferred Luxury Suppliers (Sanctuary CRM Aligned)
 # -----------------------------------------------------------------------------
 DEFAULT_SANCTUARY_SUPPLIERS = [
     {
@@ -39,7 +39,7 @@ DEFAULT_SANCTUARY_SUPPLIERS = [
         "booking_url_or_code": "SABRE-GTC-KAI",
         "commission_rate": 10.0,
         "commission_type": "PERCENTAGE",
-        "payment_terms": "Tern Native Client Card Auth",
+        "payment_terms": "Direct Client Card Authorization",
         "lead_time_days": 14,
         "preferred_tier": "PREFERRED_PARTNER",
         "service_description": (
@@ -59,7 +59,7 @@ DEFAULT_SANCTUARY_SUPPLIERS = [
         "booking_url_or_code": "CR-LIR-VIP-4WD",
         "commission_rate": 12.0,
         "commission_type": "PERCENTAGE",
-        "payment_terms": "Tern Native Client Card Auth",
+        "payment_terms": "Direct Client Card Authorization",
         "lead_time_days": 3,
         "preferred_tier": "PREFERRED_PARTNER",
         "service_description": (
@@ -79,7 +79,7 @@ DEFAULT_SANCTUARY_SUPPLIERS = [
         "booking_url_or_code": "HARMONY-CHEF-TABLE",
         "commission_rate": 8.0,
         "commission_type": "PERCENTAGE",
-        "payment_terms": "Tern Native Client Card Auth",
+        "payment_terms": "Direct Client Card Authorization",
         "lead_time_days": 5,
         "preferred_tier": "PREFERRED_PARTNER",
         "service_description": (
@@ -99,7 +99,7 @@ DEFAULT_SANCTUARY_SUPPLIERS = [
         "booking_url_or_code": "ALCH-432HZ-BALI",
         "commission_rate": 15.0,
         "commission_type": "PERCENTAGE",
-        "payment_terms": "Tern Native Client Card Auth",
+        "payment_terms": "Direct Client Card Authorization",
         "lead_time_days": 7,
         "preferred_tier": "PREFERRED_PARTNER",
         "service_description": (
@@ -159,7 +159,7 @@ DEFAULT_SANCTUARY_SUPPLIERS = [
         "booking_url_or_code": "CENOTE-PRIVATE-SACRED",
         "commission_rate": 15.0,
         "commission_type": "PERCENTAGE",
-        "payment_terms": "Tern Native Client Card Auth",
+        "payment_terms": "Direct Client Card Authorization",
         "lead_time_days": 5,
         "preferred_tier": "PREFERRED_PARTNER",
         "service_description": (
@@ -176,8 +176,8 @@ def seed_default_vendors_if_empty(db: Session) -> None:
     count = db.query(VendorSupplierRecord).count()
     if count == 0:
         for s in DEFAULT_SANCTUARY_SUPPLIERS:
-            # Sync to Tern
-            sync_res = tern_client.sync_supplier_to_tern(
+            # Register in Native CRM
+            sync_res = crm_client.sync_supplier_to_crm(
                 name=s["name"],
                 category=s["category"],
                 sanctuary_slug=s["sanctuary_slug"],
@@ -187,7 +187,7 @@ def seed_default_vendors_if_empty(db: Session) -> None:
                 website=s.get("website"),
                 commission_rate=s.get("commission_rate", 10.0),
                 commission_type=s.get("commission_type", "PERCENTAGE"),
-                payment_terms=s.get("payment_terms", "Tern Native Client Card Auth"),
+                payment_terms=s.get("payment_terms", "Direct Client Card Authorization"),
                 lead_time_days=s.get("lead_time_days", 7),
                 preferred_tier=s.get("preferred_tier", "PREFERRED_PARTNER"),
                 service_description=s["service_description"],
@@ -197,7 +197,7 @@ def seed_default_vendors_if_empty(db: Session) -> None:
 
             rec = VendorSupplierRecord(
                 id=generate_uuid_str(),
-                tern_supplier_id=sync_res["tern_supplier_id"],
+                supplier_code=sync_res.get("supplier_code"),
                 name=s["name"],
                 category=s["category"],
                 sanctuary_slug=s["sanctuary_slug"],
@@ -208,20 +208,20 @@ def seed_default_vendors_if_empty(db: Session) -> None:
                 booking_url_or_code=s.get("booking_url_or_code"),
                 commission_rate=s.get("commission_rate", 10.0),
                 commission_type=s.get("commission_type", "PERCENTAGE"),
-                payment_terms=s.get("payment_terms", "Tern Native Client Card Auth"),
+                payment_terms=s.get("payment_terms", "Direct Client Card Authorization"),
                 lead_time_days=s.get("lead_time_days", 7),
                 preferred_tier=s.get("preferred_tier", "PREFERRED_PARTNER"),
                 service_description=s["service_description"],
                 clinical_relevance=s.get("clinical_relevance"),
-                tern_deep_link=sync_res["tern_deep_link"],
-                tern_sync_status="SYNCED",
+                dossier_url=sync_res.get("dossier_url"),
+                
                 last_synced_at=datetime.now(timezone.utc),
                 status="ACTIVE"
             )
             db.add(rec)
         db.commit()
         invalidate_vendor_cache()
-        logger.info(f"Seeded {len(DEFAULT_SANCTUARY_SUPPLIERS)} preferred suppliers into SQLite and synced with Tern.")
+        logger.info(f"Seeded {len(DEFAULT_SANCTUARY_SUPPLIERS)} preferred suppliers into SQLite and registered in KAI CRM.")
 
 
 def list_vendors(
@@ -267,14 +267,14 @@ def get_vendor(db: Session, vendor_id: str) -> Optional[VendorSupplierRecord]:
 
 def create_vendor(db: Session, data: Dict[str, Any]) -> VendorSupplierRecord:
     """
-    Creates vendor in SQLite local persistent storage AND syncs to Tern CRM Back Office.
+    Creates vendor in SQLite local persistent storage AND syncs to KAI Sanctuary CRM Registry.
     """
     name = data["name"]
     category = data["category"]
     sanctuary_slug = data.get("sanctuary_slug", "all").lower()
 
-    # 1. Sync to Tern Back Office
-    sync_res = tern_client.sync_supplier_to_tern(
+    # 1. Register in Native CRM
+    sync_res = crm_client.sync_supplier_to_crm(
         name=name,
         category=category,
         sanctuary_slug=sanctuary_slug,
@@ -284,7 +284,7 @@ def create_vendor(db: Session, data: Dict[str, Any]) -> VendorSupplierRecord:
         website=data.get("website"),
         commission_rate=data.get("commission_rate", 10.0),
         commission_type=data.get("commission_type", "PERCENTAGE"),
-        payment_terms=data.get("payment_terms", "Tern Native Client Card Auth"),
+        payment_terms=data.get("payment_terms", "Direct Client Card Authorization"),
         lead_time_days=data.get("lead_time_days", 7),
         preferred_tier=data.get("preferred_tier", "PREFERRED_PARTNER"),
         service_description=data["service_description"],
@@ -295,7 +295,7 @@ def create_vendor(db: Session, data: Dict[str, Any]) -> VendorSupplierRecord:
     # 2. Persist to local SQLite
     rec = VendorSupplierRecord(
         id=generate_uuid_str(),
-        tern_supplier_id=sync_res["tern_supplier_id"],
+        supplier_code=sync_res.get("supplier_code"),
         name=name,
         category=category,
         sanctuary_slug=sanctuary_slug,
@@ -306,13 +306,13 @@ def create_vendor(db: Session, data: Dict[str, Any]) -> VendorSupplierRecord:
         booking_url_or_code=data.get("booking_url_or_code"),
         commission_rate=data.get("commission_rate", 10.0),
         commission_type=data.get("commission_type", "PERCENTAGE"),
-        payment_terms=data.get("payment_terms", "Tern Native Client Card Auth"),
+        payment_terms=data.get("payment_terms", "Direct Client Card Authorization"),
         lead_time_days=data.get("lead_time_days", 7),
         preferred_tier=data.get("preferred_tier", "PREFERRED_PARTNER"),
         service_description=data["service_description"],
         clinical_relevance=data.get("clinical_relevance"),
-        tern_deep_link=sync_res["tern_deep_link"],
-        tern_sync_status="SYNCED",
+        dossier_url=sync_res.get("dossier_url"),
+        
         last_synced_at=datetime.now(timezone.utc),
         status="ACTIVE"
     )

@@ -1,1 +1,1 @@
-# KAI Tern CRM Sidecar Package
+# KAI Sanctuary Travel CRM Sidecar Package

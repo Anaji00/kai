@@ -17,7 +17,7 @@ from backend.sidecar.models import (
     DestinationReview,
     GroundTransferRecord,
 )
-from backend.sidecar.services.tern_client import TernCRMClient
+from backend.sidecar.services.crm_client import KaiTravelCRMClient, crm_client
 from backend.sidecar.services.messaging import authorize_and_dispatch_sms
 from backend.sidecar.services.whatsapp_dispatcher import build_drafts_digest_card
 from backend.config import settings
@@ -55,9 +55,9 @@ def get_channel_metadata(draft_type: str) -> Dict[str, str]:
             "channel_badge": "travel",
             "icon": "plane"
         }
-    elif draft_type in ("booking_hold", "guest_intake", "tern_sync_review"):
+    elif draft_type in ("booking_hold", "guest_intake", "crm_booking_review", "crm_sync_review"):
         return {
-            "channel_target": "Tern CRM Sync & Itinerary",
+            "channel_target": "Sanctuary CRM Sync & Itinerary",
             "channel_badge": "intake",
             "icon": "calendar"
         }
@@ -234,17 +234,17 @@ def execute_draft_dispatch(db: Session, draft: ActionDraft, operator_name: str =
             "provider_message_id": message_id
         }
 
-    # 3. Guest Intakes & Booking Holds (Tern CRM Sync) - Uses clean standard tags
-    elif draft.type in ("guest_intake", "booking_hold", "tern_sync_review"):
-        dispatch_results["channel"] = "TERN_CRM_SYNC"
+    # 3. Guest Intakes & Booking Holds (Sanctuary CRM Commit) - Uses clean standard tags
+    elif draft.type in ("guest_intake", "booking_hold", "crm_booking_review", "crm_sync_review"):
+        dispatch_results["channel"] = "SANCTUARY_CRM"
         intake = db.query(StagingIntake).filter(
             _name_is(StagingIntake.client_name, draft.guest_name) |
             (StagingIntake.source_ref == (draft.guest_name or "").strip())
         ).first()
 
-        tern_client = TernCRMClient()
+        crm = crm_client
         if intake:
-            tern_res = tern_client.sync_intake_to_tern(
+            crm_res = crm.sync_intake_to_crm(
                 intake_id=str(intake.id),
                 client_name=intake.client_name,
                 email=intake.email,
@@ -256,19 +256,19 @@ def execute_draft_dispatch(db: Session, draft: ActionDraft, operator_name: str =
                 flight_request=intake.flight_request,
                 operator_name=operator_name
             )
-            intake.status = "SYNCED_TO_TERN"
-            intake.tern_trip_id = tern_res.get("tern_trip_id")
-            intake.tern_contact_id = tern_res.get("tern_contact_id")
+            intake.status = "CONFIRMED_IN_CRM"
+            intake.crm_trip_id = crm_res.get("crm_trip_id") 
+            intake.crm_contact_id = crm_res.get("crm_contact_id") 
             intake.synced_at = datetime.now(timezone.utc)
             db.commit()
-            dispatch_results["action_taken"] = f"Synchronized intake for {intake.client_name} to Tern CRM"
-            dispatch_results["details"] = tern_res
+            dispatch_results["action_taken"] = f"Committed intake for {intake.client_name} to Sanctuary CRM"
+            dispatch_results["details"] = crm_res
         else:
             booking = db.query(Booking).filter(_name_is(Booking.full_name, draft.guest_name)).first()
             if booking:
                 booking.status = "confirmed"
                 db.commit()
-            tern_res = tern_client.sync_intake_to_tern(
+            crm_res = crm.sync_intake_to_crm(
                 intake_id=f"BK-{draft.id}",
                 client_name=draft.guest_name,
                 email=getattr(booking, "email", f"{draft.guest_name.lower().replace(' ', '.')}@example.com"),
@@ -279,8 +279,8 @@ def execute_draft_dispatch(db: Session, draft: ActionDraft, operator_name: str =
                 consultation_thesis={},
                 operator_name=operator_name
             )
-            dispatch_results["action_taken"] = f"Created Tern CRM Trip & Itinerary for {draft.guest_name}"
-            dispatch_results["details"] = tern_res
+            dispatch_results["action_taken"] = f"Created Sanctuary CRM Trip & Itinerary for {draft.guest_name}"
+            dispatch_results["details"] = crm_res
 
     # 4. Flight Coordination & Chauffeur Updates
     elif draft.type in ("flight_coordination", "flight_delay_chauffeur_update"):

@@ -13,12 +13,12 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
-interface TernFormsModalProps {
+export interface NativeFormsModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-export default function TernFormsModal({ isOpen, onClose }: TernFormsModalProps) {
+export function NativeFormsModal({ isOpen, onClose }: NativeFormsModalProps) {
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [copiedEmbedIndex, setCopiedEmbedIndex] = useState<number | null>(null);
   const [simulating, setSimulating] = useState(false);
@@ -26,26 +26,31 @@ export default function TernFormsModal({ isOpen, onClose }: TernFormsModalProps)
 
   if (!isOpen) return null;
 
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+
   const forms = [
     {
-      title: "Trip Request & Retreat Reservation Form",
-      description: "Direct guest inquiry form that collects retreat dates, room tier, and initial health notes.",
-      url: "https://app.tern.travel/public/forms/kai-nosara-intake/responses/new",
+      title: "Retreat Reservation & Intake Inquiry Form",
+      description: "Direct guest inquiry form that collects sanctuary destination, suite tier preference, and initial somatic notes.",
+      url: `${origin}/book?sanctuary=nosara`,
+      path: "/book?sanctuary=nosara",
       type: "Trip Request",
       tag: "Inbound Pipeline",
     },
     {
-      title: "Guest Passport & Grand Travel Flight Desk Form",
-      description: "Collects passport expiration dates, issuing country, and frequent flyer airline numbers.",
-      url: "https://app.tern.travel/public/forms/kai-guest-passport/responses/new",
-      type: "Contact Details",
-      tag: "Flight Desk Sync",
+      title: "Interactive Client Proposal & Deposit Authorization",
+      description: "Client web proposal with day-by-day somatic schedule, transparent 30/70 pricing, and direct credit card authorization.",
+      url: `${origin}/my-retreat?ref=sample_proposal`,
+      path: "/my-retreat?ref=sample_proposal",
+      type: "Proposal & Folio",
+      tag: "Native Card Vault",
     },
     {
-      title: "Guest Somatic Intake & Liability Waiver Form",
-      description: "Collects somatic health disclosures, acoustic sensitivity parameters, and e-signatures.",
-      url: "https://app.tern.travel/public/forms/kai-clinical-intake/responses/new",
-      type: "Custom Waiver",
+      title: "Pre-Retreat Somatic Health Intake & Waiver Form",
+      description: "Captures 180-day passport validity, emergency contacts, food allergies, and somatic disclosures directly into local CRM.",
+      url: `${origin}/book?step=clinical`,
+      path: "/book?step=clinical",
+      type: "Clinical Waiver",
       tag: "Zero Writes Staging",
     },
   ];
@@ -66,7 +71,6 @@ export default function TernFormsModal({ isOpen, onClose }: TernFormsModalProps)
   const handleSimulateInbound = async () => {
     setSimulating(true);
     try {
-      // Dispatch simulation event or trigger seed
       const res = await fetch("/api/v1/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -106,10 +110,10 @@ export default function TernFormsModal({ isOpen, onClose }: TernFormsModalProps)
             </span>
             <div>
               <h3 className="font-serif text-lg font-bold text-[#2D3E35] leading-tight">
-                Tern Public Forms Hub (/responses/new)
+                KAI Native Travel Forms Hub
               </h3>
               <p className="text-xs text-[#5C6B5E]">
-                Native Tern public forms engine for direct guest inquiries, waivers, and embeds
+                Native client intake, proposals, and waiver forms (100% self-contained KAI platform)
               </p>
             </div>
           </div>
@@ -129,7 +133,7 @@ export default function TernFormsModal({ isOpen, onClose }: TernFormsModalProps)
             <ShieldCheck className="w-4 h-4 text-emerald-700 mt-0.5 shrink-0" />
             <div className="leading-relaxed">
               <span className="font-semibold">Founder Approval Protected (No Unapproved Sends):</span> All public submissions
-              from these forms land in the KAI Staging Queue for clinical review and 1-click authorization by Kareena Islam, RN.
+              from these forms land directly in the KAI Staging Queue for clinical review and 1-click authorization by Kareena Islam, RN.
             </div>
           </div>
 
@@ -157,7 +161,7 @@ export default function TernFormsModal({ isOpen, onClose }: TernFormsModalProps)
 
                 <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[#E5DDD0]/60">
                   <a
-                    href={f.url}
+                    href={f.path}
                     target="_blank"
                     rel="noreferrer"
                     className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-md bg-[#2D3E35] text-[#FAF7F2] font-semibold hover:bg-[#1F2C25] transition-colors text-xs"
@@ -210,10 +214,10 @@ export default function TernFormsModal({ isOpen, onClose }: TernFormsModalProps)
               <span className="font-bold text-xs uppercase tracking-wider text-[#2D3E35]">
                 Operator Inbound Testing Simulator
               </span>
-              <span className="text-[10px] text-[#5C6B5E]">Simulates external form submission</span>
+              <span className="text-[10px] text-[#5C6B5E]">Simulates internal staging intake</span>
             </div>
             <p className="text-xs text-[#5C6B5E] leading-relaxed">
-              Test the end-to-end flow: submits a mock high-burnout intake (Dr. Genevieve Sterling) which generates an AI Conversation Guide and stages an operational notification card for WhatsApp.
+              Test the end-to-end flow: submits a mock high-burnout intake (Dr. Genevieve Sterling) which generates a Clinical Consultation Guide and stages an operational notification card for WhatsApp.
             </p>
             <button
               onClick={handleSimulateInbound}
@@ -229,3 +233,6 @@ export default function TernFormsModal({ isOpen, onClose }: TernFormsModalProps)
     </div>
   );
 }
+
+
+export default NativeFormsModal;

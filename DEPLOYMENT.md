@@ -26,7 +26,7 @@ Doing it on neon.tech directly works too. Copy the **pooled** connection string 
 | `DATABASE_URL` | Neon pooled string (set for you by the Neon integration) |
 | `ENVIRONMENT` | `production` |
 | `ADMIN_USERNAME` / `ADMIN_PASSWORD` | from `.env` |
-| `JWT_SECRET_KEY`, `TERN_WEBHOOK_SECRET`, `EMAIL_WEBHOOK_SECRET`, `CIRIUM_WEBHOOK_SECRET`, `EXPEDIA_WEBHOOK_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | from `.env` |
+| `JWT_SECRET_KEY`, `EMAIL_WEBHOOK_SECRET`, `CIRIUM_WEBHOOK_SECRET`, `EXPEDIA_WEBHOOK_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | from `.env` |
 | `GROQ_API_KEY` | from https://console.groq.com/keys |
 | `NEXT_PUBLIC_SITE_URL` | `https://kaiwellnessretreats.com` |
 | `KAREENA_ROUTING_EMAIL` | `kareena@grandtravelcruise.com` |

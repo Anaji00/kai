@@ -7,5 +7,5 @@ export function backendOrigin(): string {
     return `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
   }
   if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-  return "http://127.0.0.1:8000";
+  return "http://127.0.0.1:8972";
 }

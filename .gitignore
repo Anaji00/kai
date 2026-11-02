@@ -48,3 +48,5 @@ __pycache__/
 *.db
 *.db-shm
 *.db-wal
+# Scratch test and verification scripts
+scratch/

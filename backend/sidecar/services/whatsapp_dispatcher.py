@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from backend.config import settings
 from backend.sidecar.models import StagingIntake
-from backend.sidecar.services.tern_client import tern_client
+from backend.sidecar.services.crm_client import crm_client
 
 logger = logging.getLogger("kai_whatsapp_dispatcher")
 
@@ -97,7 +97,7 @@ def build_drafts_digest_card(pending_drafts: list) -> Dict[str, Any]:
         by_category[dtype] = by_category.get(dtype, 0) + 1
 
     travel_count = sum(v for k, v in by_category.items() if "flight" in k or "chauffeur" in k)
-    intake_count = sum(v for k, v in by_category.items() if "intake" in k or "booking" in k or "tern" in k)
+    intake_count = sum(v for k, v in by_category.items() if "intake" in k or "booking" in k or "crm" in k)
     routine_count = sum(v for k, v in by_category.items() if k in ("email_reply", "outreach", "priority_circle_welcome", "guest_email_confirmation"))
     clinical_count = sum(v for k, v in by_category.items() if "clinical" in k)
 
@@ -212,8 +212,8 @@ def handle_whatsapp_action(
         if not intake:
             return {"success": False, "message": f"Intake {intake_id} not found."}
 
-        # Sync to Tern
-        sync_result = tern_client.sync_intake_to_tern(
+        # Commit to Native Sanctuary CRM
+        sync_result = crm_client.sync_intake_to_crm(
             intake_id=intake.id,
             client_name=intake.client_name,
             email=intake.email,
@@ -226,20 +226,20 @@ def handle_whatsapp_action(
             operator_name=operator_name
         )
 
-        intake.status = "SYNCED_TO_TERN"
-        intake.tern_trip_id = sync_result["tern_trip_id"]
-        intake.tern_contact_id = sync_result["tern_contact_id"]
+        intake.status = "CONFIRMED_IN_CRM"
+        intake.crm_trip_id = sync_result["crm_trip_id"]
+        intake.crm_contact_id = sync_result["crm_contact_id"]
         intake.reviewed_by = operator_name
         intake.synced_at = datetime.now(timezone.utc)
         db.commit()
 
         receipt_text = (
-            f"✅ *AUTHORIZED & SYNCED TO TERN CRM*\n"
+            f"✅ *AUTHORIZED & COMMITTED TO SANCTUARY CRM*\n"
             f"*Guest:* {intake.client_name}\n"
-            f"*Trip ID:* `{sync_result['tern_trip_id']}`\n"
-            f"*Contact ID:* `{sync_result['tern_contact_id']}`\n"
+            f"*Trip ID:* `{intake.crm_trip_id}`\n"
+            f"*Contact ID:* `{intake.crm_contact_id}`\n"
             f"*Clinical Tags:* {', '.join(sync_result['applied_tags'])}\n\n"
-            f"💳 *Payments & Invoicing:* 100% Native to Tern\n"
+            f"💳 *Payments & Invoicing:* 100% Native Sanctuary Card Vault\n"
             f"🔗 Proposal: {sync_result['deep_links']['proposal_url']}\n"
             f"🔗 Payments: {sync_result['deep_links']['payments_url']}"
         )
@@ -248,7 +248,8 @@ def handle_whatsapp_action(
             "success": True,
             "action": "APPROVE_AND_SYNC",
             "intake_id": intake.id,
-            "tern_trip_id": sync_result["tern_trip_id"],
+            "crm_trip_id": intake.crm_trip_id,
+                "crm_trip_id": intake.crm_trip_id,
             "reply_text": receipt_text
         }
 

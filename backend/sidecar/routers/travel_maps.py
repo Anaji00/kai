@@ -37,6 +37,7 @@ from backend.sidecar.services.geo_routing_service import (
 )
 from backend.sidecar.services.weather_service import (
     fetch_sanctuary_weather,
+    fetch_historical_weather_patterns,
     SANCTUARY_COORDS
 )
 from backend.sidecar.services.dining_service import (
@@ -61,12 +62,32 @@ logger = logging.getLogger("kai_travel_maps_router")
 router = APIRouter(prefix="/travel", tags=["Travel Logistics & Dining"])
 
 
+def normalize_sanctuary_slug(slug: Optional[str]) -> Optional[str]:
+    """
+    Normalizes catalog slugs, date suffixes, and aliases to canonical sanctuary identifiers.
+    """
+    if not slug or slug.upper() == "ALL":
+        return None
+    s = slug.lower().strip().replace("_", "-")
+    if "puerto" in s or "vallarta" in s or "marival" in s:
+        return "puerto-vallarta"
+    if "nosara" in s:
+        return "nosara"
+    if "amalfi" in s:
+        return "amalfi"
+    if "bali" in s or "ubud" in s:
+        return "bali"
+    if "riviera" in s or "maya" in s:
+        return "riviera-maya"
+    return s
+
+
 # -----------------------------------------------------------------------------
 # 1. Scenic Routes & Geodesic Navigation
 # -----------------------------------------------------------------------------
 @router.get("/routes", response_model=List[SanctuaryRouteResponse])
 def get_sanctuary_routes(
-    sanctuary_slug: Optional[str] = Query(None, description="Filter by sanctuary (nosara, amalfi, bali, riviera-maya)"),
+    sanctuary_slug: Optional[str] = Query(None, description="Filter by sanctuary (puerto-vallarta, nosara, amalfi, bali, riviera-maya)"),
     db: Session = Depends(get_db)
 ):
     """
@@ -75,8 +96,9 @@ def get_sanctuary_routes(
     """
     seed_default_routes_and_pois_if_empty(db)
     query = db.query(SanctuaryRoute)
-    if sanctuary_slug and sanctuary_slug.upper() != "ALL":
-        query = query.filter(SanctuaryRoute.sanctuary_slug == sanctuary_slug.lower())
+    norm_slug = normalize_sanctuary_slug(sanctuary_slug)
+    if norm_slug:
+        query = query.filter(SanctuaryRoute.sanctuary_slug == norm_slug)
     return query.all()
 
 
@@ -132,8 +154,9 @@ def get_points_of_interest(
     """
     seed_default_routes_and_pois_if_empty(db)
     query = db.query(SomaticPointOfInterest)
-    if sanctuary_slug and sanctuary_slug.upper() != "ALL":
-        query = query.filter(SomaticPointOfInterest.sanctuary_slug == sanctuary_slug.lower())
+    norm_slug = normalize_sanctuary_slug(sanctuary_slug)
+    if norm_slug:
+        query = query.filter(SomaticPointOfInterest.sanctuary_slug == norm_slug)
     return query.all()
 
 
@@ -173,6 +196,24 @@ async def get_sanctuary_weather_post(
     slug = req.sanctuary_slug.lower() if req.sanctuary_slug else "nosara"
     forecast = await fetch_sanctuary_weather(lat=req.lat, lon=req.lon, sanctuary_slug=slug)
     return WeatherForecastResponse(**forecast)
+
+
+@router.get("/weather/historical")
+async def get_sanctuary_historical_weather(
+    sanctuary_slug: str = Query("puerto-vallarta", description="Sanctuary slug"),
+    start_md: Optional[str] = Query(None, description="Start month-day e.g. 01-28"),
+    end_md: Optional[str] = Query(None, description="End month-day e.g. 01-31"),
+):
+    """
+    Fetches multi-year historical weather patterns (Open-Meteo ERA5 Reanalysis + 30-Year NOAA/ECMWF Climatology)
+    for target retreat dates in the region.
+    """
+    return await fetch_historical_weather_patterns(
+        sanctuary_slug=sanctuary_slug,
+        start_md=start_md,
+        end_md=end_md,
+    )
+
 
 # -----------------------------------------------------------------------------
 # 3. Curated Organic & Blue Zone Dining
@@ -344,25 +385,42 @@ def list_ground_transfers(
     List private chauffeur tarmac meet-and-greets and villa transfers.
     """
     query = db.query(GroundTransferRecord)
-    if sanctuary_slug and sanctuary_slug.upper() != "ALL":
-        query = query.filter(GroundTransferRecord.sanctuary_slug == sanctuary_slug.lower())
+    norm_slug = normalize_sanctuary_slug(sanctuary_slug)
+    if norm_slug:
+        query = query.filter(GroundTransferRecord.sanctuary_slug == norm_slug)
     transfers = query.order_by(GroundTransferRecord.pickup_time.asc()).all()
 
-    # Seed an active chauffeur arrival if table is empty
+    # Seed an active chauffeur arrival if table has no transfers for this destination
     if not transfers:
-        mock_transfer = GroundTransferRecord(
-            id=generate_uuid_str(),
-            sanctuary_slug="nosara",
-            guest_name="Sarah Jenkins",
-            pickup_location="Liberia Airport (LIR) Private Jet Terminal",
-            dropoff_location="KAI Nosara Ocean Sanctuary (Villa 4)",
-            flight_number="AA 1244",
-            pickup_time=datetime.now(timezone.utc),
-            chauffeur_name="Carlos Mendez (Lead Sanctuary Chauffeur)",
-            vehicle_type="Luxury 4WD Suburban Executive",
-            status="ARRIVED_AT_TARMAC",
-            chilled_amenities=["Chilled Eucalyptus Towels", "Fresh Organic Young Coconut", "Air-Ride Suspension"]
-        )
+        target_slug = norm_slug or "puerto-vallarta"
+        if target_slug == "puerto-vallarta":
+            mock_transfer = GroundTransferRecord(
+                id=generate_uuid_str(),
+                sanctuary_slug="puerto-vallarta",
+                guest_name="Julian Sterling",
+                pickup_location="Licenciado Gustavo Díaz Ordaz International Airport (PVR) Private FBO",
+                dropoff_location="KAI Marival Harmony Sanctuary (Master Villa 1)",
+                flight_number="DL 1928",
+                pickup_time=datetime.now(timezone.utc),
+                chauffeur_name="Mateo Morales (Grand Travel Chauffeur)",
+                vehicle_type="Cadillac Escalade ESV VIP with Air-Ride Suspension",
+                status="ARRIVED_AT_TARMAC",
+                chilled_amenities=["Chilled Eucalyptus Towels", "Cold-Pressed Banderas Lime Elixir", "Trace-Mineral Water"]
+            )
+        else:
+            mock_transfer = GroundTransferRecord(
+                id=generate_uuid_str(),
+                sanctuary_slug=target_slug,
+                guest_name="Sarah Jenkins",
+                pickup_location="Liberia Airport (LIR) Private Jet Terminal",
+                dropoff_location="KAI Nosara Ocean Sanctuary (Villa 4)",
+                flight_number="AA 1244",
+                pickup_time=datetime.now(timezone.utc),
+                chauffeur_name="Carlos Mendez (Lead Sanctuary Chauffeur)",
+                vehicle_type="Luxury 4WD Suburban Executive",
+                status="ARRIVED_AT_TARMAC",
+                chilled_amenities=["Chilled Eucalyptus Towels", "Fresh Organic Young Coconut", "Air-Ride Suspension"]
+            )
         db.add(mock_transfer)
         db.commit()
         db.refresh(mock_transfer)
@@ -429,7 +487,6 @@ def search_accommodations(req: AccommodationSearchRequest):
     """
     Search available sanctuary accommodations by tier and date.
     """
-    # Mocking response as there is no specific DB table yet in this module
     return {
         "destination": req.destination or "Nosara",
         "available_tiers": [

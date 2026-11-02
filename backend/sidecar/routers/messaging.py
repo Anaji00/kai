@@ -16,7 +16,7 @@ from backend.sidecar.services.messaging import (
     authorize_and_dispatch_sms
 )
 
-router = APIRouter(prefix="/messaging", tags=["Tern Sidecar: SMS Alerts & Broadcasts"])
+router = APIRouter(prefix="/messaging", tags=["Sanctuary Sidecar: SMS Alerts & Broadcasts"])
 
 
 @router.get("/queue", response_model=List[SmsDispatchResponse])

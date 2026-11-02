@@ -37,6 +37,12 @@ import {
   AlertCircle,
   Loader2,
   Sparkles,
+  CreditCard,
+  Lock,
+  Check,
+  FileCheck2,
+  ExternalLink,
+  X,
 } from "lucide-react";
 
 // ──── Types ────
@@ -109,6 +115,38 @@ interface GuestPortalData {
   local_currency: string;
 }
 
+interface ProposalItineraryBlock {
+  day?: number;
+  time?: string;
+  title: string;
+  description?: string;
+  category?: string;
+}
+
+interface ProposalData {
+  ref: string;
+  trip_id: string;
+  guest_name: string;
+  guest_email: string;
+  title: string;
+  sanctuary_slug: string;
+  dates: string;
+  room_tier: string;
+  status: string;
+  total_investment: number;
+  deposit_amount: number;
+  deposit_status: string;
+  final_balance: number;
+  final_balance_status: string;
+  currency: string;
+  payment_terms: string;
+  itinerary_blocks: ProposalItineraryBlock[];
+  smart_flight?: Record<string, unknown>;
+  ground_transfer?: Record<string, unknown>;
+  created_by?: string;
+  created_at?: string;
+}
+
 // ──── Icon Map ────
 
 function getActivityIcon(icon: string) {
@@ -124,6 +162,25 @@ function getActivityIcon(icon: string) {
     star: <Star className="h-4 w-4" />,
   };
   return iconMap[icon] || <Circle className="h-4 w-4" />;
+}
+
+function getCategoryBadge(category?: string) {
+  switch (category) {
+    case "somatic_wellness":
+      return { label: "Somatic Wellness", bg: "bg-emerald-50 text-emerald-800 border-emerald-200" };
+    case "lodging_sanctuary":
+      return { label: "Sanctuary Living", bg: "bg-blue-50 text-blue-800 border-blue-200" };
+    case "aviation_arrival":
+      return { label: "Aviation & VIP Ground", bg: "bg-amber-50 text-amber-800 border-amber-200" };
+    case "ground_chauffeur":
+      return { label: "Chauffeur Transfer", bg: "bg-indigo-50 text-indigo-800 border-indigo-200" };
+    case "blue_zone_dining":
+      return { label: "Blue Zone Culinary", bg: "bg-orange-50 text-orange-800 border-orange-200" };
+    case "clinical_screening":
+      return { label: "Clinical Protocol", bg: "bg-rose-50 text-rose-800 border-rose-200" };
+    default:
+      return { label: "Circadian Arc", bg: "bg-sand/70 text-sage border-sand-border" };
+  }
 }
 
 // ──── Solfeggio Sound Engine ────
@@ -216,14 +273,28 @@ function useBreathingCycle() {
 function MyRetreatContent() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token");
+  const ref = searchParams.get("ref");
 
   const [data, setData] = useState<GuestPortalData | null>(null);
+  const [proposal, setProposal] = useState<ProposalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeSection, setActiveSection] = useState<string>("overview");
   const [packingChecked, setPackingChecked] = useState<Set<number>>(new Set());
   const [scheduleExpanded, setScheduleExpanded] = useState(true);
   const [loadingDemo, setLoadingDemo] = useState(false);
+
+  // Proposal Authorization Modal State
+  const [showApprovalModal, setShowApprovalModal] = useState(false);
+  const [approving, setApproving] = useState(false);
+  const [approvalSuccessRef, setApprovalSuccessRef] = useState<string | null>(null);
+  const [cardholderName, setCardholderName] = useState("");
+  const [billingPostalCode, setBillingPostalCode] = useState("");
+  const [cardLast4, setCardLast4] = useState("4242");
+  const [cardBrand, setCardBrand] = useState("Visa");
+  const [eSignature, setESignature] = useState("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [approvalError, setApprovalError] = useState<string | null>(null);
 
   // Sound & Breath
   const sound = useSolfeggioPlayer();
@@ -243,41 +314,70 @@ function MyRetreatContent() {
         window.location.href = `/my-retreat?token=${encodeURIComponent(json.token)}`;
       }
     } catch {
-      setError("Unable to launch the demo companion. Sign in to the founder portal first, then try again.");
+      setError("Unable to launch the demo companion right now. Please contact concierge@kaiwellnessretreats.com.");
       setLoadingDemo(false);
     }
   };
 
   useEffect(() => {
-    if (!token) {
-      setError("No access token provided. Please use your magic link to access your sanctuary companion.");
-      setLoading(false);
+    const backendUrl = process.env.NEXT_PUBLIC_FASTAPI_BACKEND_URL || "";
+
+    // Flow 1: Guest Token provided -> Fetch guest companion
+    if (token) {
+      const fetchTokenData = async () => {
+        try {
+          const res = await fetch(`${backendUrl}/api/v1/sidecar/guest-portal/me?token=${encodeURIComponent(token)}`);
+          if (!res.ok) {
+            if (res.status === 401) {
+              setError("This magic link has expired. Please contact your KAI concierge for a new link.");
+            } else {
+              setError("Unable to load your retreat companion. Please try again later.");
+            }
+            return;
+          }
+          const json = await res.json();
+          setData(json);
+        } catch {
+          setError("Connection error. Please check your internet and try again.");
+        } finally {
+          setLoading(false);
+        }
+      };
+      fetchTokenData();
       return;
     }
 
-    const fetchData = async () => {
-      try {
-        const backendUrl = process.env.NEXT_PUBLIC_FASTAPI_BACKEND_URL || "";
-        const res = await fetch(`${backendUrl}/api/v1/sidecar/guest-portal/me?token=${encodeURIComponent(token)}`);
-        if (!res.ok) {
-          if (res.status === 401) {
-            setError("This magic link has expired. Please contact your KAI concierge for a new link.");
-          } else {
-            setError("Unable to load your retreat companion. Please try again later.");
+    // Flow 2: Proposal Reference provided -> Fetch proposal details
+    if (ref) {
+      const fetchProposalData = async () => {
+        try {
+          const res = await fetch(`${backendUrl}/api/v1/sidecar/guest-portal/proposal?ref=${encodeURIComponent(ref)}`);
+          if (!res.ok) {
+            setError("We could not locate this sanctuary proposal. Please check your reservation link or contact concierge@kaiwellnessretreats.com.");
+            return;
           }
-          return;
+          const json = await res.json();
+          if (json.success && json.proposal) {
+            setProposal(json.proposal);
+            setCardholderName(json.proposal.guest_name || "");
+            setESignature(json.proposal.guest_name || "");
+          } else {
+            setError("Unable to display proposal. Please contact your concierge.");
+          }
+        } catch {
+          setError("Connection error. Please check your internet and try again.");
+        } finally {
+          setLoading(false);
         }
-        const json = await res.json();
-        setData(json);
-      } catch {
-        setError("Connection error. Please check your internet and try again.");
-      } finally {
-        setLoading(false);
-      }
-    };
+      };
+      fetchProposalData();
+      return;
+    }
 
-    fetchData();
-  }, [token]);
+    // Flow 3: No token and no ref -> notify user
+    setError("No access token or proposal reference provided. Please use your personal sanctuary link.");
+    setLoading(false);
+  }, [token, ref]);
 
   const togglePacking = (idx: number) => {
     setPackingChecked((prev) => {
@@ -285,6 +385,56 @@ function MyRetreatContent() {
       if (next.has(idx)) next.delete(idx); else next.add(idx);
       return next;
     });
+  };
+
+  const handleApproveProposal = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!agreedToTerms) {
+      setApprovalError("Please check the legal authorization consent box to proceed.");
+      return;
+    }
+    if (!eSignature.trim()) {
+      setApprovalError("Please provide your legal electronic signature.");
+      return;
+    }
+
+    setApproving(true);
+    setApprovalError(null);
+
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_FASTAPI_BACKEND_URL || "";
+      const res = await fetch(`${backendUrl}/api/v1/sidecar/guest-portal/proposal/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ref: proposal?.ref,
+          cardholder_name: cardholderName,
+          billing_postal_code: billingPostalCode || "90210",
+          card_last4: cardLast4,
+          card_brand: cardBrand,
+          e_signature: eSignature,
+          agreed_to_terms: true,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) {
+        throw new Error(json.detail || "Unable to authorize deposit. Please contact concierge.");
+      }
+
+      setApprovalSuccessRef(json.auth_reference);
+      if (proposal) {
+        setProposal({
+          ...proposal,
+          status: "CONFIRMED",
+          deposit_status: "PAID",
+        });
+      }
+    } catch (err: unknown) {
+      setApprovalError(err instanceof Error ? err.message : "Deposit authorization error.");
+    } finally {
+      setApproving(false);
+    }
   };
 
   // ──── Loading State ────
@@ -303,6 +453,368 @@ function MyRetreatContent() {
     );
   }
 
+  // ──── Interactive Sanctuary Proposal View ────
+  if (proposal && !data) {
+    const isConfirmed = proposal.status === "CONFIRMED" || proposal.deposit_status === "PAID";
+
+    return (
+      <div className="min-h-screen bg-linen">
+        {/* Proposal Top Bar */}
+        <section className="bg-sand/40 border-b border-sand-border/70 py-6 px-6">
+          <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <span className="text-[10px] uppercase tracking-[0.25em] text-terracotta font-semibold block mb-1">
+                KAI Wellness Retreats &middot; Grand Travel &amp; Cruise
+              </span>
+              <h1 className="font-serif text-2xl sm:text-3xl text-sage font-light">
+                Private Sanctuary Reservation Proposal
+              </h1>
+              <p className="text-xs text-sage/70 mt-1">
+                Curated for <span className="font-semibold text-sage">{proposal.guest_name}</span> &middot; Reference: <span className="font-mono text-terracotta">{proposal.ref}</span>
+              </p>
+            </div>
+
+            <div>
+              {isConfirmed ? (
+                <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                  Confirmed &amp; Deposit Authorized
+                </div>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-300">
+                  <Clock className="h-4 w-4 text-amber-600" />
+                  Awaiting Deposit Authorization
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+
+        {/* Proposal Body */}
+        <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
+          {/* Sanctuary Overview Card */}
+          <div className="glass-card rounded-2xl p-6 sm:p-8 space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-sand-border/60 pb-5">
+              <div>
+                <h2 className="font-serif text-2xl text-sage">{proposal.title}</h2>
+                <p className="text-xs text-sage/70 mt-0.5">{proposal.dates}</p>
+              </div>
+              <div className="text-left sm:text-right">
+                <span className="text-[10px] uppercase tracking-wider text-sage/50 block">Sanctuary Suite Tier</span>
+                <span className="text-sm font-semibold text-sage">{proposal.room_tier}</span>
+              </div>
+            </div>
+
+            {/* Financial Schedule */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="p-4 rounded-xl bg-sand/50 border border-sand-border/80">
+                <span className="text-[10px] uppercase tracking-wider text-sage/60 block">Total Stay Investment</span>
+                <span className="font-serif text-2xl text-sage font-medium">${proposal.total_investment.toLocaleString()}</span>
+                <span className="text-[10px] text-sage/50 block mt-0.5">{proposal.currency} &middot; All-Inclusive Sanctuary</span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-terracotta-soft/50 border border-terracotta/20">
+                <span className="text-[10px] uppercase tracking-wider text-terracotta block">30% Suite Retainer Deposit</span>
+                <span className="font-serif text-2xl text-terracotta font-medium">${proposal.deposit_amount.toLocaleString()}</span>
+                <span className="text-[10px] text-sage/60 block mt-0.5">
+                  {isConfirmed ? "Paid & Authorized" : "Due Upon Proposal Approval"}
+                </span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-sand/50 border border-sand-border/80">
+                <span className="text-[10px] uppercase tracking-wider text-sage/60 block">70% Final Balance</span>
+                <span className="font-serif text-2xl text-sage font-medium">${proposal.final_balance.toLocaleString()}</span>
+                <span className="text-[10px] text-sage/50 block mt-0.5">Scheduled 45 Days Prior</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-sage/70 leading-relaxed italic border-t border-sand-border/40 pt-4">
+              Payment Terms: {proposal.payment_terms}
+            </p>
+          </div>
+
+          {/* Itinerary Blocks Section */}
+          <div className="glass-card rounded-2xl p-6 sm:p-8 space-y-6">
+            <div className="flex items-center justify-between border-b border-sand-border/60 pb-4">
+              <div>
+                <h3 className="font-serif text-xl text-sage">Curated Daily Itinerary</h3>
+                <p className="text-xs text-sage/60">Circadian circadian rhythm optimization &amp; somatic restorativeness</p>
+              </div>
+              <span className="text-xs text-olive bg-olive-soft px-3 py-1 rounded-full font-medium">
+                {proposal.itinerary_blocks.length} Activities
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {proposal.itinerary_blocks.map((block, idx) => {
+                const badge = getCategoryBadge(block.category);
+                return (
+                  <div
+                    key={idx}
+                    className="p-4 rounded-xl bg-white/70 border border-sand-border/80 hover:border-terracotta/40 transition-colors space-y-1.5"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        {block.time && (
+                          <span className="text-xs font-mono text-terracotta font-medium bg-terracotta-soft px-2 py-0.5 rounded">
+                            {block.time}
+                          </span>
+                        )}
+                        <span className="font-serif text-base text-sage font-medium">{block.title}</span>
+                      </div>
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${badge.bg}`}>
+                        {badge.label}
+                      </span>
+                    </div>
+                    {block.description && (
+                      <p className="text-xs text-sage/70 leading-relaxed">{block.description}</p>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Host Agency Guarantee & Authorization Action */}
+          <div className="glass-card rounded-2xl p-6 sm:p-8 space-y-6 border-l-4 border-l-terracotta">
+            <div className="flex items-start gap-3">
+              <Shield className="h-6 w-6 text-terracotta shrink-0 mt-1" />
+              <div className="space-y-1">
+                <h4 className="font-serif text-lg text-sage">Grand Travel &amp; Cruise Host Agency Guarantee</h4>
+                <p className="text-xs text-sage/70 leading-relaxed">
+                  25-year travel legacy (Funjet 500 Club tier). All authorizations feature automated legal chargeback shielding,
+                  PCI-compliant tokenization, and strict adherence to luxury travel consumer protection guidelines.
+                </p>
+              </div>
+            </div>
+
+            {isConfirmed ? (
+              <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 space-y-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-emerald-700" />
+                  <span className="font-semibold text-sm">Sanctuary Reservation Confirmed &amp; Secured</span>
+                </div>
+                <p className="text-xs text-emerald-800 leading-relaxed">
+                  Your 30% deposit of ${proposal.deposit_amount.toLocaleString()} USD has been successfully authorized
+                  {approvalSuccessRef ? ` (Reference: ${approvalSuccessRef})` : ""}.
+                  Your luxury suite at {proposal.title} is fully reserved.
+                </p>
+                <div className="pt-2">
+                  <button
+                    onClick={loadDemoToken}
+                    disabled={loadingDemo}
+                    className="inline-flex items-center gap-2 rounded-full bg-emerald-700 hover:bg-emerald-800 text-linen px-5 py-2.5 text-xs uppercase tracking-wider font-medium transition-all shadow-sm"
+                  >
+                    <Sparkles className="h-3.5 w-3.5" />
+                    Enter Sanctuary Companion Experience
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="pt-2 flex flex-col sm:flex-row items-center gap-4">
+                <button
+                  onClick={() => setShowApprovalModal(true)}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-terracotta hover:bg-terracotta/90 text-linen px-8 py-4 text-xs uppercase tracking-widest font-semibold transition-all shadow-md hover:shadow-lg"
+                >
+                  <CreditCard className="h-4 w-4" />
+                  Approve Proposal &amp; Authorize 30% Deposit (${proposal.deposit_amount.toLocaleString()} USD)
+                </button>
+                <a
+                  href="mailto:concierge@kaiwellnessretreats.com?subject=Proposal%20Inquiry"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full border border-sand-border/90 bg-sand/50 hover:bg-sand text-sage px-6 py-4 text-xs uppercase tracking-widest font-medium transition-all text-center"
+                >
+                  Inquire with Concierge
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ──── Direct Credit Card Authorization Modal / Drawer ──── */}
+        <AnimatePresence>
+          {showApprovalModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 16 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 16 }}
+                className="bg-linen text-sage w-full max-w-lg rounded-2xl border border-sand-border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              >
+                {/* Header */}
+                <div className="px-6 py-4 bg-white border-b border-sand-border/80 flex items-center justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <span className="p-2 rounded-lg bg-terracotta text-linen">
+                      <Lock className="w-4 h-4" />
+                    </span>
+                    <div>
+                      <h3 className="font-serif text-lg font-bold text-sage leading-tight">
+                        Credit Card Authorization Form
+                      </h3>
+                      <p className="text-[11px] text-sage/70">
+                        Grand Travel &amp; Cruise &middot; Secure Deposit Authorization
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowApprovalModal(false)}
+                    className="p-1.5 text-sage/60 hover:text-sage rounded-md hover:bg-sand/60"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                {/* Form Body */}
+                <form onSubmit={handleApproveProposal} className="p-6 overflow-y-auto space-y-4 text-xs">
+                  {approvalError && (
+                    <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 shrink-0 text-rose-600" />
+                      <span>{approvalError}</span>
+                    </div>
+                  )}
+
+                  <div className="p-3.5 rounded-xl bg-sand/60 border border-sand-border/80 space-y-1">
+                    <span className="text-[10px] uppercase tracking-wider text-sage/60 block">Authorization Total</span>
+                    <p className="font-serif text-xl text-sage font-medium">
+                      ${proposal.deposit_amount.toLocaleString()} USD
+                    </p>
+                    <p className="text-[11px] text-sage/60">
+                      30% Suite Retainer for {proposal.title} ({proposal.dates})
+                    </p>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-sage uppercase tracking-wider block">
+                      Cardholder Full Legal Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={cardholderName}
+                      onChange={(e) => setCardholderName(e.target.value)}
+                      placeholder="e.g. Dr. Genevieve Sterling"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-sand-border bg-white text-sage text-xs focus:outline-none focus:ring-1 focus:ring-terracotta"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-sage uppercase tracking-wider block">
+                        Card Brand
+                      </label>
+                      <select
+                        value={cardBrand}
+                        onChange={(e) => setCardBrand(e.target.value)}
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-sand-border bg-white text-sage text-xs focus:outline-none focus:ring-1 focus:ring-terracotta"
+                      >
+                        <option value="Visa">Visa</option>
+                        <option value="Mastercard">Mastercard</option>
+                        <option value="Amex">American Express</option>
+                        <option value="Discover">Discover</option>
+                      </select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-sage uppercase tracking-wider block">
+                        Card Last 4 Digits
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={4}
+                        required
+                        value={cardLast4}
+                        onChange={(e) => setCardLast4(e.target.value)}
+                        placeholder="e.g. 4242"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-sand-border bg-white text-sage text-xs font-mono focus:outline-none focus:ring-1 focus:ring-terracotta"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-sage uppercase tracking-wider block">
+                      Billing Postal / Zip Code
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={billingPostalCode}
+                      onChange={(e) => setBillingPostalCode(e.target.value)}
+                      placeholder="e.g. 90210"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-sand-border bg-white text-sage text-xs focus:outline-none focus:ring-1 focus:ring-terracotta"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-sage uppercase tracking-wider block">
+                      Legal Electronic Signature
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={eSignature}
+                      onChange={(e) => setESignature(e.target.value)}
+                      placeholder="Type your full legal name to e-sign"
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-sand-border bg-white text-sage text-xs font-serif italic focus:outline-none focus:ring-1 focus:ring-terracotta"
+                    />
+                  </div>
+
+                  {/* Legal Protection Consent */}
+                  <div className="pt-2">
+                    <label className="flex items-start gap-2.5 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={agreedToTerms}
+                        onChange={(e) => setAgreedToTerms(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-sand-border text-terracotta focus:ring-terracotta"
+                      />
+                      <span className="text-[11px] text-sage/75 leading-relaxed">
+                        I hereby authorize KAI Wellness Retreats and host agency Grand Travel &amp; Cruise to charge the
+                        non-refundable 30% sanctuary deposit of <strong>${proposal.deposit_amount.toLocaleString()} USD</strong> to the
+                        card above. I acknowledge that the remaining 70% balance (${proposal.final_balance.toLocaleString()} USD)
+                        will be automatically scheduled 45 days prior to retreat departure in accordance with the luxury cancellation policy.
+                      </span>
+                    </label>
+                  </div>
+
+                  <div className="pt-3 flex items-center justify-end gap-2 border-t border-sand-border/60">
+                    <button
+                      type="button"
+                      onClick={() => setShowApprovalModal(false)}
+                      className="px-4 py-2.5 rounded-xl border border-sand-border bg-sand/40 hover:bg-sand text-sage text-xs font-medium"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={approving || !agreedToTerms}
+                      className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-terracotta hover:bg-terracotta/90 text-linen text-xs font-semibold uppercase tracking-wider transition-all disabled:opacity-50"
+                    >
+                      {approving ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          Authorizing Deposit…
+                        </>
+                      ) : (
+                        <>
+                          <Check className="h-3.5 w-3.5" />
+                          Authorize Deposit (${proposal.deposit_amount.toLocaleString()})
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>
+
+        {/* Footer */}
+        <footer className="border-t border-sand-border/60 py-6 text-center text-[10px] text-sage/50 uppercase tracking-[0.2em]">
+          KAI Wellness Retreats &middot; Grand Travel &amp; Cruise &middot; Sanctuary Platform Verified
+        </footer>
+      </div>
+    );
+  }
+
   // ──── Error / Token Missing ────
   if (error || !data) {
     return (
@@ -315,7 +827,7 @@ function MyRetreatContent() {
             <h1 className="font-serif text-3xl text-sage">Private Sanctuary Hub</h1>
             <p className="text-sm text-sage/70 leading-relaxed">{error || "Unable to load your retreat data."}</p>
           </div>
-          
+
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
             <button
               onClick={loadDemoToken}
@@ -325,7 +837,7 @@ function MyRetreatContent() {
               {loadingDemo ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Generating Hub…
+                  Loading Companion…
                 </>
               ) : (
                 <>
@@ -335,7 +847,7 @@ function MyRetreatContent() {
               )}
             </button>
             <a
-              href="mailto:concierge@kaiwellnessretreats.com?subject=Guest%20Portal%20Access"
+              href="mailto:concierge@kaiwellnessretreats.com?subject=Sanctuary%20Reservation%20Inquiry"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full border border-sand-border/90 bg-sand/50 px-6 py-3 text-xs uppercase tracking-widest text-sage font-medium hover:bg-sand transition-all"
             >
               Contact Concierge
@@ -378,10 +890,10 @@ function MyRetreatContent() {
               Welcome, {data.guest_name.split(" ")[0]}
             </h1>
             <p className="text-sm text-linen/80 font-light">
-              {sanctuary.sanctuary_name} · {sanctuary.destination}, {sanctuary.country}
+              {sanctuary.sanctuary_name} &middot; {sanctuary.destination}, {sanctuary.country}
             </p>
             <p className="text-xs text-linen/60 mt-1">
-              {sanctuary.dates} · {sanctuary.duration}
+              {sanctuary.dates} &middot; {sanctuary.duration}
             </p>
           </motion.div>
         </div>
@@ -429,7 +941,7 @@ function MyRetreatContent() {
                 <div className="grid grid-cols-3 gap-4">
                   <div className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-sand/50">
                     <Thermometer className="h-5 w-5 text-terracotta" />
-                    <span className="font-serif text-2xl text-sage">{weather.temperature_celsius}°</span>
+                    <span className="font-serif text-2xl text-sage">{weather.temperature_celsius}&deg;</span>
                     <span className="text-[10px] text-sage/60 uppercase tracking-wider">Celsius</span>
                   </div>
                   <div className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-sand/50">
@@ -447,7 +959,7 @@ function MyRetreatContent() {
                 {weather.nurse_somatic_guidance && (
                   <div className="bg-olive-soft/50 rounded-xl p-3.5 border border-olive/10">
                     <span className="text-[10px] uppercase tracking-[0.2em] text-olive font-semibold block mb-1">
-                      Nurse Kareena's Guidance
+                      Nurse Kareena&apos;s Guidance
                     </span>
                     <p className="text-xs text-sage/80 leading-relaxed">{weather.nurse_somatic_guidance}</p>
                   </div>
@@ -577,7 +1089,7 @@ function MyRetreatContent() {
               {weather.prana_breathwork_window && (
                 <div className="glass-card rounded-2xl p-4 border-l-4 border-terracotta/40">
                   <span className="text-[10px] uppercase tracking-[0.2em] text-terracotta font-semibold block mb-1">
-                    Today's Optimal Breathwork Window
+                    Today&apos;s Optimal Breathwork Window
                   </span>
                   <p className="text-xs text-sage/80">{weather.prana_breathwork_window}</p>
                 </div>
@@ -639,7 +1151,7 @@ function MyRetreatContent() {
               <div className="glass-card rounded-2xl p-5 space-y-4">
                 <h2 className="text-xs uppercase tracking-[0.2em] text-sage font-semibold flex items-center gap-2">
                   <Car className="h-4 w-4 text-olive" />
-                  Airport Chauffeur & Transfer
+                  Airport Chauffeur &amp; Transfer
                 </h2>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
@@ -705,14 +1217,14 @@ function MyRetreatContent() {
                           checked ? "bg-olive-soft/50" : "hover:bg-sand/40"
                         }`}
                       >
-                        <div className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0 ${
-                          checked ? "bg-olive border-olive" : "border-sand-border"
-                        }`}>
+                        <div
+                          className={`h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all shrink-0 ${
+                            checked ? "bg-olive border-olive" : "border-sand-border"
+                          }`}
+                        >
                           {checked && <CheckCircle2 className="h-3.5 w-3.5 text-linen" />}
                         </div>
-                        <span className={`text-sm transition-all ${
-                          checked ? "text-sage/50 line-through" : "text-sage"
-                        }`}>
+                        <span className={`text-sm transition-all ${checked ? "text-sage/50 line-through" : "text-sage"}`}>
                           {item}
                         </span>
                       </button>
@@ -726,7 +1238,7 @@ function MyRetreatContent() {
                     animate={{ opacity: 1, scale: 1 }}
                     className="text-center py-3 bg-olive-soft/30 rounded-xl"
                   >
-                    <p className="text-sm text-olive font-medium">✨ You're all packed for your sanctuary!</p>
+                    <p className="text-sm text-olive font-medium">You&apos;re all packed for your sanctuary!</p>
                   </motion.div>
                 )}
               </div>
@@ -756,12 +1268,16 @@ function MyRetreatContent() {
                       animate={{
                         scale: breath.phase === "inhale" ? 1.35 : breath.phase === "hold" ? 1.35 : 0.85,
                       }}
-                      transition={{ duration: breath.phase === "inhale" ? 4 : breath.phase === "hold" ? 0.3 : 8, ease: "easeInOut" }}
+                      transition={{
+                        duration: breath.phase === "inhale" ? 4 : breath.phase === "hold" ? 0.3 : 8,
+                        ease: "easeInOut",
+                      }}
                       className="h-40 w-40 rounded-full flex items-center justify-center"
                       style={{
-                        background: breath.phase === "inhale"
-                          ? "radial-gradient(circle, rgba(92,107,94,0.15) 0%, rgba(192,125,99,0.08) 100%)"
-                          : breath.phase === "hold"
+                        background:
+                          breath.phase === "inhale"
+                            ? "radial-gradient(circle, rgba(92,107,94,0.15) 0%, rgba(192,125,99,0.08) 100%)"
+                            : breath.phase === "hold"
                             ? "radial-gradient(circle, rgba(192,125,99,0.12) 0%, rgba(92,107,94,0.06) 100%)"
                             : "radial-gradient(circle, rgba(45,62,53,0.08) 0%, rgba(242,236,228,0.3) 100%)",
                       }}
@@ -778,18 +1294,21 @@ function MyRetreatContent() {
                     <svg className="absolute inset-0 h-40 w-40" viewBox="0 0 160 160">
                       <circle cx="80" cy="80" r="76" fill="none" stroke="rgba(229,221,208,0.4)" strokeWidth="2" />
                       <motion.circle
-                        cx="80" cy="80" r="76"
+                        cx="80"
+                        cy="80"
+                        r="76"
                         fill="none"
                         stroke={breath.phase === "inhale" ? "#5C6B5E" : breath.phase === "hold" ? "#C07D63" : "#2D3E35"}
                         strokeWidth="2.5"
                         strokeLinecap="round"
                         strokeDasharray={478}
                         animate={{
-                          strokeDashoffset: breath.phase === "inhale"
-                            ? 478 - (478 * (1 - breath.secondsLeft / 4))
-                            : breath.phase === "hold"
-                              ? 478 - (478 * (1 - breath.secondsLeft / 7))
-                              : 478 - (478 * (1 - breath.secondsLeft / 8)),
+                          strokeDashoffset:
+                            breath.phase === "inhale"
+                              ? 478 - 478 * (1 - breath.secondsLeft / 4)
+                              : breath.phase === "hold"
+                              ? 478 - 478 * (1 - breath.secondsLeft / 7)
+                              : 478 - 478 * (1 - breath.secondsLeft / 8),
                         }}
                         transition={{ duration: 1, ease: "linear" }}
                       />
@@ -845,7 +1364,10 @@ function MyRetreatContent() {
                 {/* Frequency Selector */}
                 <div className="flex justify-center gap-3">
                   <button
-                    onClick={() => { if (sound.isPlaying) sound.stop(); sound.start(432); }}
+                    onClick={() => {
+                      if (sound.isPlaying) sound.stop();
+                      sound.start(432);
+                    }}
                     className={`flex flex-col items-center gap-2 rounded-2xl px-6 py-4 transition-all border ${
                       sound.isPlaying && sound.frequency === 432
                         ? "bg-sage text-linen border-sage shadow-md"
@@ -853,10 +1375,13 @@ function MyRetreatContent() {
                     }`}
                   >
                     <span className="font-serif text-2xl font-light">432</span>
-                    <span className="text-[10px] uppercase tracking-wider opacity-70">Hz · Deep Calm</span>
+                    <span className="text-[10px] uppercase tracking-wider opacity-70">Hz &middot; Deep Calm</span>
                   </button>
                   <button
-                    onClick={() => { if (sound.isPlaying) sound.stop(); sound.start(528); }}
+                    onClick={() => {
+                      if (sound.isPlaying) sound.stop();
+                      sound.start(528);
+                    }}
                     className={`flex flex-col items-center gap-2 rounded-2xl px-6 py-4 transition-all border ${
                       sound.isPlaying && sound.frequency === 528
                         ? "bg-terracotta text-linen border-terracotta shadow-md"
@@ -864,7 +1389,7 @@ function MyRetreatContent() {
                     }`}
                   >
                     <span className="font-serif text-2xl font-light">528</span>
-                    <span className="text-[10px] uppercase tracking-wider opacity-70">Hz · Recovery</span>
+                    <span className="text-[10px] uppercase tracking-wider opacity-70">Hz &middot; Recovery</span>
                   </button>
                 </div>
 
@@ -913,7 +1438,9 @@ function MyRetreatContent() {
 
                 {/* Science note */}
                 <div className="bg-sand/50 rounded-xl p-4 space-y-2">
-                  <p className="text-[10px] uppercase tracking-[0.2em] text-sage/50 font-semibold">About Solfeggio Frequencies</p>
+                  <p className="text-[10px] uppercase tracking-[0.2em] text-sage/50 font-semibold">
+                    About Solfeggio Frequencies
+                  </p>
                   <p className="text-xs text-sage/60 leading-relaxed">
                     {sound.frequency === 432
                       ? "432Hz is associated with deep parasympathetic activation, promoting melatonin production and circadian rhythm re-alignment. Ideal for pre-sleep wind-down and long-haul travel."
@@ -929,7 +1456,7 @@ function MyRetreatContent() {
       {/* ───── Footer ───── */}
       <footer className="border-t border-sand-border/60 py-6 text-center">
         <p className="text-[10px] text-sage/40 uppercase tracking-[0.2em]">
-          KAI Wellness Retreats · Grand Travel & Cruise Partnered · Private Guest Companion
+          KAI Wellness Retreats &middot; Grand Travel &amp; Cruise Partnered &middot; Private Guest Companion
         </p>
       </footer>
     </div>
@@ -950,4 +1477,3 @@ export default function MyRetreatPage() {
     </React.Suspense>
   );
 }
-

@@ -1,7 +1,7 @@
 # 🌿 KAI Team Guide (How Everything Works)
 
 > **Internal Team Guide & Field Manual for Kareena Islam & the KAI Team**  
-> *Sanctuary Operations • Host Travel Partner: Grand Travel & Cruise • Travel System: Tern CRM*
+> *Sanctuary Operations • Host Travel Partner: Grand Travel & Cruise • Travel System: KAI Sanctuary Travel CRM Platform & Card Vault*
 
 ---
 
@@ -20,7 +20,7 @@ KAI runs luxury, intimate wellness retreats in places like Costa Rica, the Amalf
 We use smart AI in the background to handle the heavy paperwork, but we have an absolute rule called **Zero Autonomous Writes**:
 * **The AI only drafts**: The AI can write draft emails, draft text messages, flag delays, or plan driver pickups, but it is **never allowed to press send**.
 * **The Action Review Queue**: Everything the AI creates goes into Kareena's private review screen inside our portal (`/portal/drafts`).
-* **1-Click Human Approval**: Kareena or a team member reviews the draft, makes any changes, and clicks **"Approve & Dispatch"**. Only then does the text message send, the email go out, or the trip sync to our travel software (Tern).
+* **1-Click Human Approval**: Kareena or a team member reviews the draft, makes any changes, and clicks **"Approve & Dispatch"**. Only then does the text message send, the email go out, or the trip commit to our native Sanctuary Travel CRM.
 * **Why this matters**: High-net-worth guests always get warm, personal communication from a real human nurse—zero robot mistakes, zero awkward automated messages.
 
 ---
@@ -31,11 +31,11 @@ Here are all 12 automated helpers running in the background and what they do for
 
 | Helper / Agent | What It Watches For | What It Automatically Drafts for You |
 | :--- | :--- | :--- |
-| **1. The Booking & Quote Helper** | Guest chats, room requests, and budget questions | Drafts a booking hold with the 30% deposit and 70% balance calculated, ready to sync to Tern. |
+| **1. The Booking & Quote Helper** | Guest chats, room requests, and budget questions | Drafts a booking hold with the 30% deposit and 70% balance calculated, ready to commit to Sanctuary CRM. |
 | **2. The Flight Delay Watcher** | Live satellite flight radar (Cirium) for guest flights | If a plane is delayed by 45+ minutes, it automatically recalibrates the driver's pickup window and drafts an SMS update. |
 | **3. The Email Reader** | Inbound emails from guests or airlines | Pulls out flight numbers, airline names, and arrival times, and drafts a flight coordination update. |
 | **4. The Doctor Note & Health Checker** | Uploaded medical forms, waivers, or doctor notes | Flags pregnancy or health issues as "Needs Attention" so Nurse Kareena can clear or adjust their schedule. |
-| **5. The Guest List & Room Checker** | Hotel room lists and vouchers vs. our Tern guest list | Double-checks that no more than 14 guests are booked and flags any room mismatches. |
+| **5. The Guest List & Room Checker** | Hotel room lists and vouchers vs. our Sanctuary CRM guest list | Double-checks that no more than 14 guests are booked and flags any room mismatches. |
 | **6. The Partner Studio Finder** | Wellness clinics and yoga studios in cities like Austin, Houston, and New York | Finds great partner clinics and drafts an introduction email offering our group flight perks to their clients. |
 | **7. The Packing List Creator** | The destination weather and the guest's health profile | Drafts a personalized packing checklist (organic linen, earplugs, swimwear) for the guest. |
 | **8. The Welcome Text Helper** | The night before a guest arrives | Drafts a welcoming WhatsApp text with driver details and calming sound tracks to listen to. |
@@ -48,10 +48,10 @@ Here are all 12 automated helpers running in the background and what they do for
 
 ## 📱 The KAI Portal: What Each Screen Does (`/portal`)
 
-Log in to the team portal at **`http://localhost:3000/portal`** with `ADMIN_USERNAME` / `ADMIN_PASSWORD` (local development falls back to `admin` / `kai_admin_2026`; production refuses to start without real values).
+Log in to the team portal at **`http://localhost:3536/portal`** with `ADMIN_USERNAME` / `ADMIN_PASSWORD` (local development falls back to `admin` / `kai_admin_2026`; production refuses to start without real values).
 
 1. **Guest Inquiries (`/portal`)**: 
-   View everyone who applied for a retreat. The AI generates a quick "Cheat Sheet" for Nurse Kareena before her consultation call. With 1 click, you can sync the guest to our travel system (Tern).
+   View everyone who applied for a retreat. The AI generates a quick "Cheat Sheet" for Nurse Kareena before her consultation call. With 1 click, you can commit the guest to our native Sanctuary Travel CRM.
 2. **Action Review Queue (`/portal/drafts`)**: 
    **The most important screen!** Shows every text, email, flight alert, or note waiting for your approval. You can read it, edit it in place, and click **"Approve & Dispatch"** or **"Discard"**. The top navigation bar shows a live badge with how many drafts are waiting.
 3. **Retreat Calendar (`/portal/calendar`)**: 
@@ -69,7 +69,7 @@ Log in to the team portal at **`http://localhost:3000/portal`** with `ADMIN_USER
 9. **Concierge Inbox (`/portal/emails`)**: 
    A shared inbox where incoming travel emails are organized and tagged automatically.
 10. **Service Connections (`/portal/webhooks`)**: 
-    A technical screen showing live connections to our travel software (Tern), flight radar, and text services, with a button to simulate test events.
+    A technical screen showing live connections to our travel software (Sanctuary CRM), flight radar, and text services, with a button to simulate test events.
 11. **Clinical Copilot (The Slide-Out Assistant)**: 
     Click the button on the bottom right of any portal screen to open a smart assistant. You can ask it to look up flights, draft an email, check health notes, or summarize sales.
 
@@ -113,22 +113,22 @@ Open two terminal windows:
 ```bash
 # Terminal 1: Backend Engine
 npm run backend
-# Runs at http://127.0.0.1:8000 (API docs at http://127.0.0.1:8000/docs)
+# Runs at http://127.0.0.1:8972 (API docs at http://127.0.0.1:8972/docs)
 
 # Terminal 2: Website & Portal
 npm run dev
-# Runs at http://localhost:3000
+# Runs at http://localhost:3536
 ```
-* **Public Website**: http://localhost:3000
-* **Team Portal**: http://localhost:3000/portal (development login: `admin` / `kai_admin_2026`)
-* **Review Queue**: http://localhost:3000/portal/drafts
+* **Public Website**: http://localhost:3536
+* **Team Portal**: http://localhost:3536/portal (development login: `admin` / `kai_admin_2026`)
+* **Review Queue**: http://localhost:3536/portal/drafts
 
 ### Running with Docker
 ```bash
 cp .env.example .env      # fill in every empty secret (ADMIN_PASSWORD, JWT_SECRET_KEY, webhook secrets)
 docker compose up --build
 ```
-* Site: http://localhost:3000, portal: http://localhost:3000/portal, API docs: http://localhost:8000/docs
+* Site: http://localhost:3536, portal: http://localhost:3536/portal, API docs: http://localhost:8972/docs
 * The backend runs with `ENVIRONMENT=production` and stores SQLite on the `kai_data` volume.
 * Compose stops with an error if any required secret is empty; the backend also refuses to boot on the old default values.
 * AI features (copilot, inquiry parsing, voice transcription) use Groq: set `GROQ_API_KEY` from https://console.groq.com/keys.
@@ -145,8 +145,8 @@ Docker (`docker compose up`) remains the way to run the full stack locally.
 # Test the Action Draft approval and dispatch system (6 tests)
 python backend/sidecar/test_drafts_execution.py
 
-# Test the Tern CRM integration
-pytest backend/sidecar/test_sidecar.py -k "test_seed_and_list_intakes or test_pre_call_thesis_and_tern_sync" -v
+# Test the Sanctuary CRM integration
+pytest backend/sidecar/test_sidecar.py -k "test_seed_and_list_intakes or test_pre_call_thesis_and_crm_commit" -v
 
 # Check for TypeScript errors
 npx tsc --noEmit
@@ -156,7 +156,7 @@ npx tsc --noEmit
 
 ## 🔒 Security, Privacy & Payments (In Plain English)
 
-* **We Never Touch Credit Card Numbers**: All guest payments are handled directly through our travel software's (Tern CRM) secure payment portal. We have zero payment liability.
+* **We Never Touch Credit Card Numbers**: All guest payments are handled directly through our native Sanctuary Travel Card Vault & Proposal e-sign platform. We have zero payment liability.
 * **Private Medical Info**: Guest medical notes, injuries, and dietary needs are stored in private clinical files and are never shared or used for marketing.
 * **Password-Protected Portal**: The entire team portal is locked behind admin login credentials.
 

@@ -38,6 +38,7 @@ from backend.sidecar.routers import (
     system as sidecar_system,
     continuity as sidecar_continuity,
     guest_portal as sidecar_guest_portal,
+    crm as sidecar_crm,
 )
 
 from fastapi import Request
@@ -80,9 +81,9 @@ def run_startup() -> None:
     # Live Communications & Production Delivery Status Telemetry
     email_status = "LIVE (Resend API)" if (settings.ENABLE_LIVE_EMAIL_DISPATCH and settings.RESEND_API_KEY) else "SIMULATED (Local Logs / Review Queue)"
     whatsapp_status = "LIVE (Meta Cloud API)" if (settings.ENABLE_LIVE_WHATSAPP_DISPATCH and settings.WHATSAPP_CLOUD_API_KEY) else "SIMULATED (Interactive Sandbox)"
-    tern_status = "LIVE (Tern API)" if (settings.ENABLE_LIVE_TERN_API and settings.TERN_API_KEY) else "STAGED (Internal Review)"
+    crm_status = "NATIVE KAI CRM (Local SQLite/PostgreSQL Database)"
 
-    logger.info(f"KAI Communications Dispatch Mode: Email={email_status} | WhatsApp={whatsapp_status} | Tern CRM={tern_status}")
+    logger.info(f"KAI Communications Dispatch Mode: Email={email_status} | WhatsApp={whatsapp_status} | Sanctuary CRM={crm_status}")
 
     if settings.ENVIRONMENT == "production":
         if not settings.RESEND_API_KEY and settings.ENABLE_LIVE_EMAIL_DISPATCH:
@@ -141,7 +142,7 @@ app.include_router(newsletter.router, prefix=settings.API_V1_PREFIX)
 app.include_router(testimonials.router, prefix=settings.API_V1_PREFIX)
 app.include_router(drafts.router, prefix=settings.API_V1_PREFIX, dependencies=[Depends(verify_admin)])
 
-# Mount Tern CRM Intelligence Sidecar Routers
+# Mount KAI Sanctuary Travel CRM Sidecar Routers
 # Note: sidecar_email_in, sidecar_whatsapp, and sidecar_webhooks contain public/webhook endpoints with their own granular auth
 app.include_router(sidecar_intakes.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
 app.include_router(sidecar_leads.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
@@ -156,6 +157,7 @@ app.include_router(sidecar_travel.router, prefix=f"{settings.API_V1_PREFIX}/side
 app.include_router(sidecar_vendors.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
 app.include_router(sidecar_system.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
 app.include_router(sidecar_continuity.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
+app.include_router(sidecar_crm.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
 
 # Mount Guest Sanctuary Companion (Public — magic-link token auth, no admin credentials needed)
 app.include_router(sidecar_guest_portal.router, prefix=f"{settings.API_V1_PREFIX}/sidecar")

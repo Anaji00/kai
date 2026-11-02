@@ -52,7 +52,7 @@ const nextConfig: NextConfig = {
     // On Vercel, /api/v1/* is served by the FastAPI Python function (api/index.py) via vercel.json.
     if (process.env.VERCEL) return [];
     // Local dev and Docker: forward to the separately running FastAPI server.
-    const backendUrl = process.env.FASTAPI_BACKEND_URL || "http://127.0.0.1:8000";
+    const backendUrl = process.env.FASTAPI_BACKEND_URL || "http://127.0.0.1:8972";
     return [
       {
         source: "/api/v1/:path*",

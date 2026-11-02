@@ -124,8 +124,8 @@ def simulate_whatsapp_interaction(
             "updated_intake": {
                 "id": intake.id,
                 "status": intake.status,
-                "tern_trip_id": intake.tern_trip_id,
-                "tern_contact_id": intake.tern_contact_id,
+                "crm_trip_id": intake.crm_trip_id,
+                "crm_contact_id": intake.crm_contact_id,
                 "room_tier": intake.room_tier
             }
         }

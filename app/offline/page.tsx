@@ -27,7 +27,7 @@ export default function OfflineStandbyPage() {
     setChecking(true);
     setTimeout(() => {
       if (navigator.onLine) {
-        router.push("/portal");
+        router.push("/");
       } else {
         setChecking(false);
       }
@@ -82,14 +82,14 @@ export default function OfflineStandbyPage() {
             className="w-full py-3.5 px-6 rounded-xl font-medium text-sm text-[#1C1917] bg-[#FAF7F2] hover:bg-stone-200 transition-colors flex items-center justify-center gap-2 shadow-lg disabled:opacity-60"
           >
             <RefreshCw className={`w-4 h-4 ${checking ? "animate-spin" : ""}`} />
-            <span>{isOnline ? "Reconnect to Portal" : "Check Connection & Retry"}</span>
+            <span>{isOnline ? "Reconnect to Sanctuary Site" : "Check Connection & Retry"}</span>
           </button>
 
           <Link
-            href="/portal"
+            href="/"
             className="text-xs text-stone-400 hover:text-stone-200 transition-colors inline-flex items-center justify-center gap-1"
           >
-            <span>Return to Cached Portal</span>
+            <span>Return to Home</span>
             <ArrowRight className="w-3 h-3" />
           </Link>
         </div>

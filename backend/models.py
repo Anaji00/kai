@@ -125,7 +125,7 @@ class ClinicalAuditLog(Base):
     operator_name = Column(String(128), nullable=False)
     guest_name = Column(String(128), nullable=False)
     intake_id = Column(String(64), nullable=True, index=True)
-    action_type = Column(String(64), nullable=False)  # VIEW_DOSSIER, EDIT_CLINICAL_FLAGS, EXPORT_WAIVER, SYNC_TERN
+    action_type = Column(String(64), nullable=False)  # VIEW_DOSSIER, EDIT_CLINICAL_FLAGS, EXPORT_WAIVER, COMMIT_CRM
     details = Column(Text, nullable=True)
     ip_address = Column(String(64), nullable=True)
     accessed_at = Column(DateTime, default=_utc_now, nullable=False)

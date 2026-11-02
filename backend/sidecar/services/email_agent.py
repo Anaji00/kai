@@ -34,11 +34,15 @@ def parse_and_stage_email(
         intent = "FLIGHT_TRANSFER_UPDATE"
     elif any(k in body_lower or k in subject_lower for k in ["corporate", "executive", "company retreat", "private cohort"]):
         intent = "CORPORATE_RETREAT_PROPOSAL"
-    elif any(k in body_lower or k in subject_lower for k in ["reserve", "sanctuary", "nosara", "amalfi", "bali", "riviera maya", "burnout"]):
+    elif any(k in body_lower or k in subject_lower for k in ["reserve", "sanctuary", "puerto vallarta", "marival", "nosara", "amalfi", "bali", "riviera maya", "burnout", "retreat"]):
         intent = "GUEST_INTAKE_INQUIRY"
 
     # 2. Entity Extraction
     entities: Dict[str, Any] = {}
+    entities["routed_founders"] = [
+        "kareena@grandtravelcruise.com",
+        "armaan@grandtravelcruise.com",
+    ]
 
     # Email extraction
     email_match = re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", raw_body)
@@ -50,14 +54,16 @@ def parse_and_stage_email(
         entities["extracted_phone"] = phone_match.group(0).strip()
 
     # Sanctuary matching
-    sanctuary_slug = None
-    if "nosara" in body_lower or "costa rica" in body_lower:
+    sanctuary_slug = "puerto-vallarta-2027"
+    if "puerto vallarta" in body_lower or "marival" in body_lower or "vallarta" in body_lower or "harmony" in body_lower or "armony" in body_lower:
+        sanctuary_slug = "puerto-vallarta-2027"
+    elif "nosara" in body_lower or "costa rica" in body_lower:
         sanctuary_slug = "nosara"
     elif "amalfi" in body_lower or "italy" in body_lower:
         sanctuary_slug = "amalfi"
     elif "bali" in body_lower or "indonesia" in body_lower:
         sanctuary_slug = "bali"
-    elif "riviera" in body_lower or "mexico" in body_lower:
+    elif "riviera" in body_lower:
         sanctuary_slug = "riviera-maya"
     entities["matched_sanctuary"] = sanctuary_slug
 
@@ -89,26 +95,41 @@ def parse_and_stage_email(
     if pnr_match:
         entities["confirmation_code"] = pnr_match.group(1).upper()
 
-    # 3. Suggested Action
+    # 3. Immediate LLM Suggested Plan for Guest Inquiries
+    from backend.sidecar.services.thesis_rag import generate_llm_suggested_plan
+    llm_plan = generate_llm_suggested_plan(
+        client_name=entities["extracted_name"],
+        retreat_id=sanctuary_slug or "puerto-vallarta-2027",
+        room_preference="private-suite",
+        movement_experience="all-levels",
+        health_notes="Inbound email inquiry",
+        intentions=raw_body[:300],
+    )
+    entities["llm_suggested_plan"] = llm_plan
+
     if intent == "GUEST_INTAKE_INQUIRY":
         suggested_action = (
-            f"Stage new guest intake for {entities['extracted_name']} ({sanctuary_slug or 'Sanctuary of choice'}). "
-            f"Generate pre-call clinical thesis and circadian schedule."
+            f"Stage new guest intake for {entities['extracted_name']} ({sanctuary_slug or 'puerto-vallarta-2027'}). "
+            f"Routed to kareena@grandtravelcruise.com & armaan@grandtravelcruise.com. "
+            f"Immediate LLM Suggested Plan: {llm_plan.get('summary', '')}"
         )
     elif intent == "FLIGHT_TRANSFER_UPDATE":
         flight_desc = f"Flight {entities.get('flight_number', 'TBD')} ({entities.get('airline', 'Airline')})" if 'flight_number' in entities else "Itinerary"
         suggested_action = (
-            f"Route VIP flight coordination to Grand Travel & Cruise Flight Desk for {entities['extracted_name']}.\n"
+            f"Route VIP flight coordination to Grand Travel & Cruise Flight Desk (kareena@grandtravelcruise.com & armaan@grandtravelcruise.com) for {entities['extracted_name']}.\n"
             f"{flight_desc} | Cabin: {entities['cabin_class']}.\n"
             f"Sync with private tarmac chauffeur and baggage service upon arrival."
         )
     elif intent == "VOUCHER_CONFIRMATION":
         suggested_action = (
             f"Reconcile voucher #{entities.get('confirmation_code', 'N/A')} against sanctuary room-block manifest. "
-            f"Verify 12–14 group capacity limit."
+            f"Verify group capacity limit."
         )
     else:
-        suggested_action = f"Review email from {entities['extracted_name']} and route response via operator cockpit."
+        suggested_action = (
+            f"Review inquiry from {entities['extracted_name']} (routed to kareena@grandtravelcruise.com & armaan@grandtravelcruise.com). "
+            f"LLM Suggested Plan: {llm_plan.get('summary', '')}"
+        )
 
     # 4. Create Staged Record (status = PENDING_APPROVAL)
     staged_email = StagedEmail(

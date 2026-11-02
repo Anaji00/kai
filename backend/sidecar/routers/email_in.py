@@ -17,7 +17,7 @@ from backend.sidecar.routers.webhooks import verify_admin
 
 logger = logging.getLogger("kai_email_in_router")
 
-router = APIRouter(prefix="/email-in", tags=["Tern Sidecar: Inbound Email Parsing Agent"])
+router = APIRouter(prefix="/email-in", tags=["Sanctuary Sidecar: Inbound Email Parsing Agent"])
 
 
 def verify_email_webhook_secret(

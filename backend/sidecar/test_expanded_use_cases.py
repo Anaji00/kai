@@ -183,7 +183,7 @@ def test_inbound_multichannel_telemetry_storm_wal_concurrency():
 
     def simulate_telemetry_ping(idx: int):
         thread_client = TestClient(app, headers=AUTH_HEADER)
-        providers = ["CIRIUM_FLIGHT_RADAR", "EXPEDIA_PMS", "WHATSAPP_GUEST_GATEWAY", "TERN_PAYMENTS"]
+        providers = ["CIRIUM_FLIGHT_RADAR", "EXPEDIA_PMS", "WHATSAPP_GUEST_GATEWAY", "SANCTUARY_CARD_VAULT"]
         provider = providers[idx % len(providers)]
 
         payload = {
@@ -343,7 +343,7 @@ def test_b2b_wellness_studio_syndicate_and_commission():
             phone="+44 20 7946 0881",
             commission_rate=15.0,
             commission_type="PERCENTAGE",
-            payment_terms="Tern Native Client Card Auth",
+            payment_terms="Sanctuary Native Client Card Auth",
             preferred_tier="PREFERRED_PARTNER",
             service_description="Exclusive Mayfair private reformer studio referring HNW clientele for European retreats.",
             clinical_relevance="Specializes in postural myofascial release and parasympathetic vagus nerve stimulation."

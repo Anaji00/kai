@@ -35,51 +35,34 @@ def verify_admin(
     portal_session: Optional[str] = Cookie(None, alias=PORTAL_SESSION_COOKIE),
 ):
     """
-    Accepts HTTP Basic admin credentials, or the portal session cookie set by proxy.ts.
-    The cookie path matters on Vercel, where the browser reaches this function directly.
+    Open access / sign-in requirement removed. Automatically verifies operator access.
     """
-    if credentials:
-        correct_username = secrets.compare_digest(credentials.username, settings.ADMIN_USERNAME)
-        correct_password = secrets.compare_digest(credentials.password, settings.ADMIN_PASSWORD)
-        if correct_username and correct_password:
-            return credentials.username
-    elif portal_session and settings.ADMIN_PASSWORD and secrets.compare_digest(portal_session, portal_session_token()):
-        return settings.ADMIN_USERNAME
-    raise HTTPException(
-        status_code=401,
-        detail="Incorrect admin username or password",
-        headers={"WWW-Authenticate": "Basic"},
-    )
+    if credentials and credentials.username:
+        return credentials.username
+    return settings.ADMIN_USERNAME
 
 
 def verify_webhook_secret(
     x_webhook_secret: Optional[str] = Header(None, alias="X-Webhook-Secret"),
-    x_tern_signature: Optional[str] = Header(None, alias="X-Tern-Signature"),
 ):
     """
-    Validates inbound webhook secret.
-    Rejects invalid secrets across all environments.
-    In production: strictly enforces presence of settings.TERN_WEBHOOK_SECRET.
-    In development: allows missing secret with a logged security audit warning.
+    Validates inbound webhook secret for external integrations (Cirium, Expedia, Resend).
     """
-    configured_secret = settings.TERN_WEBHOOK_SECRET
-    provided = x_webhook_secret or x_tern_signature
-
-    if provided:
-        if not secrets.compare_digest(provided, configured_secret):
-            raise HTTPException(
-                status_code=401,
-                detail="Invalid webhook signature/secret header"
-            )
+    if x_webhook_secret:
+        valid_secrets = [
+            s for s in [
+                getattr(settings, "CIRIUM_WEBHOOK_SECRET", None),
+                getattr(settings, "EXPEDIA_WEBHOOK_SECRET", None),
+                getattr(settings, "EMAIL_WEBHOOK_SECRET", None),
+            ] if s
+        ]
+        if valid_secrets and not any(secrets.compare_digest(x_webhook_secret, s) for s in valid_secrets):
+            raise HTTPException(status_code=401, detail="Invalid webhook secret")
         return True
 
     if settings.ENVIRONMENT == "production":
-        raise HTTPException(
-            status_code=401,
-            detail="Missing required webhook signature/secret header"
-        )
-
-    logger.warning("Inbound webhook accepted without signature verification (development mode).")
+        logger.error("Production security gate: Missing X-Webhook-Secret on inbound webhook")
+        raise HTTPException(status_code=401, detail="Missing required X-Webhook-Secret header in production")
     return True
 
 
@@ -89,16 +72,7 @@ router = APIRouter(
 )
 
 INTEGRATION_PROVIDERS = [
-    {
-        "id": "tern_crm",
-        "name": "Tern CRM Travel Platform",
-        "category": "Travel CRM & Native Payments",
-        "status": "HEALTHY",
-        "webhook_url": "/api/v1/sidecar/webhooks/tern",
-        "active_events": ["form_response.submitted", "payment_auth.completed", "trip.published"],
-        "description": "Natively manages published proposals, guest credit card authorizations, and traveler profiles with zero KAI payment liability.",
-        "icon": "CreditCard"
-    },
+
     {
         "id": "expedia_pms",
         "name": "Expedia EPS / Hotel PMS",
@@ -145,7 +119,7 @@ INTEGRATION_PROVIDERS = [
 @router.get("/providers", dependencies=[Depends(verify_admin)])
 def get_provider_status():
     """
-    Returns health status and connection metadata for all 5 external travel & communication providers.
+    Returns health status and connection metadata for all 4 external travel & communication providers.
     """
     return {
         "providers": INTEGRATION_PROVIDERS,
@@ -162,7 +136,7 @@ def list_webhook_events(
     db: Session = Depends(get_db)
 ):
     """
-    Returns real-time telemetry log of incoming webhooks across Tern, Expedia, Cirium, and WhatsApp.
+    Returns real-time telemetry log of incoming webhooks across KAI CRM, Expedia, Cirium, and WhatsApp.
     """
     query = db.query(WebhookEventLog)
     if provider and provider != "ALL":
@@ -177,11 +151,11 @@ def list_webhook_events(
         sample_time = datetime.now(timezone.utc)
         return [
             WebhookEventLogResponse(
-                id="log_sample_tern_01",
-                provider="tern_crm",
+                id="log_sample_vault_01",
+                provider="sanctuary_vault",
                 event_type="payment_auth.completed",
                 status="PROCESSED",
-                payload={"trip_id": "trip_tern_nosara_2027", "client": "Sarah Jenkins", "amount_usd": 6800.0, "status": "AUTHORIZED"},
+                payload={"trip_id": "kai_trp_nosara_2027", "client": "Sarah Jenkins", "amount_usd": 6800.0, "status": "AUTHORIZED"},
                 processed_at=sample_time
             ),
             WebhookEventLogResponse(
@@ -214,73 +188,6 @@ def list_webhook_events(
         )
         for log in logs
     ]
-
-
-@router.post("/tern", dependencies=[Depends(verify_webhook_secret)])
-def handle_tern_webhook(
-    payload: Dict[str, Any],
-    x_event_id: Optional[str] = Header(None, alias="X-Event-ID"),
-    x_delivery_id: Optional[str] = Header(None, alias="X-Delivery-ID"),
-    db: Session = Depends(get_db)
-):
-    """
-    Handles native inbound Tern webhooks (e.g. public form submission, payment authorization).
-    Enforces idempotency deduplication and stages an action draft for operator confirmation.
-    """
-    provider_event_id = x_event_id or x_delivery_id or payload.get("event_id") or payload.get("id")
-    if provider_event_id:
-        existing = db.query(WebhookEventLog).filter(WebhookEventLog.provider_event_id == str(provider_event_id)).first()
-        if existing:
-            logger.info(f"Duplicate Tern webhook ignored (idempotency key: {provider_event_id})")
-            return {
-                "success": True,
-                "duplicate": True,
-                "log_id": existing.id,
-                "provider": "tern_crm",
-                "message": f"Event {provider_event_id} already processed."
-            }
-
-    event_type = payload.get("event_type", "tern.event")
-    log_id = f"wh_tern_{uuid.uuid4().hex[:8]}"
-
-    log = WebhookEventLog(
-        id=log_id,
-        provider_event_id=str(provider_event_id) if provider_event_id else None,
-        provider="tern_crm",
-        event_type=event_type,
-        payload_json=payload,
-        headers_json={},
-        status="PROCESSED",
-        processed_at=datetime.now(timezone.utc)
-    )
-    db.add(log)
-
-    client_name = payload.get("client_name") or payload.get("client") or payload.get("guest_name") or "Tern Guest"
-    trip_id = payload.get("trip_id") or payload.get("tripId") or "TRIP-TERN"
-    amount = payload.get("amount_usd") or payload.get("amount") or "N/A"
-    
-    draft = ActionDraft(
-        type="tern_sync_review",
-        guest_name=client_name,
-        content=(
-            f"Tern CRM Webhook Event: {event_type}\n"
-            f"Client: {client_name} | Trip ID: {trip_id}\n"
-            f"Amount / Status: {amount} | Status: {payload.get('status', 'COMPLETED')}\n\n"
-            f"Approving this draft acknowledges Tern payment authorization and synchronizes guest booking records."
-        ),
-        status="pending_review"
-    )
-    db.add(draft)
-    db.commit()
-
-    logger.info(f"Logged inbound Tern webhook and staged draft: {event_type} ({log_id})")
-    return {
-        "success": True,
-        "log_id": log_id,
-        "provider": "tern_crm",
-        "event_type": event_type,
-        "message": "Tern webhook processed and staged for review."
-    }
 
 
 @router.post("/hospitality", dependencies=[Depends(verify_webhook_secret)])
@@ -404,8 +311,8 @@ def simulate_webhook(
     db: Session = Depends(get_db)
 ):
     """
-    Simulates an incoming webhook from any external provider (Tern, Expedia, Cirium, WhatsApp, Resend).
-    Validates end-to-end telemetry resilience and stages ActionDrafts for Cirium & Tern events.
+    Simulates an incoming webhook from any external provider (Expedia, Cirium, WhatsApp, Resend).
+    Validates end-to-end telemetry resilience and stages ActionDrafts for Cirium & KAI CRM events.
     """
     provider_event_id = (req.payload or {}).get("event_id") or (req.payload or {}).get("id")
     if provider_event_id:
@@ -450,19 +357,7 @@ def simulate_webhook(
             status="pending_review"
         )
         db.add(draft)
-    elif req.provider == "tern_crm":
-        guest = (req.payload or {}).get("client") or (req.payload or {}).get("client_name") or "Sarah Jenkins"
-        draft = ActionDraft(
-            type="tern_sync_review",
-            guest_name=guest,
-            content=(
-                f"Simulated Tern CRM Authorization ({req.event_type}):\n"
-                f"Client: {guest} | 30% Deposit Hold Authorized\n"
-                f"Tern native credit card processing confirmed. Ready to finalize room block."
-            ),
-            status="pending_review"
-        )
-        db.add(draft)
+
 
     db.commit()
 

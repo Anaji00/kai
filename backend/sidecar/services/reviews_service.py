@@ -39,6 +39,23 @@ def analyze_somatic_sentiment(text: str, rating: float = 5.0) -> Tuple[float, fl
     return round(deep_sleep, 1), round(quietude, 1), round(clinical, 1), label
 
 
+def normalize_sanctuary_slug(slug: Optional[str]) -> Optional[str]:
+    if not slug or slug.upper() == "ALL":
+        return None
+    s = slug.lower().strip().replace("_", "-")
+    if "puerto" in s or "vallarta" in s or "marival" in s:
+        return "puerto-vallarta"
+    if "nosara" in s:
+        return "nosara"
+    if "amalfi" in s:
+        return "amalfi"
+    if "bali" in s or "ubud" in s:
+        return "bali"
+    if "riviera" in s or "maya" in s:
+        return "riviera-maya"
+    return s
+
+
 def get_sanctuary_reviews(
     db: Session,
     sanctuary_slug: Optional[str] = None
@@ -47,8 +64,9 @@ def get_sanctuary_reviews(
     Retrieves published verified guest reflections for a given sanctuary or all retreats.
     """
     query = db.query(DestinationReview).filter(DestinationReview.status == "PUBLISHED")
-    if sanctuary_slug and sanctuary_slug.upper() != "ALL":
-        query = query.filter(DestinationReview.sanctuary_slug == sanctuary_slug.lower())
+    norm_slug = normalize_sanctuary_slug(sanctuary_slug)
+    if norm_slug:
+        query = query.filter(DestinationReview.sanctuary_slug == norm_slug)
     return query.order_by(DestinationReview.created_at.desc()).all()
 
 
@@ -105,10 +123,46 @@ def process_inbound_review_webhook(
 
 def seed_default_reviews_if_empty(db: Session) -> None:
     """
-    Seeds baseline verified guest reviews across the retreats if table is empty.
+    Seeds baseline verified guest reviews across all retreats.
+    Ensures Puerto Vallarta (2027 flagship) is always seeded.
     """
-    if db.query(DestinationReview).count() == 0:
-        default_reviews = [
+    existing_slugs = set(r.sanctuary_slug for r in db.query(DestinationReview).all())
+    reviews_to_add = []
+
+    if "puerto-vallarta" not in existing_slugs and "puerto-vallarta-2027" not in existing_slugs:
+        reviews_to_add.extend([
+            DestinationReview(
+                id=generate_uuid_str(),
+                sanctuary_slug="puerto-vallarta",
+                guest_name="Julian Sterling",
+                stay_dates="January 2026 Preview Cohort",
+                overall_rating=5.0,
+                deep_sleep_score=99.0,
+                quietude_score=99.5,
+                clinical_attentiveness_score=100.0,
+                review_text="The 432Hz crystal bowl sound bath at sunset over Banderas Bay with Nurse Kareena completely shifted my nervous system out of fight-or-flight. The private suites at Marival Harmony are acoustic sanctuaries.",
+                sentiment_label="DEEPLY_RESTORATIVE",
+                source="VERIFIED_GUEST",
+                status="PUBLISHED"
+            ),
+            DestinationReview(
+                id=generate_uuid_str(),
+                sanctuary_slug="puerto-vallarta",
+                guest_name="Lady Victoria Beck",
+                stay_dates="January 2026 Preview Cohort",
+                overall_rating=5.0,
+                deep_sleep_score=98.0,
+                quietude_score=98.5,
+                clinical_attentiveness_score=99.5,
+                review_text="Armaan's endurance pacing and Kareena's clinical attention to sleep restoration made this retreat exceptional. The oceanfront villas at Marival Harmony are unmatched for peace.",
+                sentiment_label="HELD_WITH_CARE",
+                source="VERIFIED_GUEST",
+                status="PUBLISHED"
+            )
+        ])
+
+    if "nosara" not in existing_slugs:
+        reviews_to_add.extend([
             DestinationReview(
                 id=generate_uuid_str(),
                 sanctuary_slug="nosara",
@@ -136,7 +190,11 @@ def seed_default_reviews_if_empty(db: Session) -> None:
                 sentiment_label="HELD_WITH_CARE",
                 source="VERIFIED_GUEST",
                 status="PUBLISHED"
-            ),
+            )
+        ])
+
+    if "amalfi" not in existing_slugs:
+        reviews_to_add.append(
             DestinationReview(
                 id=generate_uuid_str(),
                 sanctuary_slug="amalfi",
@@ -150,7 +208,11 @@ def seed_default_reviews_if_empty(db: Session) -> None:
                 sentiment_label="DEEPLY_RESTORATIVE",
                 source="VERIFIED_GUEST",
                 status="PUBLISHED"
-            ),
+            )
+        )
+
+    if "bali" not in existing_slugs:
+        reviews_to_add.append(
             DestinationReview(
                 id=generate_uuid_str(),
                 sanctuary_slug="bali",
@@ -165,6 +227,8 @@ def seed_default_reviews_if_empty(db: Session) -> None:
                 source="VERIFIED_GUEST",
                 status="PUBLISHED"
             )
-        ]
-        db.add_all(default_reviews)
+        )
+
+    if reviews_to_add:
+        db.add_all(reviews_to_add)
         db.commit()

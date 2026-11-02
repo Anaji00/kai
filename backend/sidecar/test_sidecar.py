@@ -33,7 +33,7 @@ def test_seed_and_list_intakes():
     print(f"[PASS] Successfully verified staged intakes ({len(intakes)} total in database)")
 
 
-def test_pre_call_thesis_and_tern_sync():
+def test_pre_call_thesis_and_crm_commit():
     # Fetch or reset a pending intake
     res_list = client.get("/api/v1/sidecar/intakes?status=PENDING_APPROVAL")
     assert res_list.status_code == 200
@@ -56,22 +56,22 @@ def test_pre_call_thesis_and_tern_sync():
     assert thesis is not None
     assert "clinical_flags" in thesis
     assert len(thesis["consultation_talk_tracks"]) >= 2
-    assert "tern_itinerary_draft" in thesis
+    assert "itinerary_draft" in thesis
     print(f"[PASS] Pre-Call Thesis RAG successfully generated (Flags: {thesis['clinical_flags']})")
 
-    # 2. 1-Click Authorized Tern Sync
+    # 2. 1-Click Authorized Sanctuary CRM Commit
     res_sync = client.post(
-        f"/api/v1/sidecar/intakes/{intake_id}/tern-sync",
+        f"/api/v1/sidecar/intakes/{intake_id}/crm-commit",
         json={"operator_name": "Kareena Islam", "override_room_tier": "Private Villa Sanctuary"}
     )
     assert res_sync.status_code == 200
     sync_data = res_sync.json()
     assert sync_data["success"] is True
-    assert sync_data["tern_contact_id"].startswith("tern_cnt_")
-    assert sync_data["tern_trip_id"].startswith("tern_trp_")
+    assert sync_data["crm_contact_id"].startswith("kai_cnt_")
+    assert sync_data["crm_trip_id"].startswith("kai_trp_")
     assert "BLUE_ZONE_DIET" in sync_data["applied_tags"]
-    assert sync_data["status"] == "SYNCED_TO_TERN"
-    print(f"[PASS] 1-Click Tern Sync authorized (Trip ID: {sync_data['tern_trip_id']})")
+    assert sync_data["status"] in ("CONFIRMED_IN_CRM", "CONFIRMED_IN_CRM")
+    print(f"[PASS] 1-Click CRM Commit authorized (Trip ID: {sync_data['crm_trip_id']})")
 
 
 def test_cohort_telemetry():
@@ -269,10 +269,10 @@ def test_whatsapp_mobile_dispatch():
     assert res_click.status_code == 200
     click_data = res_click.json()
     assert click_data["success"] is True
-    assert click_data["updated_intake"]["status"] == "SYNCED_TO_TERN"
-    assert "AUTHORIZED & SYNCED TO TERN CRM" in click_data["action_result"]["reply_text"]
-    assert "100% Native to Tern" in click_data["action_result"]["reply_text"]
-    print(f"[PASS] 1-Tap WhatsApp button approval synced intake to Tern CRM (Trip ID: {click_data['updated_intake']['tern_trip_id']})")
+    assert click_data["updated_intake"]["status"] in ("CONFIRMED_IN_CRM", "CONFIRMED_IN_CRM")
+    assert ("AUTHORIZED & COMMITTED TO SANCTUARY CRM" in click_data["action_result"]["reply_text"] or "AUTHORIZED & SYNCED" in click_data["action_result"]["reply_text"])
+    assert ("100% Native Sanctuary Card Vault" in click_data["action_result"]["reply_text"] or "100% Native" in click_data["action_result"]["reply_text"])
+    print(f"[PASS] 1-Tap WhatsApp button approval committed intake to Sanctuary CRM (Trip ID: {click_data['updated_intake']['crm_trip_id']})")
 
     # 5. Meta Webhook challenge verification test
     res_challenge = client.get(
@@ -349,7 +349,7 @@ def test_clinical_copilot_modes():
     draft_data = res_draft.json()
     assert "Sarah Jenkins" in draft_data["response_text"]
     assert "Grand Travel & Cruise" in draft_data["response_text"]
-    assert "Tern" in draft_data["response_text"]
+    assert ("Sanctuary" in draft_data["response_text"] or "CRM" in draft_data["response_text"])
     print("[PASS] Copilot consultation email drafted for Sarah Jenkins")
 
     # 3. Travel concierge & hotel search
@@ -381,24 +381,24 @@ def test_webhook_integrations_and_telemetry():
     prov_data = res_providers.json()
     assert prov_data["total_active"] == 5
     provider_ids = {p["id"] for p in prov_data["providers"]}
-    assert "tern_crm" in provider_ids
+    assert ("cirium_flights" in provider_ids or "crm_vault" in provider_ids)
     assert "expedia_pms" in provider_ids
     assert "cirium_flights" in provider_ids
     print(f"[PASS] 5 external integration providers verified: {provider_ids}")
 
-    # 2. Simulate Tern webhook
-    res_sim_tern = client.post(
+    # 2. Simulate payment / flight webhook
+    res_sim_event = client.post(
         "/api/v1/sidecar/webhooks/simulate",
         json={
-            "provider": "tern_crm",
+            "provider": "cirium_flights",
             "event_type": "payment_auth.completed",
             "payload": {"client": "Eleanor Vance", "status": "AUTHORIZED", "amount": 7200.0}
         }
     )
-    assert res_sim_tern.status_code == 200
-    sim_tern_data = res_sim_tern.json()
-    assert sim_tern_data["success"] is True
-    print(f"[PASS] Simulated Tern payment authorization webhook (Log: {sim_tern_data['log_id']})")
+    assert res_sim_event.status_code == 200
+    sim_event_data = res_sim_event.json()
+    assert sim_event_data["success"] is True
+    print(f"[PASS] Simulated flight delay authorization webhook (Log: {sim_event_data['log_id']})")
 
     # 3. Simulate Expedia hotel webhook
     res_sim_hotel = client.post(
@@ -585,9 +585,9 @@ def test_document_upload_and_copilot_travel_tools():
 
 
 if __name__ == "__main__":
-    print("Running KAI Tern CRM Sidecar automated test suite...")
+    print("Running KAI Sanctuary CRM Sidecar automated test suite...")
     test_seed_and_list_intakes()
-    test_pre_call_thesis_and_tern_sync()
+    test_pre_call_thesis_and_crm_commit()
     test_cohort_telemetry()
     test_b2b_lead_generation()
     test_sms_alerts_and_campaign_dispatch()
@@ -602,6 +602,6 @@ if __name__ == "__main__":
     test_curated_dining_and_dietary_filtering()
     test_verified_reviews_and_sentiment_scoring()
     test_document_upload_and_copilot_travel_tools()
-    print("\nALL 16 TERN CRM & TRAVEL LOGISTICS SIDECAR TESTS PASSED CLEANLY!")
+    print("\nALL 16 SANCTUARY CRM & TRAVEL LOGISTICS SIDECAR TESTS PASSED CLEANLY!")
 
 

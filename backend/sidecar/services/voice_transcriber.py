@@ -9,13 +9,15 @@ from backend.config import settings
 logger = logging.getLogger("kai_voice_transcriber")
 
 SANCTUARY_KEYWORDS = {
+    "puerto-vallarta-2027": ["puerto vallarta", "vallarta", "marival", "harmony", "armony", "banderas", "pvr", "punta de mita", "january"],
     "nosara": ["nosara", "costa rica", "nicoya", "guanacaste", "canopy", "lir"],
     "amalfi": ["amalfi", "positano", "naples", "italy", "capri", "mediterranean", "nap"],
     "bali": ["bali", "ubud", "canggu", "indonesia", "dps"],
-    "riviera-maya": ["riviera", "maya", "tulum", "cancun", "mexico", "cenote", "cun"]
+    "riviera-maya": ["riviera", "maya", "tulum", "cancun", "cenote", "cun"]
 }
 
 ROOM_TIER_KEYWORDS = {
+    "Marival Harmony Oceanfront Suite": ["marival", "harmony", "armony", "banderas", "oceanfront suite"],
     "Cliffside Stillness Suite": ["cliffside", "stillness", "cliff", "suite"],
     "Shared Ocean Pavilion": ["shared", "pavilion", "shared ocean", "twin"],
     "Private Villa Sanctuary": ["private villa", "villa", "ocean villa", "master villa", "private canopy"]
@@ -54,7 +56,7 @@ def extract_entities_from_transcript(transcript: str) -> Dict[str, Any]:
     email = f"{sanitized_name}@vip.kai"
 
     # 3. Sanctuary Selection
-    sanctuary_slug = "nosara"
+    sanctuary_slug = "puerto-vallarta-2027"
     for slug, kws in SANCTUARY_KEYWORDS.items():
         if any(kw in text_lower for kw in kws):
             sanctuary_slug = slug
@@ -195,7 +197,7 @@ Extract the GUEST details (the guest being consulted, NOT the founder Kareena Is
         f"Our travel coordinators at Grand Travel & Cruise (Funjet 500 Club volume contract) are standing by "
         f"to manage your flight logistics from {departure_airport} "
         f"{f'(Flight {flight_number})' if flight_number else ''} with seamless private tarmac transit.\n\n"
-        f"Your reservation has been staged with Tern CRM. Once you review and authorize the itinerary, "
+        f"Your reservation has been staged with the KAI Sanctuary Travel CRM. Once you review and authorize the itinerary, "
         f"your 30% deposit hold will be confirmed.\n\n"
         f"With warmth and restorative stillness,\n\n"
         f"Kareena Islam\n"
@@ -226,5 +228,12 @@ Extract the GUEST details (the guest being consulted, NOT the founder Kareena Is
             "air_desk": "Grand Travel & Cruise (Funjet 500 Club)"
         },
         "welcome_email_draft": welcome_content,
+        "automated_records_populated": [
+            f"Staged Guest Intake & Clinical Profile ({client_name})",
+            f"AI Suggested Retreat & Cultural Plan ({sanctuary_slug})",
+            f"Welcome Email & Flight Desk Draft (routed to kareena@grandtravelcruise.com & armaan@grandtravelcruise.com)",
+            f"Dietary & Somatic Kitchen Brief ({nutrition_preferences})",
+            f"Grand Travel PVR/Airport Transfer Request ({departure_airport})",
+        ],
         "extracted_at": datetime.now(timezone.utc).isoformat()
     }

@@ -4,6 +4,29 @@ export interface RetreatItineraryDay {
   highlights: string[];
 }
 
+export interface RetreatWeatherProfile {
+  targetWindow: string;
+  avgHighF: number;
+  avgLowF: number;
+  avgHighC: number;
+  avgLowC: number;
+  humidity: string;
+  oceanTempF: number;
+  oceanTempC: number;
+  rainDays: string;
+  uvIndex: string;
+  climateClassification: string;
+  climateSummary: string;
+  historicalPattern: string;
+  weatherModelNote: string;
+  whatToWear: {
+    morningPractice: string;
+    daytimeExcursion: string;
+    eveningDining: string;
+  };
+  whatToPack: string[];
+}
+
 export interface Retreat {
   id: string;
   slug: string;
@@ -22,20 +45,40 @@ export interface Retreat {
   description: string;
   clinicalFocus: string[];
   somaticPractices: string[];
+  culturalIntegrations?: string[];
+  weatherProfile?: RetreatWeatherProfile;
   inclusions: string[];
   accommodations: string;
   heroImage: string;
   gallery: string[];
   schedule: RetreatItineraryDay[];
   featured?: boolean;
-  status: "open" | "waitlist" | "few-spots";
+  status: "open" | "waitlist" | "few-spots" | "coming-soon";
 }
 
 export type RoomTier = "private-suite" | "shared-luxury" | "flexible";
+
+export interface SuggestedRetreatPlan {
+  summary: string;
+  peaceAndPiecesThesis: string;
+  recommendedSanctuary: string;
+  recommendedRoom: string;
+  dailyRhythm: string[];
+  culturalHighlights: string[];
+  weatherAndPacking: string[];
+  travelLogisticsNote: string;
+  clinicalAndEnduranceNotes: string;
+  routedTo: string[];
+  generatedBy: string;
+}
 
 export interface BookingFormState {
   success: boolean;
   message: string;
   errors?: Record<string, string[]>;
   bookingReference?: string;
+  suggestedPlan?: SuggestedRetreatPlan;
+  waiverSignedBy?: string;
+  waiverSignedAt?: string;
+  routedEmails?: string[];
 }

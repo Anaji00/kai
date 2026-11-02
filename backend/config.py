@@ -18,17 +18,33 @@ class Settings(BaseSettings):
     
     # CORS
     CORS_ORIGINS: List[str] = [
+        "http://localhost:3536",
+        "http://127.0.0.1:3536",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "https://kaiwellnessretreats.com",
         "https://www.kaiwellnessretreats.com",
     ]
     
-    # Email & Notifications
+    # Email & Notifications (Dual Founder Routing: Kareena Islam & Armaan Islam)
     RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
     RESEND_FROM_EMAIL: str = os.getenv("RESEND_FROM_EMAIL", "KAI Sanctuary Reservations <inquiries@kaiwellnessretreats.com>")
     RESEND_CONCIERGE_FROM_EMAIL: str = os.getenv("RESEND_CONCIERGE_FROM_EMAIL", "KAI Concierge Desk <concierge@kaiwellnessretreats.com>")
-    KAREENA_ROUTING_EMAIL: str = os.getenv("KAREENA_ROUTING_EMAIL", "kareena@kaiwellnessretreats.com")
+    KAREENA_ROUTING_EMAIL: str = os.getenv("KAREENA_ROUTING_EMAIL", "kareena@grandtravelcruise.com")
+    ARMAAN_ROUTING_EMAIL: str = os.getenv("ARMAAN_ROUTING_EMAIL", "armaan@grandtravelcruise.com")
+
+    @property
+    def FOUNDER_INQUIRY_EMAILS(self) -> List[str]:
+        emails = [self.KAREENA_ROUTING_EMAIL]
+        if self.ARMAAN_ROUTING_EMAIL and self.ARMAAN_ROUTING_EMAIL not in emails:
+            emails.append(self.ARMAAN_ROUTING_EMAIL)
+        return emails
+    # Optional SMTP Dispatch (e.g. Gmail App Password, Brevo, SendGrid SMTP)
+    SMTP_HOST: str = os.getenv("SMTP_HOST", "")
+    SMTP_PORT: int = int(os.getenv("SMTP_PORT", "587"))
+    SMTP_USER: str = os.getenv("SMTP_USER", "")
+    SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
+    SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "true").lower() in ("true", "1", "yes")
     EMAIL_WEBHOOK_SECRET: str = os.getenv("EMAIL_WEBHOOK_SECRET", "whsec_email_kai_sanctuary_2026")
     RESEND_WEBHOOK_SECRET: str = os.getenv("RESEND_WEBHOOK_SECRET", "")
     
@@ -39,12 +55,6 @@ class Settings(BaseSettings):
     FOUNDER_TRAVEL_RECOGNITION: str = "Future Leaders in Travel Honoree"
     FLIGHT_CONCIERGE_EMAIL: str = os.getenv("FLIGHT_CONCIERGE_EMAIL", "concierge@kaiwellnessretreats.com")
 
-    # Sidecar & Operator Portal Settings
-    TERN_API_KEY: str = os.getenv("TERN_API_KEY", "simulated_tern_key_kai")
-    TERN_API_URL: str = os.getenv("TERN_API_URL", "https://api.tern.travel/v1")
-    TERN_AGENCY_ID: str = os.getenv("TERN_AGENCY_ID", "grand_travel_cruise_kai")
-    TERN_PUBLIC_FORMS_BASE_URL: str = os.getenv("TERN_PUBLIC_FORMS_BASE_URL", "https://app.tern.travel/public/forms")
-    TERN_WEBHOOK_SECRET: str = os.getenv("TERN_WEBHOOK_SECRET", "whsec_tern_kai_sanctuary_2026")
 
     # WhatsApp Cloud API & Mobile Dispatch Settings
     WHATSAPP_PROVIDER: str = os.getenv("WHATSAPP_PROVIDER", "cloud_api")
@@ -72,7 +82,6 @@ class Settings(BaseSettings):
     LLM_TIMEOUT_SECONDS: float = float(os.getenv("LLM_TIMEOUT_SECONDS", "60.0"))
 
     # Live Integration Toggles (Transitions communications from simulated logs to live delivery)
-    ENABLE_LIVE_TERN_API: bool = os.getenv("ENABLE_LIVE_TERN_API", "false").lower() in ("true", "1", "yes")
     ENABLE_LIVE_WHATSAPP_DISPATCH: bool = os.getenv("ENABLE_LIVE_WHATSAPP_DISPATCH", "false").lower() in ("true", "1", "yes")
     ENABLE_LIVE_EMAIL_DISPATCH: bool = os.getenv("ENABLE_LIVE_EMAIL_DISPATCH", "false").lower() in ("true", "1", "yes")
     CIRIUM_WEBHOOK_SECRET: str = os.getenv("CIRIUM_WEBHOOK_SECRET", "whsec_cirium_kai_2026")
@@ -105,7 +114,6 @@ class Settings(BaseSettings):
 _DEV_DEFAULT_SECRETS = {
     "ADMIN_PASSWORD": "kai_admin_2026",
     "JWT_SECRET_KEY": "kai_sanctuary_jwt_secret_change_in_prod_2026",
-    "TERN_WEBHOOK_SECRET": "whsec_tern_kai_sanctuary_2026",
     "EMAIL_WEBHOOK_SECRET": "whsec_email_kai_sanctuary_2026",
     "CIRIUM_WEBHOOK_SECRET": "whsec_cirium_kai_2026",
     "EXPEDIA_WEBHOOK_SECRET": "whsec_expedia_kai_2026",

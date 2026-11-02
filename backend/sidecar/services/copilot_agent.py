@@ -24,9 +24,9 @@ TOOL_DESCRIPTIONS_LAYMAN = {
         "why_it_matters": "Gives you complete visibility into guest care and travel plans without overwhelming spreadsheets."
     },
     "guest_planner": {
-        "title": "Tern Guest & Travel Planner",
-        "layman_summary": "Syncs your guest details, custom itineraries, and flights with Tern CRM. All published itineraries include Tern's secure credit card authorizations and payment schedules.",
-        "why_it_matters": "You never have to build custom payment forms or handle credit card numbers yourself. Tern manages client authorizations, bank security, and waivers 100% natively."
+        "title": "KAI Guest & Travel Planner",
+        "layman_summary": "Syncs your guest details, custom itineraries, and flights with KAI Sanctuary CRM. All published itineraries include KAI CRM's secure credit card authorizations and payment schedules.",
+        "why_it_matters": "You never have to build custom payment forms or handle credit card numbers yourself. KAI CRM manages client authorizations, bank security, and waivers 100% natively."
     },
     "founder_approval": {
         "title": "Personalized Founder Approval (Zero Autonomous Writes)",
@@ -40,7 +40,7 @@ TOOL_DESCRIPTIONS_LAYMAN = {
     },
     "guest_list_check": {
         "title": "Guest List & Booking Check",
-        "layman_summary": "Compares your website registrations with confirmed Tern traveler files to catch any missing dietary needs or flight details.",
+        "layman_summary": "Compares your website registrations with confirmed KAI CRM traveler files to catch any missing dietary needs or flight details.",
         "why_it_matters": "Ensures every single guest is accounted for and well looked after before arrival."
     },
     "retreat_calendar": {
@@ -59,13 +59,13 @@ TOOL_DESCRIPTIONS_LAYMAN = {
         "why_it_matters": "Alerts your private tarmac chauffeurs if a flight is delayed so guests are never left waiting."
     },
     "public_forms": {
-        "title": "Tern Direct Guest Forms Hub",
-        "layman_summary": "Instant shareable links to Tern's official guest forms for intake, partner studio referrals, and travel preferences.",
-        "why_it_matters": "Guests complete their information directly into Tern's secure cloud with zero manual copy-pasting."
+        "title": "KAI Native Guest Forms Hub",
+        "layman_summary": "Instant shareable links to KAI's native guest forms for intake, partner studio referrals, and travel preferences.",
+        "why_it_matters": "Guests complete their information directly into KAI's secure sanctuary database with zero manual copy-pasting."
     },
     "integrations_webhooks": {
         "title": "External Travel & Service Connections",
-        "layman_summary": "A visual hub showing real-time connections to Tern CRM, Expedia / Hotel PMS, Grand Travel Flight Desk, and WhatsApp.",
+        "layman_summary": "A visual hub showing real-time connections to KAI Sanctuary CRM, Expedia / Hotel PMS, Grand Travel Flight Desk, and WhatsApp.",
         "why_it_matters": "Keeps your systems in harmony so updates flow quietly in the background without technical headaches."
     },
     "scenic_routes": {
@@ -104,8 +104,8 @@ TOOL_DESCRIPTIONS_LAYMAN = {
         "why_it_matters": "Saves you time typing between consultation calls so you can stay fully present in clinical care."
     },
     "vendor_registry": {
-        "title": "Tern Back Office Vendor & Supplier Registry",
-        "layman_summary": "Your central address book of luxury flight desks, executive chauffeurs, organic caterers, and emergency medical contacts synced with Tern CRM.",
+        "title": "KAI Sanctuary Vendor & Supplier Directory",
+        "layman_summary": "Your central address book of luxury flight desks, executive chauffeurs, organic caterers, and emergency medical contacts synced with KAI Sanctuary CRM.",
         "why_it_matters": "Tracks commission percentages, booking codes, and lead times so you can book trusted suppliers with 1 click without digging through old contracts."
     }
 }
@@ -191,7 +191,7 @@ class ClinicalCopilotAgent:
         """
         Expanded RAG retrieval across all KAI Wellness business, operational, and clinical domains:
         - Executive Operations & Pricing (group size limits, deposits, balance terms)
-        - Tern CRM Architecture (suppliers, commission tiers, native credit card authorizations)
+        - KAI Sanctuary Travel CRM Architecture (suppliers, commission tiers, native credit card authorizations)
         - Grand Travel & Cruise (group air contracts, lie-flat blocks, VIP tarmac transfers)
         - Hospitality & Accommodations (private villas, quiet decks, botanical apothecaries)
         - Partner Wellness Studios & Functional Medicine Practices (B2B referral alliances)
@@ -255,7 +255,7 @@ class ClinicalCopilotAgent:
             f"For your stay, I recommend our {room_type}, which provides complete tranquility, bespoke non-toxic botanicals, "
             f"and restorative ocean breezes.\n\n"
             f"Our travel partners at Grand Travel & Cruise (Funjet 500 Club) will coordinate your flights and private airport meet-and-greets "
-            f"so your journey begins without a moment of stress. I have prepared your personalized proposal within our secure Tern guest portal, "
+            f"so your journey begins without a moment of stress. I have prepared your personalized proposal within our secure KAI CRM guest portal, "
             f"where you can review your complete daily restorative arc and authorize your booking.\n\n"
             f"I look forward to our consultation call.\n\n"
             f"With warmth and restoration,\n\n"
@@ -389,7 +389,7 @@ class ClinicalCopilotAgent:
     ) -> Optional[Dict[str, Any]]:
         """
         Intelligently detects guest reservation and stay requests, calculates pro-rated pricing,
-        Tern 30% deposit and 70% balance ('the rest'), verifies retreat group limits (12-14), and drafts
+        30% sanctuary deposit and 70% balance ('the rest'), verifies retreat group limits (12-14), and drafts
         the clinical circadian rest protocol.
         """
         msg_lower = message.lower()
@@ -450,7 +450,7 @@ class ClinicalCopilotAgent:
             from backend.sidecar.models import StagingIntake
             staged_or_confirmed = db.query(StagingIntake).filter(
                 StagingIntake.sanctuary_slug == s_slug,
-                StagingIntake.status.in_(["PENDING_APPROVAL", "APPROVED", "SYNCED_TO_TERN"])
+                StagingIntake.status.in_(["PENDING_APPROVAL", "APPROVED", "CONFIRMED_IN_CRM"])
             ).count()
             remaining_spots = max(0, s_cfg["capacity_limit"] - staged_or_confirmed)
 
@@ -505,7 +505,7 @@ class ClinicalCopilotAgent:
                 "clinical_notes": (
                     f"{booking_info['nights']}-night restorative immersion at {s_cfg['name']}. "
                     f"Autonomic reset & circadian alignment. "
-                    f"Tern 30% Deposit: ${booking_info['deposit_30']:,.2f} | 70% Balance ('The Rest'): ${booking_info['balance_70']:,.2f} due 45 days pre-arrival."
+                    f"30% Sanctuary Deposit: ${booking_info['deposit_30']:,.2f} | 70% Balance ('The Rest'): ${booking_info['balance_70']:,.2f} due 45 days pre-arrival."
                 ),
                 "flight_request": {
                     "departure_airport": booking_info["transit_airport"],
@@ -584,7 +584,7 @@ class ClinicalCopilotAgent:
                 "contact_name": contact_name,
                 "commission_rate": comm_rate,
                 "commission_type": comm_type,
-                "payment_terms": "Tern Native Client Card Auth",
+                "payment_terms": "Direct Client Card Authorization",
                 "lead_time_days": 7,
                 "preferred_tier": "PREFERRED_PARTNER",
                 "service_description": f"Preferred retreat supplier: {name}. Vetted partner aligned with KAI restorative standards.",
@@ -592,7 +592,7 @@ class ClinicalCopilotAgent:
             }
 
             title = f"Register Preferred Supplier: {name}"
-            summary = f"Stage new supplier '{name}' ({category}) for Tern Back Office synchronization with {comm_rate}{'%' if comm_type == 'PERCENTAGE' else ' flat fee'} commission."
+            summary = f"Stage new supplier '{name}' ({category}) for KAI CRM registry synchronization with {comm_rate}{'%' if comm_type == 'PERCENTAGE' else ' flat fee'} commission."
             return {
                 "form_type": "vendor_supplier",
                 "form_title": title,
@@ -749,7 +749,7 @@ class ClinicalCopilotAgent:
                 "clinical_notes": "Awaiting initial clinical screening questionnaire."
             }
             title = f"Stage Guest Intake: {guest_name}"
-            summary = f"Stage intake record for {guest_name} ({target_sanctuary.title()}) awaiting Kareena's clinical clearance and Tern CRM sync."
+            summary = f"Stage intake record for {guest_name} ({target_sanctuary.title()}) awaiting Kareena's clinical clearance and KAI Sanctuary CRM sync."
             return {
                 "form_type": "guest_intake",
                 "form_title": title,
@@ -821,14 +821,14 @@ class ClinicalCopilotAgent:
                 f"* Sanctuary: KAI {str(matched_intake.sanctuary_slug).title()} ({matched_intake.room_tier or 'Private Villa Sanctuary'})\n"
                 f"* Intention: {primary_focus}\n"
                 f"* Protocol: 4-7-8 vagal nerve down-regulation, 432Hz sound immersion, circadian alignment.\n"
-                f"* Tern Status: Staged for 30% deposit authorization upon review."
+                f"* CRM Status: Staged for 30% deposit authorization upon review."
             )
 
         if not parts:
             if rag_results:
                 parts.append(f"Based on KAI Sanctuary somatic guidelines and operations:\n\n{rag_results[0].get('content', '')}")
             else:
-                parts.append(f"KAI Wellness Retreats ({target_sanctuary.title()}) operates under strict 12–14 guest maximum cohorts to ensure complete parasympathetic restoration. All operations are coordinated in partnership with Grand Travel & Cruise (Funjet 500 Club volume contracts) and Tern CRM for seamless, zero-autonomous payment security.")
+                parts.append(f"KAI Wellness Retreats ({target_sanctuary.title()}) operates under strict 12–14 guest maximum cohorts to ensure complete parasympathetic restoration. All operations are coordinated in partnership with Grand Travel & Cruise (Funjet 500 Club volume contracts) and KAI Sanctuary CRM for seamless, zero-autonomous payment security.")
 
         return "\n\n".join(parts)
 
@@ -921,7 +921,7 @@ class ClinicalCopilotAgent:
                         "total_usd": booking_calc["total_amount"],
                         "deposit_30_usd": booking_calc["deposit_30"],
                         "balance_70_usd": booking_calc["balance_70"],
-                        "payment_terms": "30% non-refundable deposit via Tern card authorization upon Founder review; 70% balance due 45 days prior to arrival."
+                        "payment_terms": "30% non-refundable deposit via KAI card authorization upon Founder review; 70% balance due 45 days prior to arrival."
                     },
                     "cohort_capacity": {
                         "limit": booking_calc["capacity_limit"],
@@ -943,7 +943,7 @@ class ClinicalCopilotAgent:
                 f"* Accommodation: {booking_calc['room_tier']}\n"
                 f"* Pricing & Payment Breakdown ('Calculate the Rest'):\n"
                 f"  - Total Stay Cost: ${booking_calc['total_amount']:,.2f} USD\n"
-                f"  - 30% Tern Deposit: ${booking_calc['deposit_30']:,.2f} USD (Authorized natively in Tern client card vault upon Founder review)\n"
+                f"  - 30% KAI CRM Deposit: ${booking_calc['deposit_30']:,.2f} USD (Authorized natively in KAI client card vault upon Founder review)\n"
                 f"  - 70% Remaining Balance ('The Rest'): ${booking_calc['balance_70']:,.2f} USD (Due 45 days prior to arrival)\n"
                 f"* Group Limit Protection: {booking_calc['capacity_limit']} Guest Limit ({booking_calc['remaining_spots']} spots available)\n"
                 f"* Luxury Transit: Private chauffeur meet & transfer from {booking_calc['transit_airport']} via {booking_calc['transit_vehicle']} ({booking_calc['transit_time']})\n"
@@ -1091,7 +1091,7 @@ class ClinicalCopilotAgent:
 
             thesis = matched_intake.consultation_thesis or {}
             thesis_points = thesis.get("talking_points", [])
-            thesis_str = "; ".join(thesis_points[:3]) if thesis_points else "Pre-call somatic thesis prepared in Tern portal."
+            thesis_str = "; ".join(thesis_points[:3]) if thesis_points else "Pre-call somatic thesis prepared in KAI portal."
             sympathetic_tone = thesis.get("sympathetic_tone_hypothesis", "Nervous system reset recommended.")
             circadian_protocol = thesis.get("circadian_protocol", "4-7-8 vagal activation, acoustic grounding, restorative delta sleep.")
             clinical_flags = ", ".join(thesis.get("clinical_flags", [])) or "Standard nervous system restoration"
@@ -1105,13 +1105,13 @@ class ClinicalCopilotAgent:
                 "intentions": g_intentions,
                 "clinical_flags": clinical_flags,
                 "health_notes": h_notes,
-                "tern_trip_id": matched_intake.tern_trip_id
+                "crm_trip_id": matched_intake.crm_trip_id
             })
 
             domain_context_snippets.append(
                 f"KAI CLINICAL SOMATIC PROFILE & CARE PLAN FOR '{matched_intake.client_name}':\n"
                 f"* Guest Full Name: {matched_intake.client_name}\n"
-                f"* Status: {matched_intake.status} (Tern Trip ID: {matched_intake.tern_trip_id or 'Pending Founder Approval'})\n"
+                f"* Status: {matched_intake.status} (Sanctuary Trip ID: {matched_intake.crm_trip_id or 'Pending Founder Approval'})\n"
                 f"* Destination Sanctuary: KAI {str(matched_intake.sanctuary_slug).title()} Sanctuary (12–14 guest cap protected)\n"
                 f"* Accommodation: {matched_intake.room_tier or 'Private Villa Sanctuary'}\n"
                 f"* Contact: {matched_intake.email} | {matched_intake.phone or 'Direct VIP Client'}\n"
@@ -1122,13 +1122,13 @@ class ClinicalCopilotAgent:
                 f"* Personalized Circadian Somatic Arc: {circadian_protocol}\n"
                 f"* VIP Flight & Arrival: {flight_desc}\n"
                 f"* Pre-Call Talking Points: {thesis_str}\n"
-                f"* Tern CRM Sync: Tern Trip published with native 30% deposit hold and 70% balance scheduled at 45 days.\n"
+                f"* Sanctuary CRM Sync: Sanctuary Trip published with native 30% deposit hold and 70% balance scheduled at 45 days.\n"
                 f"\n"
                 f"DIRECT INSTRUCTION TO CHIEF OF STAFF: Answer Kareena directly with the clinical care facts above for {matched_intake.client_name}. "
                 f"Do NOT ask Kareena any questions back. State {matched_intake.client_name}'s restorative needs ({g_intentions}), "
                 f"her clinical flags ({clinical_flags}), her dietary requirements ({h_notes or 'Plant-based, anti-inflammatory'}), "
                 f"the recommended somatic pathway (4-7-8 vagal nerve calibration, acoustic sound immersion, and quiet villa delta sleep), "
-                f"and her Tern CRM trip status. Speak directly, creatively, and warmly without reciting the welcome card."
+                f"and her KAI CRM trip status. Speak directly, creatively, and warmly without reciting the welcome card."
             )
         elif searched_guest_name:
             searched_not_found = True
@@ -1183,8 +1183,8 @@ class ClinicalCopilotAgent:
                 "email_draft": email_template
             })
             domain_context_snippets.append(
-                f"FOUNDER GUEST EMAIL DRAFT (Grand Travel & Cruise / Tern CRM Integration):\n{email_template}\n"
-                f"- INSTRUCTION: Present this personalized email draft for Kareena's review, ensuring {rec_name}, Grand Travel & Cruise, and Tern are prominently included."
+                f"FOUNDER GUEST EMAIL DRAFT (Grand Travel & Cruise / KAI Sanctuary CRM Integration):\n{email_template}\n"
+                f"- INSTRUCTION: Present this personalized email draft for Kareena's review, ensuring {rec_name}, Grand Travel & Cruise, and KAI CRM are prominently included."
             )
 
         # Check for dining inquiries (Whole-word match to prevent substring match like 'eat' in 'weather')
@@ -1299,7 +1299,7 @@ class ClinicalCopilotAgent:
                             f"Contact: {v['contact_name']} ({v['email']} | {v['phone']}). "
                             f"Description: {v['service_description']} "
                             f"Clinical Relevance: {v['clinical_relevance']} "
-                            f"Tern Back Office Link: {v['tern_deep_link']}"
+                            f"CRM Dossier Link: {v.get('dossier_url') or v.get('website') or 'Native Vault'}"
                         )
 
         # Check for retreat group capacity & availability inquiries
@@ -1405,7 +1405,7 @@ CORE RULES:
 1. PLATFORM IDENTITY: Wellness, rest, and luxury travel are KAI's primary focus. Clinical contraindication screening is an elevated specialized feature for guests with specific medical considerations—our base mission is restorative quietude, unbroken sleep, somatic vitality, and seamless Grand Travel logistics.
 2. INTIMATE GROUP LIMIT: 12-14 guests max per retreat to preserve intimate quietude.
 3. ZERO AUTONOMOUS WRITES: All actions require Kareena's 1-click approval via the Action Review Queue.
-4. TERN CRM & GRAND TRAVEL: Payments, supplier contracts, PCI card auth handled natively in Tern. ALWAYS bundle/mention Grand Travel & Cruise VIP flights, group air blocks, and tarmac transfers when discussing itineraries or sales.
+4. KAI SANCTUARY CRM & GRAND TRAVEL: Payments, supplier contracts, PCI card auth handled natively in KAI CRM. ALWAYS bundle/mention Grand Travel & Cruise VIP flights, group air blocks, and tarmac transfers when discussing itineraries or sales.
 5. SOMATIC WELLNESS: Evidence-based vagal nerve guidance (4-7-8), acoustic resonance (432Hz/528Hz), anti-inflammatory Blue Zone nutrition. Never diagnose.
 
 ELEVATED SAFETY SCREENING (FEATURE):
@@ -1464,7 +1464,7 @@ FORMATTING:
                     if clinical_enabled or t.get("clinical_flags"):
                         prefix += f"* **Elevated Clinical Safety Flags**: {flags_str}\n"
                     prefix += (
-                        f"* **Tern CRM Status**: Tern Trip synchronized with native 30% deposit hold; 70% balance scheduled at 45 days prior to arrival.\n\n"
+                        f"* **KAI CRM Status**: Sanctuary Trip synchronized with native 30% deposit hold; 70% balance scheduled at 45 days prior to arrival.\n\n"
                     )
 
                 if prefix:
@@ -1561,7 +1561,7 @@ FORMATTING:
                     ]
                     if clinical_enabled or t.get("clinical_flags"):
                         resp_lines.append(f"* **Elevated Clinical Safety Flags**: {flags_str}")
-                    resp_lines.append(f"* **Tern CRM Status**: Tern Trip synchronized with native 30% deposit hold; 70% balance scheduled at 45 days prior to arrival.")
+                    resp_lines.append(f"* **KAI CRM Status**: Sanctuary Trip synchronized with native 30% deposit hold; 70% balance scheduled at 45 days prior to arrival.")
                     response_text = "\n".join(resp_lines)
                 elif not is_degenerate:
                     response_text = cleaned_resp
@@ -1592,7 +1592,7 @@ FORMATTING:
             if email_tc and email_tc.get("email_draft"):
                 ed = email_tc["email_draft"]
                 rec = email_tc.get("recipient") or email_tc.get("guest_name", "")
-                if (rec and rec not in response_text) or "Grand Travel & Cruise" not in response_text or "Tern" not in response_text:
+                if (rec and rec not in response_text) or "Grand Travel & Cruise" not in response_text or "KAI CRM" not in response_text:
                     response_text = ed + "\n\n" + response_text
 
 
@@ -1607,7 +1607,7 @@ FORMATTING:
             suggested_followups = [
                 f"Review staged booking card for {booking_calc['guest_name']}",
                 f"Verify 4WD Suburban transfer from {booking_calc['transit_airport']}",
-                "Check 30% deposit card authorization in Tern CRM"
+                "Check 30% deposit card authorization in KAI CRM"
             ]
         elif any(tc.get("tool") == "draft_personalized_email" for tc in tool_calls):
             suggested_followups = [
@@ -1643,13 +1643,13 @@ FORMATTING:
             suggested_followups = [
                 f"Review staged intake proposal for {searched_guest_name.title()}",
                 "Browse active guests in upcoming cohorts",
-                "Explain Tern Guest & Travel Planner in layman terms"
+                "Explain KAI Guest & Travel Planner in layman terms"
             ]
         elif mode == "consult_prep":
             suggested_followups = [
                 "Send drafted note to Concierge Inbox",
                 "Schedule 20-min alignment call on Retreat Calendar",
-                "Generate custom Tern proposal link"
+                "Generate custom sanctuary proposal link"
             ]
         elif mode == "travel_concierge":
             suggested_followups = [
@@ -1661,7 +1661,7 @@ FORMATTING:
             suggested_followups = [
                 "Screen guest intake profile for contraindications",
                 "Check 12–14 guest capacity across upcoming cohorts",
-                "Explain Tern Guest & Travel Planner in layman terms"
+                "Explain KAI Guest & Travel Planner in layman terms"
             ]
 
         # 7. Universal Form Fill Proposal (Enforcing Founder Review)
@@ -1692,7 +1692,7 @@ FORMATTING:
                     "status": "PENDING_APPROVAL",
                     "clinical_notes": "Awaiting initial clinical screening questionnaire."
                 },
-                "summary": f"Create new guest intake record for {guest_cap} ({target_sanctuary.title()}) awaiting Kareena's clinical clearance and Tern CRM sync.",
+                "summary": f"Create new guest intake record for {guest_cap} ({target_sanctuary.title()}) awaiting Kareena's clinical clearance and KAI Sanctuary CRM sync.",
                 "requires_approval": True,
                 "approval_required": True
             }

@@ -203,9 +203,27 @@ export default function DestinationDossierTab({ sanctuarySlug }: DestinationDoss
             </div>
           </div>
         </div>
+      ) : loading ? (
+        <div className="p-12 text-center bg-white rounded-xl border border-[#E5DDD0] text-xs text-[#5C6B5E] space-y-2">
+          <RefreshCw className="w-5 h-5 animate-spin mx-auto text-[#C07D63]" />
+          <p>Loading destination &amp; packing guide...</p>
+        </div>
       ) : (
-        <div className="p-12 text-center bg-white rounded-xl border border-[#E5DDD0] text-xs text-[#5C6B5E]">
-          Loading destination guide...
+        <div className="p-8 text-center bg-white rounded-xl border border-[#E5DDD0] text-xs text-[#5C6B5E] space-y-3">
+          <p className="font-serif text-sm font-bold text-[#2D3E35]">
+            Destination Guide Temporarily Unavailable
+          </p>
+          <p>
+            Could not retrieve customs &amp; packing dossier for &quot;{sanctuarySlug}&quot;.
+          </p>
+          <button
+            type="button"
+            onClick={() => loadGuide(true)}
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-[#2D3E35] bg-[#F2ECE4] hover:bg-[#EBE3D8] border border-[#E5DDD0] rounded-md transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Retry Loading Dossier</span>
+          </button>
         </div>
       )}
     </div>

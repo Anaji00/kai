@@ -8,6 +8,16 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
+        disallow: [
+          "/portal",
+          "/portal/*",
+          "/api/portal",
+          "/api/portal/*",
+          "/staff-sanctuary-gate",
+          "/staff-sanctuary-gate/*",
+          "/ops-gate",
+          "/ops-gate/*",
+        ],
       },
     ],
     sitemap: `${baseUrl}/sitemap.xml`,

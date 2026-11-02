@@ -48,7 +48,7 @@ def audit_manifest_diff(
     document_name: str = "operator_manifest.csv"
 ) -> StagedVoucherDiff:
     """
-    Reconciles external ground operator guest lists against KAI's Tern staging records.
+    Reconciles external ground operator guest lists against KAI's Sanctuary CRM staging records.
     Uses RapidFuzz for name matching and Polars for manifest validation.
     Strictly audits KAI's 12–14 guest maximum capacity constraint!
     """
@@ -57,10 +57,10 @@ def audit_manifest_diff(
     # Fetch staged or synced intakes for this sanctuary
     db_intakes = db.query(StagingIntake).filter(
         StagingIntake.sanctuary_slug == sanctuary_slug,
-        StagingIntake.status.in_(["PENDING_APPROVAL", "APPROVED", "SYNCED_TO_TERN"])
+        StagingIntake.status.in_(["PENDING_APPROVAL", "APPROVED", "CONFIRMED_IN_CRM"])
     ).all()
 
-    tern_records = [
+    crm_records = [
         {
             "id": i.id,
             "client_name": i.client_name,
@@ -75,16 +75,17 @@ def audit_manifest_diff(
 
     # Polars manifest validation
     ext_count = len(external_guest_records)
-    tern_count = len(tern_records)
+    crm_count = len(crm_records)
+    confirmed_crm_count = crm_count
     cohort_cap = 14
 
     # Capacity Check
-    over_capacity = "YES" if ext_count > cohort_cap or tern_count > cohort_cap else "NO"
+    over_capacity = "YES" if ext_count > cohort_cap or confirmed_crm_count > cohort_cap else "NO"
     if over_capacity == "YES":
         discrepancies.append({
             "type": "CAPACITY_VIOLATION",
             "severity": "CRITICAL",
-            "message": f"Sanctuary cohort limit of {cohort_cap} exceeded. External manifest contains {ext_count} guests (Tern staging: {tern_count})."
+            "message": f"Sanctuary cohort limit of {cohort_cap} exceeded. External manifest contains {ext_count} guests (Sanctuary CRM staging: {confirmed_crm_count})."
         })
 
     # RapidFuzz Name Matching
@@ -95,11 +96,11 @@ def audit_manifest_diff(
         best_score = 0
         best_match = None
 
-        for tern_guest in tern_records:
-            score = fuzz.token_sort_ratio(ext_name.lower(), tern_guest["client_name"].lower())
+        for crm_guest in crm_records:
+            score = fuzz.token_sort_ratio(ext_name.lower(), crm_guest["client_name"].lower())
             if score > best_score:
                 best_score = score
-                best_match = tern_guest
+                best_match = crm_guest
 
         if best_score >= 80:
             # Check room tier alignment
@@ -108,10 +109,12 @@ def audit_manifest_diff(
                     "type": "ROOM_TIER_MISMATCH",
                     "severity": "MEDIUM",
                     "external_name": ext_name,
-                    "matched_tern_name": best_match["client_name"],
+                    "matched_crm_name": best_match["client_name"],
+                    "matched_crm_name": best_match["client_name"],
                     "external_room": ext_room,
-                    "tern_room": best_match["room_tier"],
-                    "message": f"Room discrepancy for {ext_name}: External listed as '{ext_room}', Tern as '{best_match['room_tier']}'."
+                    "crm_room": best_match["room_tier"],
+                    "crm_room": best_match["room_tier"],
+                    "message": f"Room discrepancy for {ext_name}: External listed as '{ext_room}', Sanctuary CRM as '{best_match['room_tier']}'."
                 })
         else:
             discrepancies.append({
@@ -119,12 +122,12 @@ def audit_manifest_diff(
                 "severity": "HIGH",
                 "external_name": ext_name,
                 "external_room": ext_room,
-                "message": f"Guest '{ext_name}' appears on external ground manifest but does not match any Tern cohort record (best score: {best_score}%)."
+                "message": f"Guest '{ext_name}' appears on external ground manifest but does not match any Sanctuary CRM cohort record (best score: {best_score}%)."
             })
 
     # Summary notes
     reconciliation_notes = (
-        f"Manifest diff complete. External count: {ext_count}, Tern staging count: {tern_count}. "
+        f"Manifest diff complete. External count: {ext_count}, Sanctuary CRM staging count: {confirmed_crm_count}. "
         f"Cohort cap: {cohort_cap}. Discrepancies flagged: {len(discrepancies)}."
     )
 
@@ -132,7 +135,7 @@ def audit_manifest_diff(
         sanctuary_slug=sanctuary_slug,
         document_name=document_name,
         external_count=ext_count,
-        tern_cohort_count=tern_count,
+        crm_cohort_count=crm_count,
         cohort_cap=cohort_cap,
         over_capacity=over_capacity,
         discrepancies=discrepancies,
@@ -150,7 +153,7 @@ def audit_manifest_diff(
             content=(
                 f"Manifest Reconciliation Discrepancy ({sanctuary_slug.title()}):\n"
                 f"Document: {document_name} | Over Capacity: {over_capacity}\n"
-                f"External Count: {ext_count} | Tern Count: {tern_count} (Cap: {cohort_cap})\n"
+                f"External Count: {ext_count} | Sanctuary CRM Count: {confirmed_crm_count} (Cap: {cohort_cap})\n"
                 f"Issues Flagged:\n{disc_summary}\n\n"
                 f"Approving this draft acknowledges and resolves the discrepancy in the audit log."
             ),

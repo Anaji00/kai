@@ -13,7 +13,12 @@ from typing import Optional, List, Dict, Any
 
 from backend.config import settings
 from backend.database import get_db
-from backend.sidecar.models import StagingIntake
+from backend.sidecar.models import StagingIntake, CRMTrip, CRMClient
+from backend.models import ActionDraft
+from sqlalchemy import or_
+import uuid
+import secrets
+from datetime import datetime, timezone
 from backend.sidecar.services.guest_portal_service import (
     get_guest_portal_data,
     validate_guest_token,
@@ -62,6 +67,16 @@ class GuestSomaticPulseRequest(BaseModel):
 
 class RevokeTokenRequest(BaseModel):
     token: str
+
+
+class GuestProposalApproveRequest(BaseModel):
+    ref: str = Field(..., description="Sanctuary trip reference ID (kai_trp_... or id)")
+    cardholder_name: str = Field(..., description="Cardholder full legal name")
+    billing_postal_code: str = Field(..., description="Card billing postal/zip code")
+    card_last4: str = Field("4242", description="Card last 4 digits")
+    card_brand: str = Field("Visa", description="Card brand / network (Visa, Mastercard, Amex)")
+    e_signature: str = Field(..., description="Legal electronic signature")
+    agreed_to_terms: bool = Field(True, description="Consent to 30% deposit authorization and sanctuary cancellation policy")
 
 
 # ──── Endpoints ────
@@ -124,7 +139,7 @@ def get_my_retreat(
     Includes sanctuary details, live weather, daily somatic schedule, chauffeur info,
     flight status, packing list, and personalized wellness focus.
     
-    Privacy: Zero clinical notes, zero Tern IDs, zero financial figures exposed.
+    Privacy: Zero clinical notes, zero internal CRM keys, zero financial figures exposed.
     """
     data = get_guest_portal_data(token, db=db)
     if not data:
@@ -156,7 +171,7 @@ def validate_token(
 def create_demo_token(db: Session = Depends(get_db)):
     """
     Creates a demo guest magic-link token for development and preview.
-    In production, tokens are generated from the operator portal after Tern sync.
+    In production, tokens are generated from the operator portal after CRM confirmation.
     """
     if settings.ENVIRONMENT == "production":
         raise HTTPException(status_code=404, detail="Demo tokens are disabled in production.")
@@ -269,3 +284,169 @@ def post_revoke_token(
     """Operator endpoint: Revokes an active guest magic link."""
     success = revoke_guest_token(payload.token, db=db)
     return {"revoked": success}
+
+
+
+# ──── Interactive Client Proposal & Deposit Authorization Endpoints (Native KAI CRM) ────
+
+@router.get("/proposal")
+def get_guest_proposal(
+    ref: str = Query(..., description="Sanctuary trip reference ID (kai_trp_... or id)"),
+    db: Session = Depends(get_db)
+):
+    """
+    Public guest-facing proposal fetcher for sanctuary proposals (/my-retreat?ref=kai_trp_...).
+    Returns sanitized proposal details: itinerary schedule, suite tier, dates, and financial breakdown.
+    Zero internal operator notes or raw CRM keys exposed.
+    """
+    clean_ref = ref.strip()
+    trip = db.query(CRMTrip).filter(
+        or_(CRMTrip.id == clean_ref, CRMTrip.crm_trip_id == clean_ref)
+    ).first()
+
+    if not trip:
+        raise HTTPException(
+            status_code=404,
+            detail="We could not locate this sanctuary proposal. Please check your reservation link or contact concierge@kaiwellnessretreats.com."
+        )
+
+    deposit = trip.deposit_amount or round(trip.total_investment * 0.3, 2)
+    balance = trip.final_balance or round(trip.total_investment - deposit, 2)
+
+    return {
+        "success": True,
+        "proposal": {
+            "ref": trip.crm_trip_id,
+            "trip_id": trip.id,
+            "guest_name": trip.client_name,
+            "guest_email": trip.client_email,
+            "title": trip.title,
+            "sanctuary_slug": trip.sanctuary_slug,
+            "dates": trip.dates,
+            "room_tier": trip.room_tier,
+            "status": trip.status,
+            "total_investment": trip.total_investment,
+            "deposit_amount": deposit,
+            "deposit_status": trip.deposit_status,
+            "final_balance": balance,
+            "final_balance_status": trip.final_balance_status,
+            "currency": trip.currency or "USD",
+            "payment_terms": trip.payment_terms or "30% non-refundable deposit upon proposal approval to secure suite. 70% remaining balance charged 45 days prior to arrival.",
+            "itinerary_blocks": trip.itinerary_blocks or [],
+            "smart_flight": trip.smart_flight or {},
+            "ground_transfer": trip.ground_transfer or {},
+            "created_by": trip.created_by,
+            "created_at": trip.created_at.isoformat() if trip.created_at else None,
+        }
+    }
+
+
+@router.post("/proposal/approve")
+def approve_guest_proposal(
+    payload: GuestProposalApproveRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Guest self-service proposal approval & credit card deposit authorization.
+    Transitions trip status from PROPOSED_ITINERARY to CONFIRMED,
+    vaults transaction authorization reference with legal e-signature,
+    stages an ActionDraft for Kareena Islam, RN, and creates an instant magic-link companion token.
+    """
+    if not payload.agreed_to_terms:
+        raise HTTPException(
+            status_code=400,
+            detail="You must accept the sanctuary payment authorization and cancellation terms to confirm your reservation."
+        )
+
+    if not payload.e_signature or len(payload.e_signature.strip()) < 2:
+        raise HTTPException(
+            status_code=400,
+            detail="A valid legal e-signature is required for payment authorization."
+        )
+
+    clean_ref = payload.ref.strip()
+    trip = db.query(CRMTrip).filter(
+        or_(CRMTrip.id == clean_ref, CRMTrip.crm_trip_id == clean_ref)
+    ).first()
+
+    if not trip:
+        raise HTTPException(status_code=404, detail="Sanctuary trip proposal not found.")
+
+    auth_ref = f"AUTH-DEP-{secrets.token_hex(4).upper()}"
+    signed_timestamp = datetime.now(timezone.utc).isoformat()
+
+    history = list(trip.payment_history or [])
+    auth_entry = {
+        "payment_id": str(uuid.uuid4()),
+        "amount": trip.deposit_amount,
+        "currency": trip.currency or "USD",
+        "payment_method": f"CARD_VAULT_{payload.card_brand.upper()}",
+        "card_last4": payload.card_last4,
+        "cardholder_name": payload.cardholder_name.strip(),
+        "billing_postal_code": payload.billing_postal_code.strip(),
+        "transaction_reference": auth_ref,
+        "e_signature": payload.e_signature.strip(),
+        "signed_at": signed_timestamp,
+        "notes": f"Client self-service proposal approval. 30% sanctuary deposit (${trip.deposit_amount:,.2f} USD) authorized. 70% balance (${trip.final_balance:,.2f} USD) scheduled 45 days prior.",
+        "processed_by": "CLIENT_SELF_SERVICE",
+        "timestamp": signed_timestamp,
+    }
+    history.append(auth_entry)
+    trip.payment_history = history
+
+    trip.deposit_status = "PAID"
+    trip.status = "CONFIRMED"
+    trip.final_balance_status = "SCHEDULED_45D"
+
+    alert_content = (
+        f"SANCTUARY PROPOSAL APPROVED & DEPOSIT AUTHORIZED\n"
+        f"Guest: {trip.client_name} ({trip.client_email})\n"
+        f"Sanctuary: {trip.title} ({trip.dates})\n"
+        f"Suite Tier: {trip.room_tier}\n"
+        f"Total Investment: ${trip.total_investment:,.2f} {trip.currency}\n"
+        f"Authorized Deposit: ${trip.deposit_amount:,.2f} {trip.currency} (Ref: {auth_ref})\n"
+        f"Cardholder: {payload.cardholder_name} | Card: {payload.card_brand} *{payload.card_last4}\n"
+        f"Legal E-Signature: {payload.e_signature} (Signed: {signed_timestamp})\n"
+        f"Remaining Balance: ${trip.final_balance:,.2f} {trip.currency} (Scheduled 45 days prior)\n\n"
+        f"Operational Next Steps for Concierge:\n"
+        f"1. Finalize Grand Travel flight meet-and-greet manifest.\n"
+        f"2. Stage welcome consultation pack for Nurse Kareena."
+    )
+    draft = ActionDraft(
+        type="guest_proposal_approval_notification",
+        guest_name=trip.client_name,
+        recipient_email=trip.client_email,
+        content=alert_content,
+        status="pending_review",
+    )
+    db.add(draft)
+
+    token_result = generate_guest_magic_token(
+        intake_id=trip.id,
+        client_name=trip.client_name,
+        email=trip.client_email,
+        sanctuary_slug=trip.sanctuary_slug,
+        room_tier=trip.room_tier,
+        flight_request=trip.smart_flight or {},
+        wellness_profile={},
+        db=db,
+    )
+
+    db.commit()
+    db.refresh(trip)
+
+    return {
+        "success": True,
+        "message": f"Sanctuary proposal approved. Your 30% deposit of ${trip.deposit_amount:,.2f} has been authorized.",
+        "auth_reference": auth_ref,
+        "trip": {
+            "ref": trip.crm_trip_id,
+            "status": trip.status,
+            "deposit_status": trip.deposit_status,
+            "total_investment": trip.total_investment,
+            "deposit_amount": trip.deposit_amount,
+            "final_balance": trip.final_balance,
+        },
+        "token": token_result.get("token"),
+        "portal_url": f"/my-retreat?token={token_result.get('token')}",
+    }

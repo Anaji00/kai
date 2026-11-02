@@ -75,21 +75,21 @@ SANCTUARY_KNOWLEDGE_SEEDS = [
         "content": (
             "All KAI Retreats operate on an all-inclusive pricing structure: Private Ocean Canopy Villas ($9,800 – $14,500 "
             "per traveler depending on sanctuary season) and Shared Ocean Pavilions ($6,800 – $8,200). "
-            "Payment schedules: A 30% non-refundable reservation deposit is authorized natively through Tern CRM upon Founder review, "
+            "Payment schedules: A 30% non-refundable reservation deposit is authorized natively through KAI Sanctuary CRM upon Founder review, "
             "with the 70% balance due 45 days prior to retreat group arrival. Strict 12–14 guest maximum per retreat group."
         ),
         "metadata_json": {"deposit_percent": 30, "balance_due_days": 45, "pricing_tier_min": 6800, "pricing_tier_max": 14500}
     },
     {
-        "category": "tern_crm",
-        "title": "Tern Back Office Supplier Architecture & Native Authorizations",
+        "category": "kai_crm",
+        "title": "KAI Sanctuary CRM Supplier Architecture & Native Authorizations",
         "content": (
-            "Tern CRM is KAI's official operating system for agency suppliers, credit card authorizations, and traveler sync. "
+            "KAI Sanctuary Travel CRM is KAI's official native operating system for agency suppliers, credit card authorizations, and traveler sync. "
             "All travel suppliers (Grand Travel & Cruise, private chauffeurs, charter airlines, organic caterers) are registered "
-            "under Tern Back Office -> Suppliers with contractual commission rates (typically 10%–15% preferred partner tier). "
-            "Clients authorize trip deposits natively through Tern's bank-grade PCI payment portal—no credit cards are ever handled manually."
+            "within KAI Sanctuary CRM -> Suppliers with contractual commission rates (typically 10%–15% preferred partner tier). "
+            "Clients authorize trip deposits natively through KAI's bank-grade PCI card authorization vault—no credit cards are ever handled manually."
         ),
-        "metadata_json": {"system": "Tern CRM", "commission_standard": "10-15%", "payment_security": "PCI DSS Native"}
+        "metadata_json": {"system": "KAI Sanctuary CRM", "commission_standard": "10-15%", "payment_security": "PCI DSS Native"}
     },
     {
         "category": "hospitality_concierge",
@@ -142,7 +142,7 @@ def generate_pre_call_thesis(
 ) -> Dict[str, Any]:
     """
     RAG-driven clinical hypothesis, talk tracks, objection scripts,
-    and Tern-ready itinerary activities.
+    and sanctuary-ready itinerary activities.
     """
     health_notes = str(clinical_profile.get("health_notes", "")).lower()
     intentions = str(clinical_profile.get("intentions", "")).lower()
@@ -159,6 +159,14 @@ def generate_pre_call_thesis(
         clinical_flags.append("SYMPATHETIC_HYPERAROUSAL")
     if any(k in health_notes or k in intentions for k in ["back", "joint", "surgery", "injury", "knee"]):
         clinical_flags.append("SOMATIC_RESTRICTION_PROTOCOL")
+    if any(k in health_notes or k in intentions for k in ["pacemaker", "arrhythmia", "cardiac", "hypertension", "heart condition"]):
+        clinical_flags.append("CARDIO_VASCULAR_RISK")
+    if any(k in health_notes or k in intentions for k in ["pregnant", "pregnancy", "prenatal", "trimester"]):
+        clinical_flags.append("PREGNANCY_MODIFIED_SOMATICS")
+    if any(k in health_notes or k in intentions for k in ["anaphylaxis", "anaphylactic", "epipen", "epi-pen", "peanut allergy"]):
+        clinical_flags.append("ANAPHYLACTIC_ALLERGEN_ALERT")
+    if any(k in health_notes or k in intentions for k in ["acl", "meniscus", "disc", "herniated", "fracture", "post-op"]):
+        clinical_flags.append("ORTHOPEDIC_RESTRICTED")
     if "first" in flight_cabin.lower() or "business" in flight_cabin.lower():
         clinical_flags.append("LIE_FLAT_VIP_AIR")
     
@@ -175,15 +183,22 @@ def generate_pre_call_thesis(
     )
 
     # Sanctuary & Tier recommendation
-    target_slug = sanctuary_slug or "nosara"
+    target_slug = (sanctuary_slug or "puerto-vallarta-2027").lower()
     sanctuary_names = {
+        "puerto-vallarta": "Puerto Vallarta • Marival Harmony (Armony) Luxury Sanctuary (Jan 28–31, 2027)",
+        "puerto-vallarta-2027": "Puerto Vallarta • Marival Harmony (Armony) Luxury Sanctuary (Jan 28–31, 2027)",
+        "puerto-vallarta-mexico-2027": "Puerto Vallarta • Marival Harmony (Armony) Luxury Sanctuary (Jan 28–31, 2027)",
         "nosara": "Nosara Costa Rica Blue Zone Sanctuary",
+        "nosara-2027": "Nosara Costa Rica Blue Zone Sanctuary",
         "amalfi": "Amalfi Coast Cliffside Stillness Retreat",
+        "amalfi-2027": "Amalfi Coast Cliffside Stillness Retreat",
         "bali": "Bali Sacred Water & Jungle Sanctuary",
-        "riviera-maya": "Riviera Maya Coastal Grounding Sanctuary"
+        "bali-2027": "Bali Sacred Water & Jungle Sanctuary",
+        "riviera-maya": "Riviera Maya Coastal Grounding Sanctuary",
+        "riviera-2026": "Riviera Maya Coastal Grounding Sanctuary",
     }
-    rec_sanctuary = sanctuary_names.get(target_slug, "Nosara Costa Rica Sanctuary")
-    rec_room = room_tier or "Private Villa Sanctuary (Ocean View)"
+    rec_sanctuary = sanctuary_names.get(target_slug, "Puerto Vallarta • Marival Harmony (Jan 28–31, 2027)")
+    rec_room = room_tier or "Private Luxury Ocean-View Suite"
 
     # Circadian schedule
     circadian_protocol = (
@@ -225,12 +240,12 @@ def generate_pre_call_thesis(
         }
     ]
 
-    # Tern-compatible activities draft (LODGING, ACTIVITY, TRANSFER) with preferred supplier linkage
+    # Sanctuary activities draft (LODGING, ACTIVITY, TRANSFER) with preferred supplier linkage
     supplier_chauffeur = "Carlos Mendez VIP Chauffeurs & Private Aviation Transfer"
     supplier_catering = "Harmony Organic Farm & Botanical Kitchen"
     supplier_sound = "Alchemy Sound & Crystal Bowls Institute" if "bali" in rec_sanctuary.lower() else "Ravello Ancient Herbal Apothecary" if "amalfi" in rec_sanctuary.lower() else "Alchemy Sound & Crystal Bowls Institute"
 
-    tern_draft = [
+    itinerary_draft = [
         {
             "type": "TRANSFER",
             "day": 1,
@@ -304,14 +319,14 @@ def generate_pre_call_thesis(
         "circadian_protocol": circadian_protocol,
         "consultation_talk_tracks": talk_tracks,
         "objection_scripts": objection_scripts,
-        "tern_itinerary_draft": tern_draft,
+        "itinerary_draft": itinerary_draft,
         "personalized_email_draft": personalized_email
     }
 
 
 def search_vendor_knowledge(db: Session, query: str, sanctuary_slug: Optional[str] = None) -> List[Dict[str, Any]]:
     """
-    Searches Tern Preferred Supplier repository for vendor intelligence matching user query.
+    Searches KAI Preferred Supplier repository for vendor intelligence matching user query.
     Used by RAG and Copilot to provide exact contact, pricing, and contract terms.
     """
     from backend.sidecar.services.vendor_service import list_vendors
@@ -335,9 +350,151 @@ def search_vendor_knowledge(db: Session, query: str, sanctuary_slug: Optional[st
                 "payment_terms": v.payment_terms,
                 "service_description": v.service_description,
                 "clinical_relevance": v.clinical_relevance,
-                "tern_supplier_id": v.tern_supplier_id,
-                "tern_deep_link": v.tern_deep_link,
+                "supplier_code": getattr(v, "supplier_code", None),
+                "dossier_url": getattr(v, "dossier_url", None),
                 "preferred_tier": v.preferred_tier
             }))
     scored_matches.sort(key=lambda x: x[0], reverse=True)
     return [m[1] for m in scored_matches[:5]]
+
+
+def generate_llm_suggested_plan(
+    client_name: str,
+    retreat_id: str,
+    room_preference: str,
+    movement_experience: str,
+    health_notes: Optional[str] = None,
+    intentions: Optional[str] = None,
+) -> Dict[str, Any]:
+    """
+    Immediately parses a guest inquiry using the LLM (with instant clinical/cultural fallback)
+    to create a personalized Suggested Retreat Plan for Kareena Islam & Armaan Islam.
+    """
+    import json
+    from backend.config import settings
+    from backend.sidecar.services.llm_service import query_llm_chat
+
+    slug_lower = (retreat_id or "puerto-vallarta-2027").lower()
+    is_pv = "puerto" in slug_lower or "vallarta" in slug_lower or slug_lower == "custom"
+
+    sanctuary_label = (
+        "Puerto Vallarta, Mexico • Marival Harmony (Armony) — January 28–31, 2027"
+        if is_pv
+        else f"{retreat_id.replace('-', ' ').title()} Sanctuary (2027 Season)"
+    )
+
+    room_label_map = {
+        "private-suite": "Private Ocean-View Luxury Suite (Single Occupancy)",
+        "shared-luxury": "Shared Luxury Botanical / Ocean Suite (Double Occupancy)",
+        "flexible": "Flexible Luxury Sanctuary Suite (Best Available Tier)",
+    }
+    room_label = room_label_map.get(room_preference, room_preference or "Private Ocean-View Luxury Suite")
+
+    health_str = (health_notes or "No acute restrictions noted; prioritize anti-inflammatory whole-food nourishment").strip()
+    intentions_str = (intentions or "Deep nervous system decompression, restorative sleep, and cultural connection").strip()
+
+    # Deterministic baseline plan tailored to the guest's inputs
+    daily_rhythm = [
+        "07:00 AM — Sunrise Banderas Bay Pranayama (4-7-8 Vagal Calibration) & Anatomical Alignment Vinyasa with Kareena Islam, BSN, RN, RYT",
+        "10:30 AM — Founders Resilience & Endurance Recovery Clinic with Ironman Athlete Armaan Islam (HRV Pacing, Mobility & Zone-2 Longevity)",
+        "02:00 PM — Melange World Spa Thermal Hydrotherapy Circuit & Personalized Dietary Nourishment",
+        "05:30 PM — Cultural Integration Circle & Sunset 432Hz Crystal Singing Bowl Sound Bath for Theta Sleep Entrainment",
+    ]
+
+    cultural_highlights = (
+        [
+            "Wixárika (Huichol) indigenous beadwork & ancestral storytelling dialogue with local Sierra Madre artisans",
+            "Sacred coastal Jalisco cacao & copal intention ceremony overlooking Banderas Bay",
+            "Nayarit & Jalisco sea-to-table healing gastronomy with anti-inflammatory heritage botanicals",
+            "Late-January Banderas Bay humpback whale migration observation during morning coastal meditation",
+        ]
+        if is_pv
+        else [
+            "Authentic regional artisan & ancestral botanical immersion curated with local elders",
+            "Farm-and-sea-to-table anti-inflammatory culinary masterclass honoring regional heritage",
+            "Sacred acoustic & water grounding ceremony where your peace within blends with the pieces around",
+        ]
+    )
+
+    weather_and_packing = (
+        [
+            "Historical Climate (Jan 28–31, Puerto Vallarta): 81°F (27°C) sunny days, 63°F (17°C) crisp coastal evenings, 75°F (24°C) ocean water, 3% rain probability",
+            "Morning Practice Attire: Breathable yoga layers + light bamboo/linen wrap for 64°F sunrise ocean breezes",
+            "Daytime & Cultural Excursion: UPF linen shirt, resort shorts/flowy dress, polarized sunglasses, reef-safe SPF 30+, and supportive sandals",
+            "Evening Sound Bath & Dining: Elevated coastal resort casual with a lightweight cashmere shawl or linen jacket",
+        ]
+        if is_pv
+        else [
+            "Pack breathable moisture-wicking yoga layers for sunrise vinyasa and a cozy wrap for evening 432Hz sound baths",
+            "Bring 2 swimsuits for saltwater hydrotherapy, polarized sunglasses, and reef-safe mineral sunscreen",
+            "Ensure passport has 6+ months validity beyond departure date",
+        ]
+    )
+
+    clinical_and_endurance = (
+        f"Movement Tier ({movement_experience}): Kareena Islam, BSN, RN will provide orthopedic prop modifications and "
+        f"titrated breathwork tailored to '{intentions_str}'. Dietary & Somatic Flag ('{health_str}'): Private culinary brief "
+        f"registered with executive kitchen; Armaan Islam's endurance recovery protocol (electrolyte hydration + myofascial psoas release) "
+        f"included for sustained cellular energy."
+    )
+
+    fallback_plan = {
+        "summary": (
+            f"Custom 4-Day Somatic, Cultural & Endurance Restoration Plan prepared for {client_name} at {sanctuary_label}. "
+            f"Designed around your intention ('{intentions_str}') with {movement_experience} movement adaptations."
+        ),
+        "peaceAndPiecesThesis": (
+            f"At KAI Wellness Retreats, where your peace within can blend with the pieces around, {client_name}'s internal "
+            f"parasympathetic reset (432Hz crystal bowls + nurse-led vagal breathwork) is woven into the living cultural fabric "
+            f"of Banderas Bay and the Sierra Madre."
+        ),
+        "recommendedSanctuary": sanctuary_label,
+        "recommendedRoom": room_label,
+        "dailyRhythm": daily_rhythm,
+        "culturalHighlights": cultural_highlights,
+        "weatherAndPacking": weather_and_packing,
+        "travelLogisticsNote": (
+            "Grand Travel & Cruise VIP Concierge (kareena@grandtravelcruise.com & armaan@grandtravelcruise.com) will coordinate "
+            "direct flight routing into Puerto Vallarta (PVR) and private chauffeured transfer to Marival Harmony."
+        ),
+        "clinicalAndEnduranceNotes": clinical_and_endurance,
+        "routedTo": list(settings.FOUNDER_INQUIRY_EMAILS),
+        "generatedBy": "KAI Clinical & Endurance AI Concierge",
+    }
+
+    # Attempt live fast LLM enrichment if GROQ_API_KEY is configured
+    if settings.GROQ_API_KEY:
+        try:
+            prompt = (
+                f"Guest Name: {client_name}\n"
+                f"Selected Retreat: {sanctuary_label}\n"
+                f"Room Preference: {room_label}\n"
+                f"Movement Experience: {movement_experience}\n"
+                f"Health/Dietary Notes: {health_str}\n"
+                f"Intentions: {intentions_str}\n\n"
+                "Create a concise JSON object with keys: 'summary' (2 sentences personalized to the guest's intentions and health notes), "
+                "'peaceAndPiecesThesis' (1 sentence connecting 'where your peace within can blend with the pieces around' to their goals), "
+                "and 'clinicalAndEnduranceNotes' (2 sentences combining Kareena Islam BSN RN somatic care and Armaan Islam Ironman recovery)."
+            )
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are the KAI Wellness Retreats AI Concierge for Founders Kareena Islam (BSN, RN, RYT) and Armaan Islam (Ironman Athlete & Business Lead). Return valid JSON only."
+                },
+                {"role": "user", "content": prompt},
+            ]
+            raw_llm = query_llm_chat(messages=messages, temperature=0.3, max_tokens=350, json_mode=True)
+            parsed = json.loads(raw_llm)
+            if isinstance(parsed, dict):
+                if parsed.get("summary"):
+                    fallback_plan["summary"] = str(parsed["summary"])
+                if parsed.get("peaceAndPiecesThesis"):
+                    fallback_plan["peaceAndPiecesThesis"] = str(parsed["peaceAndPiecesThesis"])
+                if parsed.get("clinicalAndEnduranceNotes"):
+                    fallback_plan["clinicalAndEnduranceNotes"] = str(parsed["clinicalAndEnduranceNotes"])
+                fallback_plan["generatedBy"] = f"KAI Live LLM ({settings.GROQ_MODEL})"
+        except Exception:
+            pass
+
+    return fallback_plan
+

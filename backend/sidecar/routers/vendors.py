@@ -17,11 +17,11 @@ from backend.sidecar.services.vendor_service import (
     delete_vendor,
     invalidate_vendor_cache
 )
-from backend.sidecar.services.tern_client import tern_client
+from backend.sidecar.services.crm_client import crm_client
 
 logger = logging.getLogger("kai_vendors_router")
 
-router = APIRouter(prefix="/vendors", tags=["Tern Preferred Suppliers"])
+router = APIRouter(prefix="/vendors", tags=["Sanctuary Preferred Suppliers"])
 
 
 @router.get("", response_model=List[VendorSupplierResponse])
@@ -31,7 +31,7 @@ def get_vendors(
     db: Session = Depends(get_db)
 ):
     """
-    Retrieves preferred retreat suppliers aligned with Tern Back Office.
+    Retrieves preferred retreat suppliers aligned with KAI Sanctuary CRM.
     Uses tiered caching (in-memory TTL cache + SQLite dual-storage persistence).
     """
     return list_vendors(db=db, sanctuary_slug=sanctuary_slug, category=category)
@@ -57,7 +57,7 @@ def add_vendor(
     db: Session = Depends(get_db)
 ):
     """
-    Registers a new vendor/supplier in SQLite local storage AND syncs to Tern CRM Back Office.
+    Registers a new vendor/supplier in SQLite local storage AND commits to Sanctuary CRM Registry.
     """
     try:
         new_vendor = create_vendor(db=db, data=req.model_dump())
@@ -96,20 +96,20 @@ def remove_vendor(
     return {"success": True, "vendor_id": vendor_id, "status": "INACTIVE"}
 
 
-@router.post("/{vendor_id}/sync-tern", response_model=VendorSupplierResponse)
-def force_sync_vendor_to_tern(
+@router.post("/{vendor_id}/sync-crm", response_model=VendorSupplierResponse)
+def force_sync_vendor_to_crm(
     vendor_id: str,
     db: Session = Depends(get_db)
 ):
     """
-    Forces an explicit re-sync of a supplier with Tern CRM Back Office,
+    Forces an explicit re-verification of a supplier with Sanctuary CRM,
     re-generating deep links and updating last_synced_at.
     """
     vendor = get_vendor(db, vendor_id)
     if not vendor:
         raise HTTPException(status_code=404, detail="Vendor supplier record not found.")
 
-    sync_res = tern_client.sync_supplier_to_tern(
+    sync_res = crm_client.sync_supplier_to_crm(
         name=vendor.name,
         category=vendor.category,
         sanctuary_slug=vendor.sanctuary_slug,
@@ -127,9 +127,9 @@ def force_sync_vendor_to_tern(
         operator_name="Kareena Islam"
     )
 
-    vendor.tern_supplier_id = sync_res["tern_supplier_id"]
-    vendor.tern_deep_link = sync_res["tern_deep_link"]
-    vendor.tern_sync_status = "SYNCED"
+    vendor.supplier_code = sync_res.get("supplier_code")
+    vendor.dossier_url = sync_res.get("dossier_url")
+    vendor.status = "ACTIVE"
     vendor.last_synced_at = datetime.now(timezone.utc)
     vendor.updated_at = datetime.now(timezone.utc)
     db.commit()

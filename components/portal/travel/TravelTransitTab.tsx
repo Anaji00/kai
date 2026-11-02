@@ -45,6 +45,62 @@ interface TravelTransitTabProps {
   sanctuarySlug: string;
 }
 
+const DEFAULT_ROUTE_COORDS: Record<string, {
+  originName: string;
+  originLat: string;
+  originLon: string;
+  destName: string;
+  destLat: string;
+  destLon: string;
+  terrain: "COASTAL" | "MOUNTAIN" | "JUNGLE";
+}> = {
+  "puerto-vallarta": {
+    originName: "Licenciado Gustavo Díaz Ordaz International Airport (PVR)",
+    originLat: "20.6801",
+    originLon: "-105.2542",
+    destName: "KAI Marival Harmony Sanctuary, Banderas Bay",
+    destLat: "20.7356",
+    destLon: "-105.3887",
+    terrain: "COASTAL",
+  },
+  "nosara": {
+    originName: "Liberia International Airport (LIR)",
+    originLat: "10.5933",
+    originLon: "-85.5444",
+    destName: "KAI Nosara Ocean Sanctuary",
+    destLat: "9.9806",
+    destLon: "-85.6667",
+    terrain: "COASTAL",
+  },
+  "amalfi": {
+    originName: "Naples Capodichino Airport (NAP)",
+    originLat: "40.8860",
+    originLon: "14.2908",
+    destName: "KAI Amalfi Cliffside Sanctuary",
+    destLat: "40.6340",
+    destLon: "14.6027",
+    terrain: "MOUNTAIN",
+  },
+  "bali": {
+    originName: "Ngurah Rai International Airport (DPS)",
+    originLat: "-8.7482",
+    originLon: "115.1672",
+    destName: "KAI Bali Sacred Water Sanctuary, Ubud",
+    destLat: "-8.5069",
+    destLon: "115.2625",
+    terrain: "JUNGLE",
+  },
+  "riviera-maya": {
+    originName: "Cancún International Airport (CUN)",
+    originLat: "21.0365",
+    originLon: "-86.8770",
+    destName: "KAI Riviera Maya Jungle Sanctuary",
+    destLat: "20.2114",
+    destLon: "-87.4654",
+    terrain: "COASTAL",
+  },
+};
+
 export default function TravelTransitTab({ sanctuarySlug }: TravelTransitTabProps) {
   const [routes, setRoutes] = useState<SanctuaryRoute[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<SanctuaryRoute | null>(null);
@@ -54,12 +110,12 @@ export default function TravelTransitTab({ sanctuarySlug }: TravelTransitTabProp
 
   // Calculator Form State
   const [showCalculator, setShowCalculator] = useState(false);
-  const [originName, setOriginName] = useState("Liberia International Airport (LIR)");
-  const [originLat, setOriginLat] = useState("10.5933");
-  const [originLon, setOriginLon] = useState("-85.5444");
-  const [destName, setDestName] = useState("KAI Nosara Ocean Sanctuary");
-  const [destLat, setDestLat] = useState("9.9806");
-  const [destLon, setDestLon] = useState("-85.6667");
+  const [originName, setOriginName] = useState("Licenciado Gustavo Díaz Ordaz International Airport (PVR)");
+  const [originLat, setOriginLat] = useState("20.6801");
+  const [originLon, setOriginLon] = useState("-105.2542");
+  const [destName, setDestName] = useState("KAI Marival Harmony Sanctuary, Banderas Bay");
+  const [destLat, setDestLat] = useState("20.7356");
+  const [destLon, setDestLon] = useState("-105.3887");
   const [terrain, setTerrain] = useState<"COASTAL" | "MOUNTAIN" | "JUNGLE">("COASTAL");
   const [calculating, setCalculating] = useState(false);
   const [calcSuccess, setCalcSuccess] = useState<string | null>(null);
@@ -69,6 +125,20 @@ export default function TravelTransitTab({ sanctuarySlug }: TravelTransitTabProp
 
   useEffect(() => {
     let isMounted = true;
+
+    // Dynamically update default route coordinates to match selected sanctuary
+    const normalized = (sanctuarySlug || "puerto-vallarta").toLowerCase().replace("_", "-");
+    const matchedKey = Object.keys(DEFAULT_ROUTE_COORDS).find(k => normalized.includes(k)) || "puerto-vallarta";
+    const defaults = DEFAULT_ROUTE_COORDS[matchedKey];
+    if (defaults) {
+      setOriginName(defaults.originName);
+      setOriginLat(defaults.originLat);
+      setOriginLon(defaults.originLon);
+      setDestName(defaults.destName);
+      setDestLat(defaults.destLat);
+      setDestLon(defaults.destLon);
+      setTerrain(defaults.terrain);
+    }
 
     Promise.all([
       fetchSanctuaryRoutes(sanctuarySlug),

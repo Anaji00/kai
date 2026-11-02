@@ -3,7 +3,7 @@ Deep Expanded Real-World Use Case Test Suite for KAI Sanctuary Platform
 ========================================================================
 This suite validates the remaining deep operational domains of the KAI platform:
 1. High-Net-Worth Staged Guest Intake & RAG Clinical Thesis Generation
-2. 1-Click Founder Clinical Review & Tern CRM CRM Sync
+2. 1-Click Founder Clinical Review & Sanctuary CRM Commit
 3. Operational SMS Dispatch Gate & Multi-Recipient Campaign Broadcast
 4. Terrain-Adjusted Dynamic Geodesic Navigation & Luxury Fleet Matching
 5. Real-Time Microclimate Bioclimatology & Somatic Nursing Guidance
@@ -77,7 +77,7 @@ def run_suite():
     # =========================================================================
     log_step(
         "1. High-Net-Worth Staged Intake & RAG Clinical Thesis Generation",
-        "A hedge fund manager submits a high-stress medical intake. Sidecar runs clinical RAG to formulate a vagal thesis, stages intake in PENDING_APPROVAL, and prevents direct writes to Tern CRM."
+        "A hedge fund manager submits a high-stress medical intake. Sidecar runs clinical RAG to formulate a vagal thesis, stages intake in PENDING_APPROVAL, and prevents premature writes to Sanctuary CRM."
     )
     t0 = time.time()
     intake_payload = {
@@ -108,14 +108,14 @@ def run_suite():
     intake_id = intake_data["id"]
 
     assert intake_data["status"] == "PENDING_APPROVAL", "Invariant violated: intake must be staged in PENDING_APPROVAL"
-    assert intake_data["tern_trip_id"] is None, "Governance violated: autonomous write to Tern CRM occurred prematurely"
+    assert intake_data.get("crm_trip_id") is None, "Governance violated: premature write to Sanctuary CRM occurred"
     assert intake_data["consultation_thesis"] is not None, "Clinical thesis was not generated"
 
     thesis = intake_data["consultation_thesis"]
     assert "sympathetic_tone_hypothesis" in thesis
     assert "circadian_protocol" in thesis
     assert len(thesis.get("consultation_talk_tracks", [])) > 0
-    assert len(thesis.get("tern_itinerary_draft", [])) > 0
+    assert len(thesis.get("itinerary_draft", [])) > 0
 
     # Verify ActionDraft queued
     with SessionLocal() as db:
@@ -133,11 +133,11 @@ def run_suite():
     passed += 1
 
     # =========================================================================
-    # USE CASE 2: 1-Click Founder Clinical Review & Tern CRM CRM Sync
+    # USE CASE 2: 1-Click Founder Clinical Review & Sanctuary CRM Commit
     # =========================================================================
     log_step(
-        "2. 1-Click Founder Clinical Review & Tern CRM Sync",
-        "Founder Kareena reviews Julian's clinical thesis, overrides room tier, and clicks 1-tap Tern Sync. Intake status transitions to SYNCED_TO_TERN with Tern trip and contact IDs."
+        "2. 1-Click Founder Clinical Review & Sanctuary CRM Commit",
+        "Founder Kareena reviews Julian's clinical thesis, overrides room tier, and clicks 1-tap CRM Commit. Intake status transitions to CONFIRMED_IN_CRM with native CRM trip and contact IDs."
     )
     t0 = time.time()
     sync_payload = {
@@ -145,27 +145,27 @@ def run_suite():
         "override_room_tier": "Private Ocean Canopy Villa",
         "notes": "Reviewed by Kareena Islam, RN. Cleared for 432Hz acoustic sessions and gentle vagal breathwork."
     }
-    res2 = client.post(f"/api/v1/sidecar/intakes/{intake_id}/tern-sync", json=sync_payload)
+    res2 = client.post(f"/api/v1/sidecar/intakes/{intake_id}/crm-commit", json=sync_payload)
     assert res2.status_code == 200, f"Expected 200, got {res2.status_code}: {res2.text}"
     sync_data = res2.json()
 
     assert sync_data["success"] is True
-    assert sync_data["status"] == "SYNCED_TO_TERN"
-    assert sync_data["tern_contact_id"].startswith("tern_cnt_")
-    assert sync_data["tern_trip_id"].startswith("tern_trp_")
+    assert sync_data["status"] == "CONFIRMED_IN_CRM"
+    assert sync_data["crm_contact_id"].startswith("kai_cnt_")
+    assert sync_data["crm_trip_id"].startswith("kai_trp_")
     assert len(sync_data["applied_tags"]) > 0
 
     # Verify database state
     with SessionLocal() as db:
         intake_db = db.query(StagingIntake).filter(StagingIntake.id == intake_id).first()
-        assert intake_db.status == "SYNCED_TO_TERN"
+        assert intake_db.status == "CONFIRMED_IN_CRM"
         assert intake_db.reviewed_by == "Kareena Islam"
-        assert intake_db.tern_trip_id == sync_data["tern_trip_id"]
+        assert intake_db.crm_trip_id == sync_data["crm_trip_id"]
 
-    print(f" [PASS] 1-Click Tern CRM Sync executed in {int((time.time()-t0)*1000)}ms")
+    print(f" [PASS] 1-Click Sanctuary CRM Commit executed in {int((time.time()-t0)*1000)}ms")
     print(f"        Status: {sync_data['status']}")
-    print(f"        Tern Contact ID: {sync_data['tern_contact_id']}")
-    print(f"        Tern Trip ID: {sync_data['tern_trip_id']}")
+    print(f"        CRM Contact ID: {sync_data['crm_contact_id']}")
+    print(f"        CRM Trip ID: {sync_data['crm_trip_id']}")
     print(f"        Applied Clinical Tags: {sync_data['applied_tags']}")
     passed += 1
 
@@ -448,7 +448,7 @@ def run_suite():
     assert nosara_c is not None and amalfi_c is not None
     assert nosara_c["capacity_limit"] == 14
     assert amalfi_c["capacity_limit"] == 12
-    assert nosara_c["remaining_spots"] == max(0, nosara_c["capacity_limit"] - (nosara_c["staged_count"] + nosara_c["tern_confirmed_count"]))
+    assert nosara_c["remaining_spots"] == max(0, nosara_c["capacity_limit"] - (nosara_c["staged_count"] + nosara_c.get("crm_confirmed_count", 0)))
 
     # Public retreat availability endpoint
     res9_pub = client.get("/api/v1/retreats/nosara/availability")
@@ -459,7 +459,7 @@ def run_suite():
 
     print(f" [PASS] Cohort telemetry & capacity audit verified in {int((time.time()-t0)*1000)}ms")
     for c in cohorts:
-        print(f"        Cohort '{c['title']}': Cap {c['capacity_limit']} | Staged {c['staged_count']} | Synced {c['tern_confirmed_count']} | Remaining: {c['remaining_spots']} ({c['status']})")
+        print(f"        Cohort '{c['title']}': Cap {c['capacity_limit']} | Staged {c['staged_count']} | Synced {c.get('crm_confirmed_count', 0)} | Remaining: {c['remaining_spots']} ({c['status']})")
     passed += 1
 
     # =========================================================================

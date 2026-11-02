@@ -1,5 +1,5 @@
 -- =============================================================================
--- KAI Wellness Retreats: Tern CRM Sidecar Staging Schema (PostgreSQL 16 + pgvector)
+-- KAI Wellness Retreats: Sanctuary Travel CRM Staging Schema (PostgreSQL 16 + pgvector)
 -- MANDATORY GOVERNANCE: ZERO DIRECT AUTONOMOUS WRITES
 -- All intakes, leads, and broadcasts default to status = 'PENDING_APPROVAL'
 -- =============================================================================

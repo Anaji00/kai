@@ -31,8 +31,8 @@ export default function WebhookTelemetryView() {
   const [simSuccessMsg, setSimSuccessMsg] = useState("");
 
   // Simulation Form
-  const [simProvider, setSimProvider] = useState("tern_crm");
-  const [simEventType, setSimEventType] = useState("payment_auth.completed");
+  const [simProvider, setSimProvider] = useState("cirium_flights");
+  const [simEventType, setSimEventType] = useState("flight.delayed");
 
   const loadData = async () => {
     setLoading(true);
@@ -59,15 +59,7 @@ export default function WebhookTelemetryView() {
     setSimSuccessMsg("");
     try {
       let samplePayload: Record<string, unknown> = {};
-      if (simProvider === "tern_crm") {
-        samplePayload = {
-          client: "Eleanor Vance",
-          amount_usd: 7200,
-          status: "AUTHORIZED",
-          trip_id: "trip_amalfi_2027",
-          gateway: "Tern Native Payments"
-        };
-      } else if (simProvider === "expedia_pms") {
+       if (simProvider === "expedia_pms") {
         samplePayload = {
           hotel: "Andaz Peninsula Papagayo",
           gateway: "LIR",
@@ -107,8 +99,6 @@ export default function WebhookTelemetryView() {
 
   const getProviderIcon = (id: string) => {
     switch (id) {
-      case "tern_crm":
-        return <CreditCard className="w-5 h-5 text-emerald-400" />;
       case "expedia_pms":
         return <Building className="w-5 h-5 text-amber-400" />;
       case "cirium_flights":
@@ -132,7 +122,7 @@ export default function WebhookTelemetryView() {
             </span>
           </div>
           <p className="text-xs text-stone-400 mt-1">
-            Real-time webhooks and live status for Tern CRM, Expedia / Hotel PMS, Grand Travel Flight Desk, and WhatsApp.
+            Real-time webhooks and live status for KAI Sanctuary Platform, Expedia / Hotel PMS, Grand Travel Flight Desk, and WhatsApp.
           </p>
         </div>
 
@@ -210,15 +200,14 @@ export default function WebhookTelemetryView() {
               value={simProvider}
               onChange={e => {
                 setSimProvider(e.target.value);
-                if (e.target.value === "tern_crm") setSimEventType("payment_auth.completed");
-                else if (e.target.value === "expedia_pms") setSimEventType("booking.confirmed");
+                if (e.target.value === "expedia_pms") setSimEventType("booking.confirmed");
                 else if (e.target.value === "cirium_flights") setSimEventType("flight.status_update");
                 else if (e.target.value === "whatsapp_cloud") setSimEventType("messages.received");
                 else setSimEventType("email.received");
               }}
               className="w-full px-3 py-2 bg-stone-950 border border-stone-800 rounded-xl text-xs text-stone-200 focus:outline-none focus:border-amber-500"
             >
-              <option value="tern_crm">Tern CRM (Native Payments & Proposal)</option>
+              
               <option value="expedia_pms">Expedia EPS / Hotel PMS</option>
               <option value="cirium_flights">Cirium Flight Tracker</option>
               <option value="whatsapp_cloud">Meta WhatsApp Cloud</option>

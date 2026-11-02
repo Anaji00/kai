@@ -25,7 +25,7 @@ import {
   VendorSupplier,
   fetchVendors,
   createVendor,
-  syncVendorToTern,
+  syncVendorToCrm,
   VendorSupplierCreateRequest
 } from "@/lib/sidecar-api";
 import { onFormFill, FormFillProposal } from "@/lib/portal-form-bus";
@@ -71,7 +71,7 @@ export default function VendorSuppliersRegistry() {
     booking_url_or_code: "",
     commission_rate: 10.0,
     commission_type: "PERCENTAGE",
-    payment_terms: "Tern Native Client Card Auth",
+    payment_terms: "Direct Client Card Authorization",
     lead_time_days: 7,
     preferred_tier: "PREFERRED_PARTNER",
     service_description: "",
@@ -111,7 +111,7 @@ export default function VendorSuppliersRegistry() {
           booking_url_or_code: (fields.booking_url_or_code as string) || "",
           commission_rate: (fields.commission_rate as number) ?? 10.0,
           commission_type: (fields.commission_type as string) || "PERCENTAGE",
-          payment_terms: (fields.payment_terms as string) || "Tern Native Client Card Auth",
+          payment_terms: (fields.payment_terms as string) || "Direct Client Card Authorization",
           lead_time_days: (fields.lead_time_days as number) ?? 7,
           preferred_tier: (fields.preferred_tier as string) || "PREFERRED_PARTNER",
           service_description: (fields.service_description as string) || "",
@@ -124,12 +124,12 @@ export default function VendorSuppliersRegistry() {
     return unsubscribe;
   }, []);
 
-  const handleSyncTern = async (id: string) => {
+  const handleSyncCrm = async (id: string) => {
     setSyncingId(id);
-    const updated = await syncVendorToTern(id);
+    const updated = await syncVendorToCrm(id);
     if (updated) {
       setVendors(prev => prev.map(v => v.id === id ? updated : v));
-      showToast("Synced with Tern Back Office successfully.");
+      showToast("Supplier updated and active in KAI CRM successfully.");
     }
     setSyncingId(null);
   };
@@ -148,7 +148,7 @@ export default function VendorSuppliersRegistry() {
     if (res) {
       setIsModalOpen(false);
       loadVendors();
-      showToast(`Supplier '${res.name}' registered and synced to Tern!`);
+      showToast(`Supplier '${res.name}' registered in KAI CRM successfully!`);
     } else {
       alert("Failed to save vendor. Please check backend connection.");
     }
@@ -188,14 +188,14 @@ export default function VendorSuppliersRegistry() {
           <div>
             <div className="flex items-center gap-2 text-xs uppercase tracking-widest text-[#829e86] font-semibold mb-1">
               <Briefcase className="w-4 h-4" />
-              Tern CRM Back Office Integration
+              KAI Sanctuary Vendor & Supplier Directory
             </div>
             <h1 className="text-3xl font-serif text-[#1e2922] tracking-tight">
               Preferred Vendors & Suppliers
             </h1>
             <p className="text-sm text-[#6b6255] max-w-2xl mt-1">
-              Centralized supplier contracts, commission structures, and wellness certifications synced directly with 
-              <span className="font-semibold text-[#1e2922]"> Tern Back Office → Suppliers</span>.
+              Centralized supplier contracts, commission structures, and wellness certifications managed directly within 
+              <span className="font-semibold text-[#1e2922]"> KAI Sanctuary Platform</span>.
             </p>
           </div>
 
@@ -221,13 +221,13 @@ export default function VendorSuppliersRegistry() {
           </div>
         </div>
 
-        {/* Tern Architecture Highlights */}
+        {/* Native CRM Architecture Highlights */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6 pt-6 border-t border-[#eee9e0] text-xs">
           <div className="flex items-start gap-2.5">
             <ShieldCheck className="w-4 h-4 text-[#829e86] shrink-0 mt-0.5" />
             <div>
               <span className="font-semibold text-[#1e2922] block">Dual-Storage Architecture</span>
-              <span className="text-[#6b6255]">Stored locally in SQLite for sub-millisecond Copilot RAG, dual-synced with Tern Cloud.</span>
+              <span className="text-[#6b6255]">Stored locally in SQLite for sub-millisecond Copilot RAG, unified with Sanctuary CRM Back Office.</span>
             </div>
           </div>
           <div className="flex items-start gap-2.5">
@@ -332,9 +332,9 @@ export default function VendorSuppliersRegistry() {
                       {vendor.preferred_tier.replace(/_/g, " ")}
                     </span>
                     <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${
-                      vendor.tern_sync_status === "SYNCED" ? "text-emerald-700 bg-emerald-50" : "text-amber-700 bg-amber-50"
+                      vendor.status === "SYNCED" ? "text-emerald-700 bg-emerald-50" : "text-amber-700 bg-amber-50"
                     }`}>
-                      {vendor.tern_sync_status}
+                      {vendor.status}
                     </span>
                   </div>
                 </div>
@@ -420,21 +420,16 @@ export default function VendorSuppliersRegistry() {
 
               {/* Bottom Actions */}
               <div className="pt-3 border-t border-[#f0ece4] flex items-center justify-between gap-2">
-                <a
-                  href={vendor.tern_deep_link || `https://app.tern.travel/back-office/suppliers/${vendor.tern_supplier_id || vendor.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs font-semibold text-[#2d5236] hover:text-[#1e2922] inline-flex items-center gap-1 transition"
-                >
-                  Open in Tern Back Office
-                  <ArrowUpRight className="w-3.5 h-3.5" />
-                </a>
+                <span className="text-xs font-semibold text-[#2d5236] inline-flex items-center gap-1">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Verified Supplier Dossier</span>
+                </span>
 
                 <button
-                  onClick={() => handleSyncTern(vendor.id)}
+                  onClick={() => handleSyncCrm(vendor.id)}
                   disabled={syncingId === vendor.id}
                   className="text-[11px] text-[#6b6255] hover:text-[#1e2922] p-1.5 rounded-lg hover:bg-[#f5f1eb] transition"
-                  title="Re-sync with Tern CRM Cloud"
+                  title="Refresh supplier in KAI CRM"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${syncingId === vendor.id ? "animate-spin" : ""}`} />
                 </button>
@@ -471,7 +466,7 @@ export default function VendorSuppliersRegistry() {
               <div className="bg-[#eaf2ec] border border-[#c4dcce] rounded-xl p-3 mb-5 flex items-center gap-2.5 text-xs text-[#22442b]">
                 <Sparkles className="w-4 h-4 text-[#3c784e] shrink-0" />
                 <span>
-                  <strong>Founder Proposal Authorized:</strong> Pre-populated from your Copilot conversation. Review and confirm to sync to Tern CRM.
+                  <strong>Founder Proposal Authorized:</strong> Pre-populated from your Copilot conversation. Review and confirm to commit to Sanctuary CRM.
                 </span>
               </div>
             )}
@@ -491,7 +486,7 @@ export default function VendorSuppliersRegistry() {
                 </div>
 
                 <div>
-                  <label className="block font-semibold text-[#1e2922] mb-1">Tern Supplier Category *</label>
+                  <label className="block font-semibold text-[#1e2922] mb-1">Sanctuary Supplier Category *</label>
                   <select
                     value={formData.category}
                     onChange={e => setFormData({ ...formData, category: e.target.value })}
@@ -601,7 +596,7 @@ export default function VendorSuppliersRegistry() {
                     value={formData.payment_terms}
                     onChange={e => setFormData({ ...formData, payment_terms: e.target.value })}
                     className="w-full px-3 py-2 rounded-xl border border-[#d6cfc4] bg-white text-xs focus:ring-2 focus:ring-[#829e86]/40 outline-none"
-                    placeholder="Tern Native Client Card Auth"
+                    placeholder="Sanctuary Native Client Card Auth"
                   />
                 </div>
               </div>

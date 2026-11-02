@@ -15,13 +15,19 @@ interface FlightConciergeModalProps {
 export default function FlightConciergeModal({
   isOpen,
   onClose,
-  defaultRetreatId = "nosara-2027",
+  defaultRetreatId = "puerto-vallarta-2027",
 }: FlightConciergeModalProps) {
   const [guestName, setGuestName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [departureAirport, setDepartureAirport] = useState("");
   const [retreatId, setRetreatId] = useState(defaultRetreatId);
+  const [prevDefaultRetreatId, setPrevDefaultRetreatId] = useState(defaultRetreatId);
+
+  if (defaultRetreatId !== prevDefaultRetreatId) {
+    setPrevDefaultRetreatId(defaultRetreatId);
+    setRetreatId(defaultRetreatId);
+  }
   const [cabinClass, setCabinClass] = useState<"economy" | "premium-economy" | "business" | "first">("business");
   const [preferredAirline, setPreferredAirline] = useState("");
   const [specialRequests, setSpecialRequests] = useState("");

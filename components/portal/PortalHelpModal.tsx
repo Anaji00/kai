@@ -88,11 +88,11 @@ const TOOL_ENTRIES = [
   },
   {
     key: "guest_planner",
-    title: "Tern Guest & Travel Planner",
+    title: "KAI Guest & Travel Planner",
     subtitle: "Itineraries & Zero-Liability Payments",
     icon: CreditCard,
-    layman: "Connects your guest details, custom retreat itineraries, and flight itineraries directly with Tern CRM. All published proposals include Tern's native credit card authorizations and payment schedules.",
-    why_it_matters: "You never have to handle credit card numbers or build payment gateways yourself. Tern manages client authorizations, terms waivers, and PCI security 100% natively."
+    layman: "Connects your guest details, custom retreat itineraries, and flight itineraries directly within KAI Sanctuary CRM. All published proposals include KAI CRM's native credit card authorizations and payment schedules.",
+    why_it_matters: "You never have to handle credit card numbers or build payment gateways yourself. KAI CRM manages client authorizations, terms waivers, and PCI security 100% natively."
   },
   {
     key: "founder_approval",
@@ -131,7 +131,7 @@ const TOOL_ENTRIES = [
     title: "Guest List & Booking Check",
     subtitle: "Vouchers & Manifest Check Made Simple",
     icon: FileSpreadsheet,
-    layman: "Compares your website registrations with confirmed Tern traveler files to catch any missing dietary requirements, flight routing, or room tier mismatches.",
+    layman: "Compares your website registrations with confirmed confirmed sanctuary traveler records to catch any missing dietary requirements, flight routing, or room tier mismatches.",
     why_it_matters: "Ensures every single guest is accounted for and well looked after before arrival."
   },
   {
@@ -155,7 +155,7 @@ const TOOL_ENTRIES = [
     title: "External Travel & Service Connections",
     subtitle: "Multi-Provider Integration Hub",
     icon: Globe2,
-    layman: "A visual health center displaying live connections to Tern CRM, Expedia / Hotel PMS, Grand Travel Flight Desk, and WhatsApp Cloud.",
+    layman: "A visual health center displaying live connections to KAI Sanctuary CRM, Expedia / Hotel PMS, Grand Travel Flight Desk, and WhatsApp Cloud.",
     why_it_matters: "Keeps your systems in harmony so updates flow quietly in the background without technical headaches."
   }
 ];
@@ -163,7 +163,7 @@ const TOOL_ENTRIES = [
 const FAQS = [
   {
     q: "How do payments work for KAI retreats?",
-    a: "Payments are 100% handled by Tern CRM. When you approve an itinerary in the portal, it generates a published Tern proposal link (app.tern.travel/public/proposals/...). Guests enter their payment details directly on Tern's secure platform, which handles card holds, terms & conditions waivers, and installment schedules. KAI never handles or stores credit card numbers."
+    a: "Payments and card authorizations are 100% handled natively by KAI CRM. When you approve an itinerary in the portal, it generates a published sanctuary proposal link (/my-retreat?ref=...). Guests enter their payment details directly on KAI CRM's secure platform, which handles card holds, terms & conditions waivers, and installment schedules. KAI never handles or stores credit card numbers."
   },
   {
     q: "Can the AI or system send emails or create bookings without my knowledge?",
@@ -344,13 +344,13 @@ export default function PortalHelpModal({ isOpen, onClose }: PortalHelpModalProp
                   },
                   {
                     step: "4",
-                    title: "Approve & Sync to Tern CRM",
-                    text: "Click 'Approve & Sync to Tern' (either in the portal with 1 click or on your phone via WhatsApp). Tern creates the traveler profile and itinerary draft."
+                    title: "Approve & Commit to KAI CRM",
+                    text: "Click 'Approve & Commit to CRM' (either in the portal with 1 click or on your phone via WhatsApp). KAI CRM creates the traveler profile and itinerary draft."
                   },
                   {
                     step: "5",
-                    title: "Guest Authorizes on Tern",
-                    text: "Send the published Tern proposal link to the guest. Tern handles the credit card authorization, waivers, and payments natively with 100% bank-grade safety."
+                    title: "Guest Authorizes on Sanctuary Hub",
+                    text: "Send the published sanctuary proposal link to the guest. KAI handles the credit card authorization natively, waivers, and payments natively with 100% bank-grade safety."
                   }
                 ].map(item => (
                   <div key={item.step} className="flex items-start gap-4 p-4 rounded-xl bg-stone-950/60 border border-stone-800">
@@ -386,7 +386,7 @@ export default function PortalHelpModal({ isOpen, onClose }: PortalHelpModalProp
         <div className="p-4 border-t border-stone-800 bg-stone-950 flex items-center justify-between text-xs text-stone-400">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-            <span>Founder Care Platform · Tern Travel Partner Engine · Grand Travel Host Agency</span>
+            <span>Founder Care Platform · KAI Sanctuary Travel CRM · Grand Travel Host Agency</span>
           </div>
           <button
             onClick={onClose}

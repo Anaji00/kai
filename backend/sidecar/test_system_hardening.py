@@ -3,7 +3,7 @@ Comprehensive System Hardening & Regression Test Suite for KAI Sanctuary Platfor
 Validates:
 1. PII Endpoint Security (Bookings, Concierge Requests, Newsletter Subscribers require Admin Basic Auth)
 2. Action Drafts Isolation (Draft listing and approvals require Admin Basic Auth)
-3. Decoupled Webhook Authentication (Meta WhatsApp challenge, Tern CRM signature, Email ingestion token)
+3. Decoupled Webhook Authentication (Meta WhatsApp challenge, External webhook signatures, Email ingestion token)
 4. Fast Non-Blocking Guest Booking Experience (FastAPI BackgroundTasks offload)
 5. Document Upload Safety (Strict 10MB chunked size cap)
 6. SQLite WAL Concurrency & Lock Resilience
@@ -98,9 +98,9 @@ def test_meta_whatsapp_webhook_handshake():
     print("[PASS] Meta WhatsApp Webhook handshake decoupled and verified.")
 
 
-def test_tern_webhook_secret_verification():
-    """Verify that Tern CRM webhook uses granular secret header validation."""
-    settings.TERN_WEBHOOK_SECRET = "test_tern_shared_secret"
+def test_external_webhook_secret_verification():
+    """Verify that external webhooks use granular secret header validation."""
+    settings.CIRIUM_WEBHOOK_SECRET = "test_cirium_shared_secret"
 
     payload = {
         "event": "trip.booked",
@@ -111,7 +111,7 @@ def test_tern_webhook_secret_verification():
 
     # 1. Invalid secret -> 401 in all environments
     res_wrong = client.post(
-        "/api/v1/sidecar/webhooks/tern",
+        "/api/v1/sidecar/webhooks/flights",
         json=payload,
         headers={"X-Webhook-Secret": "invalid_secret"}
     )
@@ -121,21 +121,21 @@ def test_tern_webhook_secret_verification():
     old_env = settings.ENVIRONMENT
     try:
         settings.ENVIRONMENT = "production"
-        res_missing = client.post("/api/v1/sidecar/webhooks/tern", json=payload)
+        res_missing = client.post("/api/v1/sidecar/webhooks/flights", json=payload)
         assert res_missing.status_code == 401
     finally:
         settings.ENVIRONMENT = old_env
 
     # 3. Valid secret -> 200
     res_ok = client.post(
-        "/api/v1/sidecar/webhooks/tern",
+        "/api/v1/sidecar/webhooks/flights",
         json=payload,
-        headers={"X-Webhook-Secret": "test_tern_shared_secret"}
+        headers={"X-Webhook-Secret": "test_cirium_shared_secret"}
     )
     assert res_ok.status_code == 200
     assert res_ok.json()["success"] is True
 
-    print("[PASS] Tern CRM webhook secret validation verified.")
+    print("[PASS] External webhook secret validation verified.")
 
 
 def test_inbound_email_webhook_secret_verification():
@@ -265,7 +265,7 @@ if __name__ == "__main__":
     test_pii_endpoints_require_admin_auth()
     test_action_drafts_require_admin_auth()
     test_meta_whatsapp_webhook_handshake()
-    test_tern_webhook_secret_verification()
+    test_external_webhook_secret_verification()
     test_inbound_email_webhook_secret_verification()
     test_fast_guest_booking_checkout()
     test_document_upload_size_limit()

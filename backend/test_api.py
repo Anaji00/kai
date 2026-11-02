@@ -5,6 +5,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 from starlette.testclient import TestClient
 from backend.main import app
 
+from backend.services.retreats_service import RETREATS_CATALOG
+
 client = TestClient(app)
 
 
@@ -14,7 +16,7 @@ def test_health():
     data = res.json()
     assert data["status"] in ["healthy", "degraded"]
     assert data["databaseConnected"] is True
-    assert data["totalRetreats"] == 4
+    assert data["totalRetreats"] == len(RETREATS_CATALOG)
     print("[PASS] Health check passed")
 
 
@@ -22,8 +24,9 @@ def test_retreats():
     res = client.get("/api/v1/retreats")
     assert res.status_code == 200
     data = res.json()
-    assert len(data) == 4
+    assert len(data) == len(RETREATS_CATALOG)
     assert any(r["id"] == "nosara-2027" for r in data)
+    assert any(r["id"] == "puerto-vallarta-2027" for r in data)
     print("[PASS] List retreats passed")
 
     res_single = client.get("/api/v1/retreats/nosara-costa-rica-2027")

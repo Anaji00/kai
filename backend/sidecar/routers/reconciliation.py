@@ -14,7 +14,7 @@ from backend.sidecar.services.reconciliation import (
     audit_manifest_diff
 )
 
-router = APIRouter(prefix="/reconciliation", tags=["Tern Sidecar: Reconciliation & Diff Engine"])
+router = APIRouter(prefix="/reconciliation", tags=["Sanctuary Sidecar: Reconciliation & Diff Engine"])
 
 
 @router.post("/parse-voucher")

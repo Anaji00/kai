@@ -74,13 +74,13 @@ class TestActionDraftExecution(unittest.TestCase):
         self.assertEqual(data["dispatch_result"]["channel"], "GRAND_TRAVEL_FLIGHT_DESK_AND_CHAUFFEUR")
         print("Flight dispatch result:", data["dispatch_result"])
 
-    def test_03_approve_intake_tern_sync(self):
-        # Test Tern CRM sync with clean standard tags (no clinical tags)
+    def test_03_approve_intake_crm_commit(self):
+        # Test Sanctuary CRM commit with clean standard tags (no clinical tags)
         with SessionLocal() as db:
             draft = ActionDraft(
                 type="booking_hold",
                 guest_name="Eleanor Vance",
-                content="Booking Hold for Ocean Villa - 6 nights. Authorize Tern Sync.",
+                content="Booking Hold for Ocean Villa - 6 nights. Authorize CRM Commit.",
                 status="pending_review"
             )
             db.add(draft)
@@ -91,16 +91,16 @@ class TestActionDraftExecution(unittest.TestCase):
         res = self.client.post(f"/api/v1/drafts/{draft_id}/approve", json={"operator_name": "Kareena Islam"})
         self.assertEqual(res.status_code, 200)
         data = res.json()
-        self.assertEqual(data["dispatch_result"]["channel"], "TERN_CRM_SYNC")
-        tern_details = data["dispatch_result"]["details"]
-        applied_tags = tern_details.get("applied_tags", [])
+        self.assertEqual(data["dispatch_result"]["channel"], "SANCTUARY_CRM")
+        crm_details = data["dispatch_result"]["details"]
+        applied_tags = crm_details.get("applied_tags", [])
         self.assertIn("KAI_GUEST", applied_tags)
         self.assertIn("COHORT_2026_2027", applied_tags)
         # Verify no clinical diagnostic tags were forced
         for tag in applied_tags:
             self.assertNotIn("DYSREGULATION", tag)
             self.assertNotIn("HYPERAROUSAL", tag)
-        print("Tern sync applied tags:", applied_tags)
+        print("CRM commit applied tags:", applied_tags)
 
     def test_04_approve_manifest_diff_resolution(self):
         with SessionLocal() as db:
@@ -109,7 +109,7 @@ class TestActionDraftExecution(unittest.TestCase):
                 sanctuary_slug="nosara",
                 document_name="test_manifest.csv",
                 external_count=15,
-                tern_cohort_count=14,
+                crm_cohort_count=14,
                 cohort_cap=14,
                 over_capacity="YES",
                 discrepancies=[{"guest": "Test Guest", "reason": "Over cap"}],

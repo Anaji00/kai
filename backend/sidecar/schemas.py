@@ -37,7 +37,11 @@ class PreCallThesisGenerateRequest(BaseModel):
     custom_notes: Optional[str] = None
 
 
-class TernActivityItem(BaseModel):
+class CrmActivityItem(BaseModel):
+    pass
+
+
+class CrmActivityItem(BaseModel):
     type: str  # LODGING, ACTIVITY, TRANSFER
     title: str
     description: str
@@ -53,7 +57,7 @@ class PreCallThesis(BaseModel):
     circadian_protocol: str
     consultation_talk_tracks: List[Dict[str, str]]
     objection_scripts: List[Dict[str, str]]
-    tern_itinerary_draft: List[Dict[str, Any]]
+    itinerary_draft: List[Dict[str, Any]] = []
     personalized_email_draft: str
 
 
@@ -63,10 +67,10 @@ class StagingIntakeResponse(StagingIntakeBase):
     consultation_thesis: Optional[Dict[str, Any]] = None
     status: str
     reviewed_by: Optional[str] = None
-    tern_trip_id: Optional[str] = None
-    tern_sub_trip_id: Optional[str] = None
-    tern_group_trip_id: Optional[str] = None
-    tern_contact_id: Optional[str] = None
+    crm_trip_id: Optional[str] = None
+    crm_contact_id: Optional[str] = None
+    sub_trip_id: Optional[str] = None
+    group_cohort_id: Optional[str] = None
     synced_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
@@ -74,39 +78,23 @@ class StagingIntakeResponse(StagingIntakeBase):
     model_config = ConfigDict(from_attributes=True)
 
 
-class TernSyncRequest(BaseModel):
+class CrmCommitRequest(BaseModel):
     operator_name: str = "Kareena Islam"
     override_room_tier: Optional[str] = None
-    notes: Optional[str] = None
 
 
-class TernSyncResponse(BaseModel):
+class CrmCommitResponse(BaseModel):
     success: bool
     message: str
     intake_id: str
-    tern_contact_id: str
-    tern_trip_id: str
-    tern_sub_trip_id: Optional[str] = None
-    tern_group_trip_id: Optional[str] = None
+    crm_contact_id: str
+    crm_trip_id: str
     applied_tags: List[str]
     status: str
-    synced_at: datetime
+    deep_links: Optional[Dict[str, str]] = None
 
 
-class TernWebhookPayload(BaseModel):
-    event_type: str = "form_response.submitted"
-    group_trip_id: Optional[str] = None
-    sub_trip_id: Optional[str] = None
-    contact_id: Optional[str] = None
-    contact_email: Optional[str] = None
-    contact_name: Optional[str] = None
-    sanctuary_slug: Optional[str] = None
-    form_responses: Dict[str, Any] = Field(default_factory=dict)
-    flight_details: Optional[Dict[str, Any]] = None
-    timestamp: Optional[str] = None
-
-
-class TernManifestItem(BaseModel):
+class CrmManifestItem(BaseModel):
     guest_name: str
     email: str
     phone: Optional[str] = None
@@ -116,7 +104,6 @@ class TernManifestItem(BaseModel):
     room_tier: str
     room_code: str
     sub_trip_id: Optional[str] = None
-    tern_contact_id: Optional[str] = None
     cabin_class: Optional[str] = None
     departure_airport: Optional[str] = None
     flight_requests: Optional[str] = None
@@ -276,7 +263,7 @@ class ManifestDiffResponse(BaseModel):
     sanctuary_slug: str
     document_name: str
     external_count: int
-    tern_cohort_count: int
+    crm_cohort_count: int = 0
     cohort_cap: int
     over_capacity: str
     discrepancies: List[Dict[str, Any]]
@@ -296,7 +283,7 @@ class SanctuaryCohortStatus(BaseModel):
     dates: str
     capacity_limit: int  # 12 to 14
     staged_count: int
-    tern_confirmed_count: int
+    crm_confirmed_count: int = 0
     remaining_spots: int
     status: str  # OPEN, NEAR_CAPACITY, FULL
 
@@ -373,7 +360,7 @@ class CopilotChatResponse(BaseModel):
 # Webhook Schemas
 # -----------------------------------------------------------------------------
 class WebhookSimulateRequest(BaseModel):
-    provider: str  # tern, expedia, cirium, whatsapp, resend
+    provider: str  # expedia, cirium, whatsapp, resend
     event_type: str
     payload: Dict[str, Any] = Field(default_factory=dict)
 
@@ -625,7 +612,7 @@ class UploadedDocumentResponse(BaseModel):
 
 
 # -----------------------------------------------------------------------------
-# Tern Back Office Preferred Vendors & Suppliers
+# Sanctuary CRM Preferred Vendors & Suppliers
 # -----------------------------------------------------------------------------
 class VendorSupplierCreateRequest(BaseModel):
     name: str
@@ -638,7 +625,7 @@ class VendorSupplierCreateRequest(BaseModel):
     booking_url_or_code: Optional[str] = None
     commission_rate: float = 10.0
     commission_type: str = "PERCENTAGE"
-    payment_terms: str = "Tern Native Client Card Auth"
+    payment_terms: str = "Sanctuary Native Client Card Auth"
     lead_time_days: int = 7
     preferred_tier: str = "PREFERRED_PARTNER"
     service_description: str
@@ -666,7 +653,7 @@ class VendorSupplierUpdateRequest(BaseModel):
 
 class VendorSupplierResponse(BaseModel):
     id: str
-    tern_supplier_id: Optional[str] = None
+    supplier_code: Optional[str] = None
     name: str
     category: str
     sanctuary_slug: str
@@ -682,8 +669,8 @@ class VendorSupplierResponse(BaseModel):
     preferred_tier: str
     service_description: str
     clinical_relevance: Optional[str] = None
-    tern_deep_link: Optional[str] = None
-    tern_sync_status: str
+    dossier_url: Optional[str] = None
+    status: str = "ACTIVE"
     last_synced_at: Optional[datetime] = None
     status: str
     created_at: datetime

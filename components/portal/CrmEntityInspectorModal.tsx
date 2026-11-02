@@ -14,32 +14,43 @@ import {
   Check,
   Code,
   Layers,
+  Database,
+  Sparkles,
+  Mail,
+  Compass,
+  FileCheck2,
+  SendHorizontal,
 } from "lucide-react";
-import { StagingIntake } from "@/lib/sidecar-api";
+import { StagingIntake, automateCrmTripOutreach } from "@/lib/sidecar-api";
 
-interface TernEntityInspectorModalProps {
+export interface CrmEntityInspectorModalProps {
   isOpen: boolean;
   onClose: () => void;
   intake: StagingIntake | null;
 }
 
-export default function TernEntityInspectorModal({
+export function CrmEntityInspectorModal({
   isOpen,
   onClose,
   intake,
-}: TernEntityInspectorModalProps) {
+}: CrmEntityInspectorModalProps) {
+
+
   const [activeTab, setActiveTab] = useState<"overview" | "json">("overview");
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
+  const [automating, setAutomating] = useState<string | null>(null);
+  const [automationResult, setAutomationResult] = useState<string | null>(null);
 
   if (!isOpen || !intake) return null;
 
-  const tripId = intake.tern_trip_id || `tern_trp_${intake.id.substring(0, 8)}`;
-  const contactId = intake.tern_contact_id || `tern_cnt_${intake.id.substring(0, 8)}`;
+  const tripId = intake.crm_trip_id || `kai_trp_${intake.id.substring(0, 8)}`;
+  const contactId = intake.crm_contact_id || `kai_cnt_${intake.id.substring(0, 8)}`;
 
-  const tripUrl = `https://app.tern.travel/trips/${tripId}`;
-  const paymentsUrl = `https://app.tern.travel/trips/${tripId}/payments`;
-  const contactUrl = `https://app.tern.travel/contacts/${contactId}`;
-  const proposalUrl = `https://app.tern.travel/public/proposals/${tripId}`;
+  // Native internal database URLs (no third-party external lock-in)
+  const tripUrl = `/portal?tab=crm&trip_id=${tripId}`;
+  const paymentsUrl = `/portal?tab=crm&trip_id=${tripId}&view=payments`;
+  const contactUrl = `/portal?tab=crm&client_id=${contactId}`;
+  const proposalUrl = `/portal?tab=crm&section=proposal&trip_id=${tripId}`;
 
   const copyToClipboard = (url: string, label: string) => {
     navigator.clipboard.writeText(url);
@@ -47,15 +58,15 @@ export default function TernEntityInspectorModal({
     setTimeout(() => setCopiedLink(null), 2000);
   };
 
-  const isSynced = intake.status === "SYNCED_TO_TERN";
+  const isSynced = intake.status === "CONFIRMED_IN_CRM" || intake.status === "APPROVED";
 
   // Simulated flight block
   const flight = intake.flight_request || {};
   const flightBlock = {
-    airline: flight.preferred_airline || "Delta Air Lines",
-    flight_number: "DL 1928",
+    airline: flight.preferred_airline || "United Airlines / Delta Air Lines",
+    flight_number: "UA 1420",
     departure: flight.departure_airport || "MIA",
-    arrival: "LIR",
+    arrival: (intake.sanctuary_slug || "").includes("puerto") ? "PVR" : "LIR",
     cabin_class: flight.cabin_class || "Business",
     status: "ON_TIME (Cirium Active)",
   };
@@ -64,28 +75,46 @@ export default function TernEntityInspectorModal({
     "CORTISOL_RESET",
     "VAGAL_DYSREGULATION",
     "BLUE_ZONE_DIET",
+    "LIE_FLAT_AIR",
   ];
+
+  const handleAutomate = async (
+    actionType: "draft_welcome" | "draft_packing_guide" | "draft_flight_coordination" | "draft_post_retreat_arc",
+    label: string
+  ) => {
+    setAutomating(actionType);
+    setAutomationResult(null);
+    try {
+      const res = await automateCrmTripOutreach(tripId, actionType, "Kareena Islam");
+      setAutomationResult(`Success: Staged "${label}" (Draft #${res.draft_id}) ready for advisor approval.`);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to automate advisor task";
+      setAutomationResult(`Notice: ${msg}`);
+    } finally {
+      setAutomating(null);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="bg-[#FAF7F2] text-[#2D3E35] w-full max-w-2xl rounded-2xl border border-[#E5DDD0] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-[#FAF7F2] text-[#2D3E35] w-full max-w-2xl rounded-2xl border border-[#E5DDD0] shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
         <div className="px-6 py-4 bg-white border-b border-[#E5DDD0] flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
             <span className="p-2 rounded-lg bg-[#2D3E35] text-[#FAF7F2]">
-              <Layers className="w-4 h-4" />
+              <Database className="w-4 h-4" />
             </span>
             <div>
               <h3 className="font-serif text-lg font-bold text-[#2D3E35] leading-tight">
-                Tern CRM Entity &amp; Payments Inspector
+                KAI Sanctuary Travel CRM Record
               </h3>
-              <p className="text-xs text-[#5C6B5E]">
-                Client: <span className="font-semibold text-[#2D3E35]">{intake.client_name}</span> &middot;{" "}
-                {isSynced ? (
-                  <span className="text-emerald-700 font-medium">Live Synced Record</span>
-                ) : (
-                  <span className="text-amber-700 font-medium">Staged / Pre-Sync Preview</span>
-                )}
+              <p className="text-xs text-[#5C6B5E] flex items-center gap-1.5 flex-wrap">
+                <span>Client: <strong className="text-[#2D3E35]">{intake.client_name}</strong></span>
+                <span>&middot;</span>
+                <span className="inline-flex items-center gap-1 font-medium text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 text-[10px]">
+                  <Database className="w-3 h-3 text-emerald-600" />
+                  Stored Natively in KAI Database (crm_clients &amp; crm_trips)
+                </span>
               </p>
             </div>
           </div>
@@ -111,7 +140,7 @@ export default function TernEntityInspectorModal({
                 }`}
               >
                 <Code className="w-3 h-3" />
-                <span>Payload</span>
+                <span>DB Payload</span>
               </button>
             </div>
             <button
@@ -127,34 +156,47 @@ export default function TernEntityInspectorModal({
         <div className="p-6 overflow-y-auto space-y-5 text-xs">
           {activeTab === "overview" ? (
             <>
-              {/* Native Tern Payments Banner */}
+              {/* Native CRM Payments & Card Schedule */}
               <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] shadow-sm space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <CreditCard className="w-4 h-4 text-[#C07D63]" />
                     <span className="font-bold text-sm text-[#2D3E35]">
-                      Tern Native Credit Card Authorization &amp; Payments
+                      Native Payment Schedule &amp; Card Invoicing
                     </span>
                   </div>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-900 border border-amber-200">
-                    PENDING AUTHORIZATION
+                    PENDING CLIENT AUTHORIZATION
                   </span>
                 </div>
 
                 <p className="text-xs text-[#5C6B5E] leading-relaxed">
-                  Payments, PCI DSS compliance, 2FA validation, and installment invoicing are managed
-                  <span className="font-semibold text-[#2D3E35]"> 100% natively by Tern</span>. KAI does not
-                  store or process raw credit cards. Guests authorize cards directly on their published itinerary.
+                  Financial records, installment schedules, and guest payment statuses are managed
+                  <span className="font-semibold text-[#2D3E35]"> natively in KAI&apos;s database</span>.
+                  Guests authorize card payments securely through their private itinerary link without reliance on external SaaS subscriptions.
                 </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 py-1 text-[11px]">
+                  <div className="bg-[#FAF7F2] p-2.5 rounded-lg border border-[#E5DDD0]">
+                    <span className="text-[#5C6B5E] text-[10px] uppercase font-semibold">Total Investment</span>
+                    <div className="text-sm font-bold text-[#2D3E35]">$4,850.00 USD</div>
+                  </div>
+                  <div className="bg-[#FAF7F2] p-2.5 rounded-lg border border-[#E5DDD0]">
+                    <span className="text-[#5C6B5E] text-[10px] uppercase font-semibold">30% Deposit (Due Now)</span>
+                    <div className="text-sm font-bold text-[#C07D63]">$1,500.00 USD</div>
+                  </div>
+                  <div className="bg-[#FAF7F2] p-2.5 rounded-lg border border-[#E5DDD0] col-span-2 sm:col-span-1">
+                    <span className="text-[#5C6B5E] text-[10px] uppercase font-semibold">70% Balance (45d Prior)</span>
+                    <div className="text-sm font-bold text-[#2D3E35]">$3,350.00 USD</div>
+                  </div>
+                </div>
 
                 <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-[#E5DDD0]/60">
                   <a
                     href={paymentsUrl}
-                    target="_blank"
-                    rel="noreferrer"
                     className="inline-flex items-center space-x-1 px-3 py-1.5 rounded-md bg-[#2D3E35] text-[#FAF7F2] font-semibold hover:bg-[#1F2C25] transition-colors"
                   >
-                    <span>Open Tern Payments Tab</span>
+                    <span>View Native Payment Record</span>
                     <ExternalLink className="w-3 h-3" />
                   </a>
                   <button
@@ -176,13 +218,83 @@ export default function TernEntityInspectorModal({
                 </div>
               </div>
 
-              {/* Tern Entity IDs & Deep Links Grid */}
+              {/* 1-Click Database Automations */}
+              <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] shadow-sm space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <Sparkles className="w-4 h-4 text-[#C07D63]" />
+                    <span className="font-bold text-xs uppercase tracking-wider text-[#2D3E35]">
+                      1-Click Advisor Task Automations
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-[#5C6B5E]">Stages draft for Kareena &amp; Armaan</span>
+                </div>
+
+                {automationResult && (
+                  <div className="p-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px] font-medium flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{automationResult}</span>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  <button
+                    onClick={() => handleAutomate("draft_welcome", "Pre-Arrival Welcome")}
+                    disabled={automating !== null}
+                    className="p-2.5 rounded-lg border border-[#E5DDD0] bg-[#FAF7F2] hover:bg-[#F2ECE4] text-left transition-colors flex items-center justify-between group disabled:opacity-50"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Mail className="w-3.5 h-3.5 text-[#C07D63]" />
+                      <span className="font-medium text-[#2D3E35]">Pre-Arrival Welcome</span>
+                    </div>
+                    <SendHorizontal className="w-3 h-3 text-[#5C6B5E] group-hover:text-[#2D3E35] transition-transform group-hover:translate-x-0.5" />
+                  </button>
+
+                  <button
+                    onClick={() => handleAutomate("draft_packing_guide", "14-Day Packing Guide")}
+                    disabled={automating !== null}
+                    className="p-2.5 rounded-lg border border-[#E5DDD0] bg-[#FAF7F2] hover:bg-[#F2ECE4] text-left transition-colors flex items-center justify-between group disabled:opacity-50"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Compass className="w-3.5 h-3.5 text-[#2D3E35]" />
+                      <span className="font-medium text-[#2D3E35]">14-Day Packing Guide</span>
+                    </div>
+                    <SendHorizontal className="w-3 h-3 text-[#5C6B5E] group-hover:text-[#2D3E35] transition-transform group-hover:translate-x-0.5" />
+                  </button>
+
+                  <button
+                    onClick={() => handleAutomate("draft_flight_coordination", "Flight & Chauffeur")}
+                    disabled={automating !== null}
+                    className="p-2.5 rounded-lg border border-[#E5DDD0] bg-[#FAF7F2] hover:bg-[#F2ECE4] text-left transition-colors flex items-center justify-between group disabled:opacity-50"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Plane className="w-3.5 h-3.5 text-blue-700" />
+                      <span className="font-medium text-[#2D3E35]">Flight &amp; Chauffeur Align</span>
+                    </div>
+                    <SendHorizontal className="w-3 h-3 text-[#5C6B5E] group-hover:text-[#2D3E35] transition-transform group-hover:translate-x-0.5" />
+                  </button>
+
+                  <button
+                    onClick={() => handleAutomate("draft_post_retreat_arc", "30-Day Somatic Arc")}
+                    disabled={automating !== null}
+                    className="p-2.5 rounded-lg border border-[#E5DDD0] bg-[#FAF7F2] hover:bg-[#F2ECE4] text-left transition-colors flex items-center justify-between group disabled:opacity-50"
+                  >
+                    <div className="flex items-center space-x-2">
+                      <FileCheck2 className="w-3.5 h-3.5 text-emerald-700" />
+                      <span className="font-medium text-[#2D3E35]">30-Day Somatic Arc</span>
+                    </div>
+                    <SendHorizontal className="w-3 h-3 text-[#5C6B5E] group-hover:text-[#2D3E35] transition-transform group-hover:translate-x-0.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Native Database Entities Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Trip Entity */}
                 <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] space-y-2">
                   <div className="flex items-center justify-between text-[#5C6B5E]">
                     <span className="font-bold text-xs uppercase tracking-wider text-[#2D3E35]">
-                      Tern Trip Entity
+                      Native Trip Record
                     </span>
                     <span className="font-mono text-[10px] bg-[#FAF7F2] px-2 py-0.5 rounded border border-[#E5DDD0]">
                       {tripId}
@@ -197,11 +309,9 @@ export default function TernEntityInspectorModal({
                   <div className="pt-2 flex items-center space-x-2">
                     <a
                       href={tripUrl}
-                      target="_blank"
-                      rel="noreferrer"
                       className="text-xs text-[#C07D63] hover:underline flex items-center space-x-1 font-medium"
                     >
-                      <span>View in Tern Itinerary</span>
+                      <span>View in Native CRM</span>
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
@@ -211,7 +321,7 @@ export default function TernEntityInspectorModal({
                 <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] space-y-2">
                   <div className="flex items-center justify-between text-[#5C6B5E]">
                     <span className="font-bold text-xs uppercase tracking-wider text-[#2D3E35]">
-                      Tern Contact Entity
+                      Native Client Record
                     </span>
                     <span className="font-mono text-[10px] bg-[#FAF7F2] px-2 py-0.5 rounded border border-[#E5DDD0]">
                       {contactId}
@@ -223,16 +333,14 @@ export default function TernEntityInspectorModal({
                   </div>
                   <div className="text-[11px] text-[#5C6B5E]">
                     {intake.email} &middot; Matching:{" "}
-                    <span className="font-semibold text-emerald-700">Email Key Matched</span>
+                    <span className="font-semibold text-emerald-700">Database Record Synced</span>
                   </div>
                   <div className="pt-2 flex items-center space-x-2">
                     <a
                       href={contactUrl}
-                      target="_blank"
-                      rel="noreferrer"
                       className="text-xs text-[#C07D63] hover:underline flex items-center space-x-1 font-medium"
                     >
-                      <span>View Contact Profile</span>
+                      <span>View Client Dossier</span>
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
@@ -245,7 +353,7 @@ export default function TernEntityInspectorModal({
                   <div className="flex items-center space-x-2">
                     <Plane className="w-4 h-4 text-[#2D3E35]" />
                     <span className="font-bold text-xs uppercase tracking-wider text-[#2D3E35]">
-                      Tern Smart Flight Integration (Cirium Active)
+                      Smart Flight Tracking (Cirium Active)
                     </span>
                   </div>
                   <span className="text-[10px] font-mono text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded font-semibold">
@@ -274,10 +382,10 @@ export default function TernEntityInspectorModal({
                 </div>
               </div>
 
-              {/* Applied Guest Tags */}
+              {/* Standardized Guest Tags */}
               <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] space-y-2">
                 <span className="font-bold text-xs uppercase tracking-wider text-[#2D3E35]">
-                  Standardized Guest Tags in Tern CRM
+                  Standardized Guest Tags in Native CRM
                 </span>
                 <div className="flex flex-wrap gap-1.5 pt-1">
                   {tags.map((t) => (
@@ -291,6 +399,9 @@ export default function TernEntityInspectorModal({
                   <span className="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-amber-50 text-amber-900 border border-amber-200">
                     COHORT_2026_2027
                   </span>
+                  <span className="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-blue-50 text-blue-900 border border-blue-200">
+                    NATIVE_DB_RECORD
+                  </span>
                 </div>
               </div>
             </>
@@ -298,26 +409,31 @@ export default function TernEntityInspectorModal({
             /* JSON Technical View */
             <div className="space-y-2">
               <div className="flex justify-between items-center text-xs text-[#5C6B5E]">
-                <span>Raw Tern Sync Payload Structure</span>
+                <span>Native Database Record Structure (crm_clients &amp; crm_trips)</span>
                 <button
                   onClick={() =>
                     copyToClipboard(
                       JSON.stringify(
                         {
-                          contact: {
+                          crm_client: {
                             id: contactId,
                             name: intake.client_name,
                             email: intake.email,
                             tags,
+                            source: "WEBSITE_INTAKE",
+                            total_lifetime_spend: 4850.0,
                           },
-                          trip: {
+                          crm_trip: {
                             id: tripId,
                             status: "PROPOSED_ITINERARY",
                             room_tier: intake.room_tier,
                             deep_links: { tripUrl, paymentsUrl, proposalUrl },
                             payments: {
-                              provider: "TERN_NATIVE",
+                              total: 4850.0,
+                              deposit: 1500.0,
+                              balance: 3350.0,
                               status: "PENDING_CLIENT_AUTHORIZATION",
+                              storage: "NATIVE_KAI_DATABASE",
                             },
                             smart_flight: flightBlock,
                           },
@@ -331,7 +447,7 @@ export default function TernEntityInspectorModal({
                   className="hover:text-[#2D3E35] flex items-center space-x-1"
                 >
                   {copiedLink === "json" ? (
-                    <span className="text-emerald-700">Copied!</span>
+                    <span className="text-emerald-700 font-semibold">Copied!</span>
                   ) : (
                     <>
                       <Copy className="w-3 h-3" />
@@ -343,21 +459,26 @@ export default function TernEntityInspectorModal({
               <pre className="p-4 rounded-xl bg-[#2D3E35] text-[#FAF7F2] font-mono text-[11px] overflow-x-auto leading-relaxed max-h-[380px]">
                 {JSON.stringify(
                   {
-                    contact: {
+                    crm_client: {
                       id: contactId,
                       name: intake.client_name,
                       email: intake.email,
                       tags,
+                      source: "WEBSITE_INTAKE",
+                      total_lifetime_spend: 4850.0,
                     },
-                    trip: {
+                    crm_trip: {
                       id: tripId,
                       status: "PROPOSED_ITINERARY",
                       room_tier: intake.room_tier,
                       deep_links: { tripUrl, paymentsUrl, proposalUrl },
                       payments: {
-                        provider: "TERN_NATIVE",
+                        total: 4850.0,
+                        deposit: 1500.0,
+                        balance: 3350.0,
                         status: "PENDING_CLIENT_AUTHORIZATION",
-                        note: "PCI compliance handled 100% natively by Tern",
+                        storage: "NATIVE_KAI_DATABASE",
+                        note: "PCI DSS compliance & payment records handled natively in KAI database",
                       },
                       smart_flight: flightBlock,
                     },
@@ -373,3 +494,6 @@ export default function TernEntityInspectorModal({
     </div>
   );
 }
+
+
+export default CrmEntityInspectorModal;

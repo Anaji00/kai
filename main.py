@@ -12,6 +12,8 @@ __all__ = ["app"]
 
 if __name__ == "__main__":
     import uvicorn
-    print("Starting KAI Wellness Retreats API on http://127.0.0.1:8000 ...")
-    print("Documentation available at http://127.0.0.1:8000/docs")
-    uvicorn.run("backend.main:app", host="127.0.0.1", port=8000, reload=True)
+    import os
+    port = int(os.getenv("PORT", "8972"))
+    print(f"Starting KAI Wellness Retreats API on http://127.0.0.1:{port} ...")
+    print(f"Documentation available at http://127.0.0.1:{port}/docs")
+    uvicorn.run("backend.main:app", host="127.0.0.1", port=port, reload=True)

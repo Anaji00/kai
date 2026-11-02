@@ -1,4 +1,5 @@
 from sqlalchemy import Column, String, Text, DateTime, JSON, Integer, Float, Boolean
+from sqlalchemy.orm import synonym
 from datetime import datetime, timezone
 import uuid
 from backend.database import Base
@@ -16,7 +17,7 @@ class StagingIntake(Base):
     Staging table for client reservations, wellness preferences, and clinical inquiries.
     MANDATORY GOVERNANCE: ZERO DIRECT AUTONOMOUS WRITES.
     Defaults to status = 'PENDING_APPROVAL'.
-    Requires human operator review before syncing to Tern CRM.
+    Requires human operator review before committing to Sanctuary CRM.
     """
     __tablename__ = "staging_intakes"
 
@@ -34,10 +35,10 @@ class StagingIntake(Base):
     consultation_thesis = Column(JSON, nullable=True)  # Generated Pre-Call Thesis RAG Dossier
     status = Column(String(32), default="PENDING_APPROVAL", index=True, nullable=False)
     reviewed_by = Column(String(64), nullable=True)
-    tern_trip_id = Column(String(64), nullable=True)
-    tern_sub_trip_id = Column(String(64), nullable=True)
-    tern_group_trip_id = Column(String(64), nullable=True)
-    tern_contact_id = Column(String(64), nullable=True)
+    crm_trip_id = Column(String(64), nullable=True)
+    crm_contact_id = Column(String(64), nullable=True)
+    sub_trip_id = Column(String(64), nullable=True)
+    group_cohort_id = Column(String(64), nullable=True)
     synced_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=_utc_now, nullable=False)
     updated_at = Column(DateTime, default=_utc_now, onupdate=_utc_now, nullable=False)
@@ -130,7 +131,7 @@ class StagedVoucherDiff(Base):
     sanctuary_slug = Column(String(64), nullable=False)
     document_name = Column(String(128), nullable=False)
     external_count = Column(Integer, default=0)
-    tern_cohort_count = Column(Integer, default=0)
+    crm_cohort_count = Column(Integer, default=0)
     cohort_cap = Column(Integer, default=14)
     over_capacity = Column(String(8), default="NO")  # YES, NO
     discrepancies = Column(JSON, nullable=False, default=list)
@@ -142,14 +143,14 @@ class StagedVoucherDiff(Base):
 
 class WebhookEventLog(Base):
     """
-    Log of inbound events from Tern CRM, Expedia / Hotel PMS,
+    Log of inbound events from Sanctuary Card Vault, Expedia / Hotel PMS,
     Grand Travel Flight Desk, WhatsApp Cloud, and Resend.
     """
     __tablename__ = "webhook_event_logs"
 
     id = Column(String(36), primary_key=True, default=generate_uuid_str, index=True)
     provider_event_id = Column(String(128), unique=True, index=True, nullable=True)  # Idempotency deduplication key
-    provider = Column(String(64), nullable=False, index=True)  # TERN, HOSPITALITY_EXPEDIA, FLIGHT_DESK, WHATSAPP, RESEND
+    provider = Column(String(64), nullable=False, index=True)  # HOSPITALITY_EXPEDIA, FLIGHT_DESK, WHATSAPP, RESEND
     event_type = Column(String(64), nullable=False, index=True)  # trip.approved, payment.authorized, hotel.inventory, flight.delayed
     payload_json = Column(JSON, nullable=False, default=dict)
     headers_json = Column(JSON, nullable=False, default=dict)
@@ -327,14 +328,14 @@ class UploadedDocumentRecord(Base):
 
 class VendorSupplierRecord(Base):
     """
-    Tern CRM Back Office Preferred Supplier Registry & Dual-Storage Cache.
+    Sanctuary CRM Preferred Supplier Registry & Local Database Storage.
     Tracks luxury suppliers, commission structures, contact info, and Nurse Kareena's
     clinical suitability notes.
     """
     __tablename__ = "vendor_supplier_records"
 
     id = Column(String(36), primary_key=True, default=generate_uuid_str, index=True)
-    tern_supplier_id = Column(String(64), index=True, nullable=True)  # e.g. tern_sup_...
+    supplier_code = Column(String(64), index=True, nullable=True)  # e.g. sup_...
     name = Column(String(128), nullable=False)
     category = Column(String(64), nullable=False, index=True)  # TRANSPORTATION_CHAUFFEUR, LODGING_VILLA, etc.
     sanctuary_slug = Column(String(64), default="all", index=True, nullable=False)
@@ -345,13 +346,12 @@ class VendorSupplierRecord(Base):
     booking_url_or_code = Column(String(256), nullable=True)
     commission_rate = Column(Float, default=10.0, nullable=False)
     commission_type = Column(String(32), default="PERCENTAGE", nullable=False)  # PERCENTAGE, FLAT_FEE, NET_RATE_WHOLESALE, NON_COMMISSIONABLE
-    payment_terms = Column(String(128), default="Tern Native Client Card Auth", nullable=False)
+    payment_terms = Column(String(128), default="Sanctuary Native Client Card Auth", nullable=False)
     lead_time_days = Column(Integer, default=7, nullable=False)
     preferred_tier = Column(String(32), default="PREFERRED_PARTNER", nullable=False)  # PREFERRED_PARTNER, ACTIVE_SUPPLIER, VETTED_BACKUP
     service_description = Column(Text, nullable=False)
     clinical_relevance = Column(Text, nullable=True)
-    tern_deep_link = Column(String(256), nullable=True)
-    tern_sync_status = Column(String(32), default="SYNCED", index=True, nullable=False)  # SYNCED, PENDING_SYNC, LOCAL_ONLY
+    dossier_url = Column(String(256), nullable=True)
     last_synced_at = Column(DateTime, default=_utc_now, nullable=True)
     status = Column(String(32), default="ACTIVE", index=True, nullable=False)
     created_at = Column(DateTime, default=_utc_now, nullable=False)
@@ -402,4 +402,151 @@ class GuestSomaticPulse(Base):
     private_reflection_notes = Column(Text, nullable=True)
     recorded_at = Column(DateTime, default=_utc_now, nullable=False)
 
+
+
+
+class CRMClient(Base):
+    """
+    Native Sanctuary Travel CRM Client / Contact entity stored in the database.
+    Stores comprehensive personal, clinical, passport, and travel history ready for staff querying and automation.
+    """
+    __tablename__ = "crm_clients"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid_str, index=True)
+    crm_contact_id = Column(String(64), unique=True, index=True, nullable=False)  # e.g. kai_cnt_...
+    full_name = Column(String(128), nullable=False, index=True)
+    email = Column(String(128), unique=True, index=True, nullable=False)
+    phone = Column(String(32), nullable=True)
+    date_of_birth = Column(String(32), nullable=True)
+    passport_number = Column(String(64), nullable=True)
+    passport_issuing_country = Column(String(64), nullable=True)
+    passport_expiry = Column(String(32), nullable=True)
+    passport_valid_6mo = Column(Boolean, default=True, nullable=False)
+    address = Column(JSON, nullable=True, default=dict)
+    emergency_contact = Column(JSON, nullable=True, default=dict)
+    dietary_requirements = Column(Text, nullable=True)
+    health_notes = Column(Text, nullable=True)
+    movement_experience = Column(String(64), default="all-levels")
+    intentions = Column(Text, nullable=True)
+    tags = Column(JSON, nullable=False, default=list)  # ["KAI_GUEST", "CORTISOL_RESET", "LIE_FLAT_AIR", "VIP_RETREAT", ...]
+    loyalty_programs = Column(JSON, nullable=True, default=dict)
+    total_lifetime_spend = Column(Float, default=0.0, nullable=False)
+    total_trips_count = Column(Integer, default=0, nullable=False)
+    source = Column(String(64), default="DIRECT_WEBSITE", nullable=False)
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=_utc_now, onupdate=_utc_now, nullable=False)
+
+
+class CRMTrip(Base):
+    """
+    Native Sanctuary Travel CRM Trip & Itinerary entity stored in the database.
+    Manages complete retreat itineraries, smart flight blocks, pricing, room allocations, and proposals.
+    """
+    __tablename__ = "crm_trips"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid_str, index=True)
+    crm_trip_id = Column(String(64), unique=True, index=True, nullable=False)  # e.g. kai_trp_...
+    client_id = Column(String(36), index=True, nullable=False)
+    client_name = Column(String(128), nullable=False)
+    client_email = Column(String(128), index=True, nullable=False)
+    sanctuary_slug = Column(String(64), nullable=False, index=True)
+    title = Column(String(256), nullable=False)
+    dates = Column(String(128), nullable=False)
+    room_tier = Column(String(128), default="Private Luxury Suite")
+    status = Column(String(32), default="PROPOSED_ITINERARY", index=True, nullable=False)  # INQUIRY, PROPOSED_ITINERARY, DEPOSIT_PAID, CONFIRMED, COMPLETED
+    total_investment = Column(Float, default=4850.0, nullable=False)
+    deposit_amount = Column(Float, default=1500.0, nullable=False)
+    deposit_status = Column(String(32), default="PENDING_CLIENT_AUTHORIZATION", nullable=False)
+    final_balance = Column(Float, default=3350.0, nullable=False)
+    final_balance_status = Column(String(32), default="SCHEDULED", nullable=False)
+    currency = Column(String(8), default="USD", nullable=False)
+    payment_terms = Column(String(256), default="KAI Native Card Authorization & Grand Travel Deposit Schedule")
+    payment_history = Column(JSON, nullable=True, default=list)  # Ledger of split payments, wire txns, card settlements
+    cancellation_record = Column(JSON, nullable=True, default=dict)  # Cancellation audit, refund amount, insurance notes
+    smart_flight = Column(JSON, nullable=True)  # Flight schedule, airline, cabin, tracking
+    ground_transfer = Column(JSON, nullable=True)  # Chauffeur, pickup, vehicle
+    clinical_thesis = Column(JSON, nullable=True)  # Full pre-call clinical talk tracks & RAG notes
+    suggested_plan = Column(JSON, nullable=True)  # Somatic & endurance restoration itinerary
+    itinerary_blocks = Column(JSON, nullable=False, default=list)  # Day-by-day scheduled activities
+    proposal_url = Column(String(256), nullable=True)
+    deep_link = Column(String(256), nullable=True)
+    created_by = Column(String(64), default="Kareena Islam", nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=_utc_now, onupdate=_utc_now, nullable=False)
+
+
+class AIAutomationPlaybook(Base):
+    """
+    Database-backed registry of AI Assistant Playbooks & Sanctuary CRM Workflows.
+    Each playbook encapsulates a verified real-life use case (Scenarios 1–36),
+    its trigger condition, deterministic + LLM synthesis prompts, target endpoint,
+    and execution telemetry.
+    """
+    __tablename__ = "ai_automation_playbooks"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid_str, index=True)
+    playbook_code = Column(String(64), unique=True, index=True, nullable=False)  # e.g. SCENARIO_19_FORCE_MAJEURE
+    scenario_number = Column(Integer, nullable=False, index=True)
+    title = Column(String(160), nullable=False)
+    category = Column(String(64), nullable=False, index=True)  # COHORT_CRISIS, AVIATION_LOGISTICS, SANCTUARY_PAY_FX, CLINICAL_RN_TRIAGE, VIP_CONCIERGE
+    assistant_persona = Column(String(128), default="KAI Chief of Staff & Clinical RN Copilot", nullable=False)
+    trigger_condition = Column(Text, nullable=False)
+    automated_actions_json = Column(JSON, nullable=False, default=list)  # Step-by-step automated actions
+    sample_payload_json = Column(JSON, nullable=False, default=dict)  # Ready-to-run example payload from stress tests
+    target_endpoint = Column(String(160), nullable=False)
+    requires_founder_approval = Column(Boolean, default=True, nullable=False)
+    is_enabled = Column(Boolean, default=True, nullable=False)
+    total_runs_count = Column(Integer, default=0, nullable=False)
+    last_run_at = Column(DateTime, nullable=True)
+    last_status = Column(String(32), default="READY", nullable=False)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=_utc_now, onupdate=_utc_now, nullable=False)
+
+
+class AIAutomationExecutionLog(Base):
+    """
+    Immutable database execution log for every AI Assistant & Staff Automation run.
+    Links the triggered playbook/scenario to the generated ActionDraft id,
+    latency metrics, AI reasoning summary, and affected guest/cohort records.
+    """
+    __tablename__ = "ai_automation_execution_logs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid_str, index=True)
+    playbook_code = Column(String(64), index=True, nullable=False)
+    playbook_title = Column(String(160), nullable=False)
+    category = Column(String(64), index=True, nullable=False)
+    assistant_persona = Column(String(128), nullable=False)
+    sanctuary_slug = Column(String(64), index=True, nullable=True)
+    target_guest_Or_cohort = Column(String(160), nullable=True)
+    input_payload_json = Column(JSON, nullable=False, default=dict)
+    output_summary_json = Column(JSON, nullable=False, default=dict)
+    ai_copilot_briefing = Column(Text, nullable=False)
+    staged_draft_ids = Column(JSON, nullable=False, default=list)
+    execution_latency_ms = Column(Integer, default=12, nullable=False)
+    status = Column(String(32), default="STAGED_FOR_APPROVAL", index=True, nullable=False)
+    triggered_by = Column(String(64), default="Kareena Islam, BSN, RN", nullable=False)
+    executed_at = Column(DateTime, default=_utc_now, nullable=False)
+
+
+class AICopilotConversationLog(Base):
+    """
+    Persistent database store for AI Chief of Staff & Clinical Copilot sessions.
+    Tracks staff prompts, RAG citations, safety screening flags, and staged proposals.
+    """
+    __tablename__ = "ai_copilot_conversation_logs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid_str, index=True)
+    session_id = Column(String(64), index=True, nullable=False)
+    operator_name = Column(String(64), default="Kareena Islam, BSN, RN", nullable=False)
+    mode = Column(String(64), default="wellness_safety", index=True, nullable=False)
+    sanctuary_slug = Column(String(64), nullable=True)
+    user_message = Column(Text, nullable=False)
+    assistant_response = Column(Text, nullable=False)
+    safety_level = Column(String(32), default="CLEAR", nullable=False)
+    citations_json = Column(JSON, nullable=False, default=list)
+    tool_calls_json = Column(JSON, nullable=False, default=list)
+    latency_ms = Column(Integer, default=0, nullable=False)
+    model_used = Column(String(64), nullable=True)
+    created_at = Column(DateTime, default=_utc_now, nullable=False)
 
