@@ -34,7 +34,7 @@ export default function AboutPage() {
           </h1>
 
           <p className="text-sm sm:text-base text-sage/85 leading-relaxed font-light max-w-3xl mx-auto">
-            Co-founded by <strong>Kareena Islam, BSN, RN, RYT</strong> and <strong>Armaan Islam</strong>, KAI unites high-acuity clinical nursing science, 432Hz somatic sound restoration, Ironman endurance discipline, and strategic business execution—all anchored by 25+ years of global luxury travel mastery at <strong>Grand Travel & Cruise</strong> and deep cultural integrations.
+            Co-founded by <strong>Kareena Islam, BSN, RN</strong> and <strong>Armaan Islam</strong>, KAI unites high-acuity clinical nursing science, 432Hz somatic sound restoration, Ironman endurance discipline, and strategic business execution—all anchored by 25+ years of global luxury travel mastery at <strong>Grand Travel & Cruise</strong> and deep cultural integrations.
           </p>
 
           {/* Direct Founder Inquiry Routing Pill */}
@@ -69,7 +69,7 @@ export default function AboutPage() {
               <div className="relative h-80 w-full overflow-hidden bg-sand">
                 <Image
                   src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1200&q=85"
-                  alt="Kareena Islam, BSN, RN, RYT — Co-Founder of KAI Wellness Retreats"
+                  alt="Kareena Islam, BSN, RN — Co-Founder of KAI Wellness Retreats"
                   fill
                   priority
                   className="object-cover"
@@ -77,15 +77,15 @@ export default function AboutPage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-sage-dark/90 via-sage-dark/30 to-transparent" />
                 <div className="absolute top-4 left-4 flex flex-wrap gap-2">
                   <span className="rounded-full bg-linen/95 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-olive">
-                    Co-Founder &amp; Clinical Director
+                    Founder
                   </span>
                   <span className="rounded-full bg-terracotta px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-linen">
-                    BSN, RN • RYT • 432Hz Sound
+                    BSN, RN • 432Hz Sound
                   </span>
                 </div>
                 <div className="absolute bottom-5 left-6 right-6 text-linen">
                   <h2 className="font-serif text-3xl sm:text-4xl font-light">
-                    Kareena Islam, BSN, RN, RYT
+                    Kareena Islam, BSN, RN
                   </h2>
                   <p className="text-xs text-sand-muted mt-0.5">
                     Registered Nurse • Somatic &amp; Crystal Sound Healer • National Future Leaders in Travel Honoree

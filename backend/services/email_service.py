@@ -20,30 +20,33 @@ MOVEMENT_LABELS = {
 
 
 
-def _send_smtp_email(to_emails: List[str], subject: str, html_content: str, from_email: str) -> bool:
+def _send_smtp_email(to_emails: List[str], subject: str, html_content: str, display_name: str = "KAI Sanctuary Reservations") -> bool:
     import smtplib
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
+    from email.utils import formataddr
 
     if not (settings.SMTP_HOST and settings.SMTP_USER and settings.SMTP_PASSWORD):
         return False
 
+    from_header = formataddr((display_name, settings.SMTP_USER))
+
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
-        msg["From"] = from_email
+        msg["From"] = from_header
         msg["To"] = ", ".join(to_emails)
         msg.attach(MIMEText(html_content, "html"))
 
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10) as server:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=12) as server:
             if settings.SMTP_USE_TLS:
                 server.starttls()
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
-            server.sendmail(from_email, to_emails, msg.as_string())
-        logger.info(f"[SMTP Live] Dispatched email to {to_emails} via {settings.SMTP_HOST}")
+            server.sendmail(settings.SMTP_USER, to_emails, msg.as_string())
+        logger.info(f"[SMTP Live] Dispatched email to {to_emails} via {settings.SMTP_HOST} (From: {from_header})")
         return True
     except Exception as e:
-        logger.error(f"[SMTP Error] Failed sending to {to_emails}: {e}")
+        logger.error(f"[SMTP Error] Failed sending to {to_emails} via {settings.SMTP_HOST}: {e}")
         return False
 
 def _get_founder_recipients() -> List[str]:
@@ -201,7 +204,7 @@ def send_booking_confirmation(booking_data: dict, retreat_info: dict) -> bool:
 
         # 1. Dispatch Internal Founder Alert
         if settings.SMTP_HOST:
-            success_admin = _send_smtp_email(founder_recipients, f"[New KAI Inquiry] {retreat_title} - {guest_name} ({ref})", admin_html, from_admin)
+            success_admin = _send_smtp_email(founder_recipients, f"[New KAI Inquiry] {retreat_title} - {guest_name} ({ref})", admin_html, display_name="KAI Sanctuary Reservations")
         if not success_admin:
             try:
                 payload_admin = {
@@ -227,7 +230,7 @@ def send_booking_confirmation(booking_data: dict, retreat_info: dict) -> bool:
         # 2. Dispatch Guest Confirmation Email
         if guest_email:
             if settings.SMTP_HOST:
-                success_guest = _send_smtp_email([guest_email], f"Your KAI Sanctuary Reservation Inquiry for {retreat_title} [Ref: {ref}]", guest_html, from_concierge)
+                success_guest = _send_smtp_email([guest_email], f"Your KAI Sanctuary Reservation Inquiry for {retreat_title} [Ref: {ref}]", guest_html, display_name="KAI Concierge Desk")
             if not success_guest:
                 try:
                     payload_guest = {
@@ -247,6 +250,21 @@ def send_booking_confirmation(booking_data: dict, retreat_info: dict) -> bool:
                         logger.info(f"[Resend Live] Guest Confirmation Email dispatched to {guest_email} for {ref} (ID: {res_guest.json().get('id')})")
                     else:
                         logger.error(f"[Resend Error] Guest Confirmation failed ({res_guest.status_code}): {res_guest.text[:300]}")
+                        # Customer confirmation delivery fallback:
+                        if founder_recipients:
+                            mirror_payload = {
+                                "from": "KAI Concierge Desk <onboarding@resend.dev>",
+                                "to": founder_recipients,
+                                "subject": f"[CUSTOMER CONFIRMATION: {guest_email}] Your KAI Reservation for {retreat_title} [Ref: {ref}]",
+                                "html": f'''
+                                    <div style="background-color: #FFF3CD; border: 1px solid #FFEEBA; color: #856404; padding: 14px 18px; border-radius: 8px; margin-bottom: 24px; font-family: sans-serif; font-size: 13px; line-height: 1.5;">
+                                        <strong>Customer Delivery Notice:</strong> In production with your verified domain (<code>kaiwellnessretreats.com</code>), this confirmation is delivered directly to the customer (<code>{guest_email}</code>). In testing sandbox mode, Resend delivers this customer copy here to <code>{founder_recipients[0]}</code> so you can review the exact layout and reference code.
+                                    </div>
+                                ''' + guest_html,
+                            }
+                            mirror_res = requests.post("https://api.resend.com/emails", json=mirror_payload, headers=headers, timeout=8)
+                            if mirror_res.status_code in (200, 201):
+                                logger.info(f"[Resend Fallback] Delivered customer confirmation preview to {founder_recipients} for {guest_email}")
                 except Exception as e:
                     logger.error(f"[Resend Exception] Error sending guest confirmation to {guest_email}: {e}")
     else:

@@ -150,6 +150,118 @@ pytest backend/sidecar/test_sidecar.py -k "test_seed_and_list_intakes or test_pr
 
 # Check for TypeScript errors
 npx tsc --noEmit
+
+# Test transactional email dispatch & booking pipeline
+python scripts/send_test_email.py --to your-email@gmail.com --pipeline
+```
+
+---
+
+## 📬 Transactional Email Architecture & Go-Live Guide
+
+KAI uses a **Dual-Dispatch Email Architecture** for every reservation inquiry submitted on the website (`/book`).
+
+```
+                            ┌───────────────────────────────────┐
+                            │    Guest Booking on /book         │
+                            │    (with legal waiver e-sign)     │
+                            └─────────────────┬─────────────────┘
+                                              │
+                    ┌─────────────────────────┴─────────────────────────┐
+                    ▼                                                   ▼
+    ┌───────────────────────────────┐                   ┌───────────────────────────────┐
+    │ 1. Customer Confirmation      │                   │ 2. Founder / Staff Alert      │
+    ├───────────────────────────────┤                   ├───────────────────────────────┤
+    │ • Booking Reference (KAI-XXXX)│                   │ • Full medical / health notes │
+    │ • Retreat dates & suite tier  │                   │ • Movement experience tier    │
+    │ • Liability waiver receipt    │                   │ • Passport readiness status   │
+    │ • 24–48hr concierge call info │                   │ • Legal waiver e-sign receipt │
+    │ • Grand Travel air assistance │                   │ • Staged CRM intake & draft   │
+    ├───────────────────────────────┤                   ├───────────────────────────────┤
+    │ TO: Customer / Guest          │                   │ TO: Kareena & Armaan Islam    │
+    │ FROM: KAI Concierge Desk      │                   │ FROM: KAI Sanctuary Inquiries │
+    └───────────────────────────────┘                   └───────────────────────────────┘
+```
+
+### 1. Production Go-Live: Domain Verification (Standard Method)
+
+The gold standard for brand trust and deliverability is verifying your domain on [Resend](https://resend.com/domains):
+
+* **Choice A: Host Agency Domain (`grandtravelcruise.com`)**
+  1. Go to [resend.com/domains](https://resend.com/domains) and click **Add Domain** (`grandtravelcruise.com`).
+  2. Add the 3 DNS records (DKIM, SPF, DMARC) in your domain DNS host (GoDaddy, Cloudflare, etc.).
+  3. In `.env`:
+     ```env
+     RESEND_FROM_EMAIL="KAI Sanctuary Reservations <kareena@grandtravelcruise.com>"
+     RESEND_CONCIERGE_FROM_EMAIL="KAI Concierge Desk <armaan@grandtravelcruise.com>"
+     KAREENA_ROUTING_EMAIL="kareena@grandtravelcruise.com"
+     ARMAAN_ROUTING_EMAIL="armaan@grandtravelcruise.com"
+     ```
+
+* **Choice B: Sanctuary Brand Domain (`kaiwellnessretreats.com`)**
+  1. In [resend.com/domains](https://resend.com/domains), click **Add Domain** (`kaiwellnessretreats.com`).
+  2. Add the 3 DNS records at your domain host.
+  3. In `.env`:
+     ```env
+     RESEND_FROM_EMAIL="KAI Sanctuary Reservations <inquiries@kaiwellnessretreats.com>"
+     RESEND_CONCIERGE_FROM_EMAIL="KAI Concierge Desk <concierge@kaiwellnessretreats.com>"
+     KAREENA_ROUTING_EMAIL="kareena@grandtravelcruise.com"
+     ARMAAN_ROUTING_EMAIL="armaan@grandtravelcruise.com"
+     ```
+
+---
+
+### 2. Alternative Fallback Methods (Zero DNS Access Required)
+
+If you or Kareena/Armaan do not have immediate access to your DNS host, use one of these verified zero-DNS fallbacks:
+
+#### Fallback A: Microsoft 365 SMTP (Native to Grand Travel & Cruise)
+*Grand Travel & Cruise (`grandtravelcruise.com`) email is hosted on Microsoft 365 (`mail.protection.outlook.com`). SPF and DKIM are already configured on Microsoft's servers.*
+
+1. In Kareena or Armaan's Microsoft 365 account, create an **App Password** (or enable SMTP AUTH).
+2. Configure in `.env`:
+   ```env
+   SMTP_HOST="smtp.office365.com"
+   SMTP_PORT="587"
+   SMTP_USER="kareena@grandtravelcruise.com"
+   SMTP_PASSWORD="<your-365-app-password>"
+   SMTP_USE_TLS="true"
+   ```
+* **Benefits**: Zero DNS changes. Emails send directly through Kareena's actual Microsoft 365 mailbox, appear in her Sent folder, and deliver to any customer worldwide without sandbox restrictions.
+
+#### Fallback B: Google / Gmail SMTP with App Password (60-Second Setup)
+*Fastest fallback to send to any real email without touching Microsoft 365 or DNS.*
+
+1. Go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) on any Google Account with 2-Step Verification enabled.
+2. Create an App Password named `KAI Sanctuary` (Google generates a 16-character code).
+3. Configure in `.env`:
+   ```env
+   SMTP_HOST="smtp.gmail.com"
+   SMTP_PORT="587"
+   SMTP_USER="your-email@gmail.com"
+   SMTP_PASSWORD="<16-character-app-password>"
+   SMTP_USE_TLS="true"
+   ```
+* **Benefits**: Zero DNS changes. Instantly bypasses Resend sandbox restrictions and delivers confirmations to any customer email.
+
+#### Fallback C: Email-Link Single Sender Verification (Brevo / Postmark)
+*Services like Brevo or Postmark allow sending from `kareena@grandtravelcruise.com` without DNS by sending a one-click confirmation link to her inbox.*
+
+#### Fallback D: Built-In Sandbox Testing Mirror (Active by Default)
+*While in testing mode using `onboarding@resend.dev`, Resend blocks delivery to external recipients. Our code automatically catches this and forwards a complete **Customer Confirmation Carbon Copy** to `alessionaji1@gmail.com` labeled `[CUSTOMER CONFIRMATION: <email>]` so you can verify the email design and reference code without any setup.*
+
+---
+
+### 3. Testing the Email Pipeline via CLI
+
+To verify transactional delivery at any time from your terminal:
+
+```bash
+# Test direct API handshake and recipient delivery:
+python scripts/send_test_email.py --to your-email@gmail.com
+
+# Test the complete intake pipeline (Founder Alert + Customer Confirmation):
+python scripts/send_test_email.py --to your-email@gmail.com --pipeline
 ```
 
 ---

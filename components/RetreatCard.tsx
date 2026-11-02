@@ -4,16 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
-import {
-  Users,
-  MapPin,
-  Sparkles,
-  ArrowRight,
-  CheckCircle,
-  X,
-  CloudSun,
-  Compass,
-} from "lucide-react";
+import { Users, MapPin, Sparkles, ArrowRight, CheckCircle, X, Sun } from "lucide-react";
 import { Retreat } from "@/lib/types";
 
 interface RetreatCardProps {
@@ -23,18 +14,11 @@ interface RetreatCardProps {
 
 export default function RetreatCard({ retreat, priority = false }: RetreatCardProps) {
   const [showItineraryModal, setShowItineraryModal] = useState(false);
-  const isComingSoon = retreat.status === "coming-soon";
-  const wp = retreat.weatherProfile;
+  const isComingSoon = retreat.status === "coming-soon" || retreat.dates.toLowerCase().includes("coming soon");
 
   return (
     <>
-      <div
-        className={`group flex flex-col overflow-hidden rounded-3xl border bg-linen shadow-sm hover:shadow-md transition-all duration-300 ${
-          retreat.id === "puerto-vallarta-2027"
-            ? "border-terracotta/60 ring-1 ring-terracotta/25"
-            : "border-sand-border"
-        }`}
-      >
+      <div className="group flex flex-col overflow-hidden rounded-3xl border border-sand-border bg-linen shadow-sm hover:shadow-md transition-all duration-300">
         {/* Image Container */}
         <div className="relative h-72 w-full overflow-hidden bg-sand">
           <Image
@@ -45,29 +29,20 @@ export default function RetreatCard({ retreat, priority = false }: RetreatCardPr
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             className="object-cover transition-transform duration-700 group-hover:scale-105"
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-sage-dark/85 via-sage-dark/25 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-sage-dark/80 via-sage-dark/20 to-transparent" />
 
           {/* Top Badges */}
-          <div className="absolute top-4 left-4 right-4 flex items-center justify-between gap-2">
-            <span className="rounded-full bg-linen/95 backdrop-blur-md px-3.5 py-1 text-[11px] font-medium uppercase tracking-wider text-sage border border-sand-border/80">
+          <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+            <span className="rounded-full bg-linen/90 backdrop-blur-md px-3.5 py-1 text-[11px] font-medium uppercase tracking-wider text-sage border border-sand-border/80">
               {retreat.destination}
             </span>
-            {isComingSoon ? (
-              <span className="rounded-full bg-sage-dark/90 backdrop-blur-md px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-sand border border-sand/30 shadow-sm">
-                Coming Soon
-              </span>
-            ) : (
-              <span className="rounded-full bg-terracotta/95 backdrop-blur-md px-3 py-1 text-[11px] font-semibold text-linen shadow-sm">
-                First Retreat of 2027 • {retreat.spotsRemaining} spots left
-              </span>
-            )}
+            <span className="rounded-full bg-terracotta/90 backdrop-blur-md px-3 py-1 text-[11px] font-medium text-linen shadow-sm">
+              {isComingSoon ? "Coming Soon" : `${retreat.spotsRemaining} spots left`}
+            </span>
           </div>
 
           {/* Bottom Title on Image */}
-          <Link
-            href={`/retreats/${retreat.slug}`}
-            className="absolute bottom-4 left-4 right-4 text-linen block group/title"
-          >
+          <Link href={`/retreats/${retreat.slug}`} className="absolute bottom-4 left-4 right-4 text-linen block group/title">
             <span className="text-xs uppercase tracking-widest text-sand-muted font-light block">
               {retreat.dates} • {retreat.duration}
             </span>
@@ -78,35 +53,17 @@ export default function RetreatCard({ retreat, priority = false }: RetreatCardPr
         </div>
 
         {/* Card Body */}
-        <div className="flex flex-1 flex-col p-6 sm:p-7 justify-between space-y-5">
+        <div className="flex flex-1 flex-col p-6 sm:p-7 justify-between space-y-6">
           <div className="space-y-4">
             <p className="text-xs leading-relaxed text-sage/80 line-clamp-3">
               {retreat.description}
             </p>
 
-            {/* Weather Context for Sanctuary Dates */}
-            {wp && (
-              <div className="rounded-2xl border border-sand-border/70 bg-sand/35 p-3 space-y-1 text-xs">
-                <span className="text-[10px] uppercase tracking-wider font-semibold text-olive flex items-center gap-1.5">
-                  <CloudSun className="h-3.5 w-3.5 text-terracotta shrink-0" />
-                  Weather Context • {wp.targetWindow.split("(")[0].trim()}
-                </span>
-                <p className="text-[11px] font-medium text-sage">
-                  {wp.avgHighF}°F High / {wp.avgLowF}°F Low • {wp.oceanTempF}°F Ocean • {wp.climateSummary}
-                </p>
-                <p className="text-[10px] text-sage/75">
-                  Recommended: {wp.whatToPack.slice(0, 3).join(", ")}.
-                </p>
-              </div>
-            )}
-
-            {/* Clinical & Cultural Highlights */}
-            <div className="space-y-2 border-t border-b border-sand-border/60 py-3">
-              <div className="flex items-center justify-between text-xs font-medium text-olive">
-                <span className="flex items-center gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5 text-terracotta" />
-                  <span className="uppercase tracking-wider text-[10px]">Somatic & Cultural Core</span>
-                </span>
+            {/* Clinical & Somatic Highlights */}
+            <div className="space-y-2 border-t border-b border-sand-border/60 py-3.5">
+              <div className="flex items-center gap-2 text-xs font-medium text-olive">
+                <Sparkles className="h-3.5 w-3.5 text-terracotta" />
+                <span className="uppercase tracking-wider text-[10px]">Clinical & Somatic Core</span>
               </div>
               <ul className="space-y-1.5 text-xs text-sage/85">
                 {retreat.clinicalFocus.slice(0, 2).map((focus, idx) => (
@@ -115,25 +72,26 @@ export default function RetreatCard({ retreat, priority = false }: RetreatCardPr
                     <span className="line-clamp-1">{focus}</span>
                   </li>
                 ))}
-                {retreat.culturalIntegrations && retreat.culturalIntegrations[0] && (
-                  <li className="flex items-start gap-2 text-olive">
-                    <Compass className="h-3.5 w-3.5 text-terracotta shrink-0 mt-0.5" />
-                    <span className="line-clamp-1">{retreat.culturalIntegrations[0]}</span>
-                  </li>
-                )}
               </ul>
             </div>
 
             {/* Meta Row */}
-            <div className="grid grid-cols-2 gap-2 text-xs text-sage/75 pt-1">
+            <div className="flex items-center justify-between text-xs text-sage/75 pt-1">
               <div className="flex items-center gap-1.5">
                 <Users className="h-3.5 w-3.5 text-olive shrink-0" />
-                <span>Intimate ({retreat.spotsTotal} guests max)</span>
+                <span>Intimate ({retreat.spotsTotal} max)</span>
               </div>
-              <div className="flex items-center gap-1.5 justify-end">
-                <MapPin className="h-3.5 w-3.5 text-olive shrink-0" />
-                <span>{retreat.country}</span>
-              </div>
+              {retreat.weatherProfile ? (
+                <div className="flex items-center gap-1 text-[11px] text-olive font-medium bg-sand/70 px-2 py-0.5 rounded-full border border-sand-border/60">
+                  <Sun className="h-3 w-3 text-terracotta" />
+                  <span>{retreat.weatherProfile.avgHighF}°F • Dry Season</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5 justify-end">
+                  <MapPin className="h-3.5 w-3.5 text-olive shrink-0" />
+                  <span>{retreat.country}</span>
+                </div>
+              )}
             </div>
           </div>
 
@@ -141,7 +99,7 @@ export default function RetreatCard({ retreat, priority = false }: RetreatCardPr
           <div className="pt-2 flex items-center justify-between gap-3 border-t border-sand-border/60">
             <div>
               <span className="text-[10px] uppercase tracking-wider text-sage/60 block">
-                {isComingSoon ? "Projected Investment" : "Starting From"}
+                Starting From
               </span>
               <span className="font-serif text-xl font-medium text-sage">
                 {retreat.investmentStarting}
@@ -158,11 +116,7 @@ export default function RetreatCard({ retreat, priority = false }: RetreatCardPr
 
               <Link
                 href={`/book?retreat=${retreat.id}`}
-                className={`flex items-center gap-1.5 rounded-full px-4 py-2 text-xs font-medium uppercase tracking-wider transition-all shadow-sm ${
-                  isComingSoon
-                    ? "bg-olive/90 text-linen hover:bg-olive"
-                    : "bg-sage text-linen hover:bg-sage-dark"
-                }`}
+                className="flex items-center gap-1.5 rounded-full bg-sage px-4 py-2 text-xs font-medium uppercase tracking-wider text-linen hover:bg-sage-dark transition-all shadow-sm"
               >
                 <span>{isComingSoon ? "Waitlist" : "Reserve"}</span>
                 <ArrowRight className="h-3 w-3" />
@@ -211,6 +165,7 @@ export default function RetreatCard({ retreat, priority = false }: RetreatCardPr
 
               {/* Modal Content */}
               <div className="mt-6 space-y-8">
+                {/* Description */}
                 <div>
                   <h4 className="text-xs uppercase tracking-widest font-semibold text-olive mb-2">
                     Retreat Essence
@@ -220,6 +175,7 @@ export default function RetreatCard({ retreat, priority = false }: RetreatCardPr
                   </p>
                 </div>
 
+                {/* Accommodations */}
                 <div className="rounded-2xl border border-sand-border bg-sand/50 p-4">
                   <h4 className="text-xs uppercase tracking-widest font-semibold text-olive mb-1">
                     Sanctuary Accommodations
@@ -229,6 +185,7 @@ export default function RetreatCard({ retreat, priority = false }: RetreatCardPr
                   </p>
                 </div>
 
+                {/* Clinical Grounding Rationale */}
                 <div>
                   <h4 className="text-xs uppercase tracking-widest font-semibold text-olive mb-3">
                     The Clinical Science Behind This Sanctuary
@@ -243,6 +200,7 @@ export default function RetreatCard({ retreat, priority = false }: RetreatCardPr
                   </ul>
                 </div>
 
+                {/* Day-by-day Itinerary */}
                 <div>
                   <h4 className="text-xs uppercase tracking-widest font-semibold text-olive mb-3">
                     Curated Daily Rhythm
@@ -273,37 +231,40 @@ export default function RetreatCard({ retreat, priority = false }: RetreatCardPr
                   </div>
                 </div>
 
+                {/* All Inclusions */}
                 <div>
                   <h4 className="text-xs uppercase tracking-widest font-semibold text-olive mb-3">
-                    All-Inclusive Sanctuary Offerings
+                    All-Inclusive Luxury Amenities
                   </h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {retreat.inclusions.map((inc, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-2 text-xs text-sage/80 bg-sand/30 rounded-xl px-3 py-2 border border-sand-border/50"
-                      >
-                        <span className="h-1.5 w-1.5 rounded-full bg-olive shrink-0" />
-                        <span>{inc}</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-sage/85">
+                    {retreat.inclusions.map((item, idx) => (
+                      <div key={idx} className="flex items-start gap-2">
+                        <span className="text-terracotta text-sm leading-none">•</span>
+                        <span>{item}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Modal Bottom Action */}
-                <div className="flex items-center justify-between border-t border-sand-border pt-6">
+                {/* CTA inside Modal */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-sand-border pt-6">
                   <div>
-                    <span className="text-xs text-sage/70 block">Starting Investment</span>
+                    <span className="text-xs text-sage/60 block">Starting Investment</span>
                     <span className="font-serif text-2xl font-medium text-sage">
                       {retreat.investmentStarting}
                     </span>
+                    <span className="text-[11px] text-olive block">
+                      Limited to {retreat.spotsTotal} total guests ({retreat.spotsRemaining} spots remaining)
+                    </span>
                   </div>
+
                   <Link
                     href={`/book?retreat=${retreat.id}`}
                     onClick={() => setShowItineraryModal(false)}
-                    className="rounded-full bg-sage px-6 py-3 text-xs uppercase tracking-widest text-linen hover:bg-sage-dark transition-all shadow-md"
+                    className="w-full sm:w-auto flex items-center justify-center gap-2 rounded-full bg-sage px-6 py-3 text-xs font-medium uppercase tracking-widest text-linen hover:bg-sage-dark transition-all shadow"
                   >
-                    Reserve Your Spot
+                    <span>Reserve Your Spot</span>
+                    <ArrowRight className="h-4 w-4" />
                   </Link>
                 </div>
               </div>

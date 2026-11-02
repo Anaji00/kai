@@ -3,6 +3,53 @@
 import { z } from "zod";
 import crypto from "crypto";
 import { Resend } from "resend";
+import nodemailer from "nodemailer";
+
+async function sendEmailViaSmtp(options: {
+  to: string[];
+  subject: string;
+  html: string;
+  senderName: string;
+}): Promise<boolean> {
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASSWORD;
+  const port = parseInt(process.env.SMTP_PORT || "587", 10);
+  const secure = process.env.SMTP_SECURE === "true" || port === 465;
+
+  if (!host || !user || !pass) {
+    return false;
+  }
+
+  try {
+    const transporter = nodemailer.createTransport({
+      host,
+      port,
+      secure,
+      auth: {
+        user,
+        pass,
+      },
+      tls: {
+        rejectUnauthorized: false,
+      },
+    });
+
+    const fromHeader = `"${options.senderName}" <${user}>`;
+    await transporter.sendMail({
+      from: fromHeader,
+      to: options.to.join(", "),
+      subject: options.subject,
+      html: options.html,
+    });
+    console.log(`[SMTP Live] Dispatched email to ${options.to.join(", ")} via ${host} (From: ${fromHeader})`);
+    return true;
+  } catch (smtpErr) {
+    console.error(`[SMTP Error] Failed sending to ${options.to.join(", ")} via ${host}:`, smtpErr);
+    return false;
+  }
+}
+
 import { BookingFormState } from "@/lib/types";
 import { getRetreatById } from "@/lib/retreats";
 import { backendOrigin } from "@/lib/backend-origin";
@@ -111,12 +158,7 @@ export async function submitBookingInquiry(
     if (resendApiKey) {
       const resend = new Resend(resendApiKey);
 
-      // 1. Internal Alert Email routed to BOTH kareena@grandtravelcruise.com & armaan@grandtravelcruise.com
-      await resend.emails.send({
-        from: fromEmailAdmin,
-        to: FOUNDER_EMAILS,
-        subject: `[New KAI Inquiry] ${retreatTitle} - ${data.fullName} (${bookingReference})`,
-        html: `
+      const adminHtml = `
           <div style="font-family: 'Georgia', serif; color: #2D3E35; max-width: 640px; margin: 0 auto; padding: 30px; background-color: #FAF7F2; border: 1px solid #E5DDD0; border-radius: 12px;">
             <h2 style="color: #2D3E35; border-bottom: 1px solid #E5DDD0; padding-bottom: 12px; margin-top: 0;">New Sanctuary Reservation Inquiry</h2>
             <p><strong>Routed To:</strong> kareena@grandtravelcruise.com &amp; armaan@grandtravelcruise.com</p>
@@ -137,15 +179,9 @@ export async function submitBookingInquiry(
             <hr style="border: none; border-top: 1px solid #E5DDD0; margin: 20px 0;" />
             <p style="font-size: 12px; color: #738475;">Sent from KAI Wellness Retreats Reservation Desk • Founded by Kareena Islam &amp; Armaan Islam</p>
           </div>
-        `,
-      });
+        `;
 
-      // 2. Guest Confirmation Email
-      await resend.emails.send({
-        from: fromEmailConcierge,
-        to: [data.email],
-        subject: `Your KAI Sanctuary Reservation Inquiry for ${retreatTitle} [Ref: ${bookingReference}]`,
-        html: `
+      const guestHtml = `
           <div style="font-family: 'Georgia', serif; color: #2D3E35; max-width: 640px; margin: 0 auto; padding: 40px; background-color: #FAF7F2; border: 1px solid #E5DDD0; border-radius: 16px; line-height: 1.6;">
             <div style="text-align: center; margin-bottom: 30px;">
               <span style="font-size: 24px; letter-spacing: 4px; text-transform: uppercase; color: #2D3E35; display: block;">K A I</span>
@@ -171,8 +207,81 @@ export async function submitBookingInquiry(
               <span style="font-size: 13px; color: #738475;">Co-Founders, KAI Wellness Retreats • Grand Travel &amp; Cruise</span>
             </p>
           </div>
-        `,
-      });
+        `;
+
+      // 1. Internal Founder Alert (Dual Engine: SMTP -> Resend Fallback)
+      let founderSent = false;
+      if (process.env.SMTP_HOST) {
+        founderSent = await sendEmailViaSmtp({
+          to: FOUNDER_EMAILS,
+          subject: `[New KAI Inquiry] ${retreatTitle} - ${data.fullName} (${bookingReference})`,
+          html: adminHtml,
+          senderName: "KAI Sanctuary Reservations",
+        });
+      }
+
+      if (!founderSent) {
+        try {
+          await resend.emails.send({
+            from: fromEmailAdmin,
+            to: FOUNDER_EMAILS,
+            subject: `[New KAI Inquiry] ${retreatTitle} - ${data.fullName} (${bookingReference})`,
+            html: adminHtml,
+          });
+          console.log(`[Resend Live] Founder Alert sent to ${FOUNDER_EMAILS.join(", ")} for ${bookingReference}`);
+        } catch (err: unknown) {
+          console.error("[Resend Error] Founder Alert failed:", err instanceof Error ? err.message : err);
+        }
+      }
+
+      // 2. Customer Confirmation Email (Dual Engine: SMTP -> Resend -> Sandbox Mirror)
+      let guestSent = false;
+      if (process.env.SMTP_HOST) {
+        guestSent = await sendEmailViaSmtp({
+          to: [data.email],
+          subject: `Your KAI Sanctuary Reservation Inquiry for ${retreatTitle} [Ref: ${bookingReference}]`,
+          html: guestHtml,
+          senderName: "KAI Concierge Desk",
+        });
+      }
+
+      if (!guestSent) {
+        try {
+          const guestRes = await resend.emails.send({
+            from: fromEmailConcierge,
+            to: [data.email],
+            subject: `Your KAI Sanctuary Reservation Inquiry for ${retreatTitle} [Ref: ${bookingReference}]`,
+            html: guestHtml,
+          });
+          if (guestRes.error) {
+            throw new Error(guestRes.error.message);
+          }
+          console.log(`[Resend Live] Guest Confirmation dispatched to ${data.email} for ${bookingReference}`);
+        } catch (err: unknown) {
+          const errMsg = err instanceof Error ? err.message : String(err);
+          console.error(`[Resend Error] Guest Confirmation to ${data.email} failed:`, errMsg);
+
+          // If delivery to customer fails (e.g. sandbox restriction or domain pending verification):
+          // Deliver the exact Customer Confirmation copy to the test founder inbox so it can be verified.
+          if (FOUNDER_EMAILS.length > 0) {
+            try {
+              await resend.emails.send({
+                from: "KAI Concierge Desk <onboarding@resend.dev>",
+                to: FOUNDER_EMAILS,
+                subject: `[CUSTOMER CONFIRMATION: ${data.email}] Your KAI Reservation for ${retreatTitle} [Ref: ${bookingReference}]`,
+                html: `
+                  <div style="background-color: #FFF3CD; border: 1px solid #FFEEBA; color: #856404; padding: 14px 18px; border-radius: 8px; margin-bottom: 24px; font-family: sans-serif; font-size: 13px; line-height: 1.5;">
+                    <strong>Customer Delivery Notice:</strong> In production with your verified domain (<code>kaiwellnessretreats.com</code>) or SMTP, this confirmation is delivered directly to the customer (<code>${data.email}</code>). In testing sandbox mode, Resend delivers this customer copy here to <code>${FOUNDER_EMAILS[0]}</code> so you can review the exact layout and reference code.
+                  </div>
+                ` + guestHtml,
+              });
+              console.log(`[Resend Fallback] Delivered customer confirmation preview to ${FOUNDER_EMAILS[0]}`);
+            } catch (mirrorErr) {
+              console.error("[Resend Fallback Error]:", mirrorErr);
+            }
+          }
+        }
+      }
     } else {
       console.log("[Resend Simulated Dual Founder Alert to kareena@grandtravelcruise.com & armaan@grandtravelcruise.com]:", {
         to: FOUNDER_EMAILS,

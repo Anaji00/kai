@@ -16,6 +16,7 @@ import {
   ChevronRight,
   Waves,
   Globe2,
+  Sun,
 } from "lucide-react";
 import { RETREATS, getRetreatBySlug } from "@/lib/retreats";
 
@@ -439,6 +440,12 @@ export default async function RetreatDetailPage({ params }: PageProps) {
                   <Clock className="h-4 w-4 text-olive shrink-0" />
                   <span>{retreat.duration}</span>
                 </div>
+                {retreat.weatherProfile && (
+                  <div className="flex items-center gap-2.5">
+                    <Sun className="h-4 w-4 text-terracotta shrink-0" />
+                    <span>{retreat.weatherProfile.avgHighF}°F High / {retreat.weatherProfile.avgLowF}°F Low • Dry Season ({retreat.weatherProfile.oceanTempF}°F Ocean)</span>
+                  </div>
+                )}
                 <div className="flex items-center gap-2.5">
                   <Compass className="h-4 w-4 text-olive shrink-0" />
                   <span>Logistics by Grand Travel & Cruise</span>

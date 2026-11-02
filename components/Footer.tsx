@@ -2,7 +2,7 @@
 
 import React, { useActionState } from "react";
 import Link from "next/link";
-import { Compass, ArrowRight, CheckCircle2, Loader2, Mail, Globe, Share2 } from "lucide-react";
+import { Compass, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { subscribeNewsletter } from "@/app/actions/booking";
 
@@ -33,89 +33,35 @@ export default function Footer() {
               </div>
             </div>
 
-            <p className="font-serif italic text-lg text-sage/95 leading-snug">
-              &ldquo;KAI Wellness Retreats is a place where your peace within can blend with the pieces around.&rdquo;
+            <p className="font-serif italic text-lg text-sage/90">
+              &ldquo;Kai means renewal in Japanese. A return to balance. To presence. To yourself.&rdquo;
             </p>
 
             <p className="text-xs leading-relaxed text-sage/75">
-              Immersive somatic & cultural sanctuaries founded by <strong>Kareena Islam, BSN, RN, RYT</strong> & <strong>Armaan Islam</strong>. Rooted in clinical restorative science, Ironman endurance discipline, 432Hz crystal sound resonance, cultural integrations, and <strong>Grand Travel & Cruise</strong> luxury execution.
+              Immersive somatic sanctuaries thoughtfully curated by Kareena Islam. Rooted in restorative wellness science, anatomical yoga, crystal sound resonance, and high-touch luxury travel.
             </p>
 
-            {/* Direct Founder Inquiry Emails */}
-            <div className="rounded-2xl border border-sand-border bg-linen/80 p-3.5 space-y-1.5 text-xs">
-              <span className="text-[10px] uppercase tracking-wider font-semibold text-olive flex items-center gap-1.5">
-                <Mail className="h-3 w-3 text-terracotta" /> Direct Founders Inquiry Desk
-              </span>
+            {/* Social & Partner Badges */}
+            <div className="flex flex-wrap items-center gap-3 pt-2">
               <a
-                href="mailto:kareena@grandtravelcruise.com"
-                className="block text-sage hover:text-terracotta transition-colors font-medium"
+                href="https://www.instagram.com/kaiwellnessretreats/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-full border border-sand-border bg-linen px-3.5 py-1.5 text-xs text-sage hover:text-terracotta hover:border-terracotta transition-colors"
               >
-                kareena@grandtravelcruise.com
+                <InstagramIcon className="h-3.5 w-3.5" />
+                <span>@kaiwellnessretreats</span>
               </a>
+
               <a
-                href="mailto:armaan@grandtravelcruise.com"
-                className="block text-sage hover:text-terracotta transition-colors font-medium"
+                href="https://www.instagram.com/kareenatravelrn/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 rounded-full border border-sand-border bg-linen px-3.5 py-1.5 text-xs text-sage hover:text-terracotta hover:border-terracotta transition-colors"
               >
-                armaan@grandtravelcruise.com
+                <InstagramIcon className="h-3.5 w-3.5" />
+                <span>@kareenatravelrn</span>
               </a>
-            </div>
-
-            {/* Social & Grand Travel Social Media Badges */}
-            <div className="space-y-2 pt-1">
-              <span className="text-[10px] uppercase tracking-widest text-olive font-semibold flex items-center gap-1.5">
-                <Share2 className="h-3 w-3 text-terracotta" /> KAI & Grand Travel Social Media
-              </span>
-              <div className="flex flex-wrap items-center gap-2">
-                <a
-                  href="https://www.instagram.com/kaiwellnessretreats/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 rounded-full border border-sand-border bg-linen px-3 py-1.5 text-[11px] text-sage hover:text-terracotta hover:border-terracotta transition-colors"
-                >
-                  <InstagramIcon className="h-3 w-3" />
-                  <span>@kaiwellnessretreats</span>
-                </a>
-
-                <a
-                  href="https://www.instagram.com/kareenatravelrn/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 rounded-full border border-sand-border bg-linen px-3 py-1.5 text-[11px] text-sage hover:text-terracotta hover:border-terracotta transition-colors"
-                >
-                  <InstagramIcon className="h-3 w-3" />
-                  <span>@kareenatravelrn</span>
-                </a>
-
-                <a
-                  href="https://www.instagram.com/grandtravelcruise/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 rounded-full border border-sand-border bg-linen px-3 py-1.5 text-[11px] text-sage hover:text-terracotta hover:border-terracotta transition-colors"
-                >
-                  <InstagramIcon className="h-3 w-3" />
-                  <span>@grandtravelcruise</span>
-                </a>
-
-                <a
-                  href="https://www.facebook.com/grandtravelcruise"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 rounded-full border border-sand-border bg-linen px-3 py-1.5 text-[11px] text-sage hover:text-terracotta hover:border-terracotta transition-colors"
-                >
-                  <Globe className="h-3 w-3 text-olive" />
-                  <span>FB: Grand Travel & Cruise</span>
-                </a>
-
-                <a
-                  href="https://grandtravelcruise.com/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 rounded-full border border-sand-border bg-linen px-3 py-1.5 text-[11px] text-sage hover:text-terracotta hover:border-terracotta transition-colors"
-                >
-                  <Compass className="h-3 w-3 text-terracotta" />
-                  <span>grandtravelcruise.com</span>
-                </a>
-              </div>
             </div>
           </div>
 
@@ -126,60 +72,57 @@ export default function Footer() {
             </h4>
             <ul className="space-y-2 text-xs text-sage/80">
               <li>
-                <Link
-                  href="/retreats/puerto-vallarta-mexico-2027"
-                  className="text-terracotta font-semibold hover:underline transition-colors"
-                >
-                  Puerto Vallarta • Marival Harmony (Jan 28–31, 2027)
-                </Link>
-              </li>
-              <li>
                 <Link href="/retreats" className="hover:text-terracotta transition-colors">
-                  All 2027 Retreats
+                  All 2026–2027 Retreats
                 </Link>
               </li>
               <li>
-                <Link href="/retreats/nosara-costa-rica-2027" className="hover:text-terracotta transition-colors">
-                  Nosara, Costa Rica (Coming Soon)
+                <Link href="/book?retreat=nosara-2027" className="hover:text-terracotta transition-colors">
+                  Nosara, Costa Rica (Feb 2027)
                 </Link>
               </li>
               <li>
-                <Link href="/retreats/amalfi-coast-italy-2027" className="hover:text-terracotta transition-colors">
-                  Amalfi Coast, Italy (Coming Soon)
+                <Link href="/book?retreat=amalfi-2027" className="hover:text-terracotta transition-colors">
+                  Amalfi Coast, Italy (May 2027)
                 </Link>
               </li>
               <li>
-                <Link href="/retreats/ubud-sidemen-bali-2027" className="hover:text-terracotta transition-colors">
-                  Ubud & Sidemen, Bali (Coming Soon)
+                <Link href="/book?retreat=bali-2027" className="hover:text-terracotta transition-colors">
+                  Ubud & Sidemen, Bali (Sep 2027)
+                </Link>
+              </li>
+              <li>
+                <Link href="/book?retreat=riviera-2026" className="hover:text-terracotta transition-colors">
+                  Riviera Maya, Mexico (Fall 2026)
                 </Link>
               </li>
               <li>
                 <Link href="/book?retreat=custom" className="hover:text-terracotta transition-colors">
-                  Private & Corporate Groups
+                  Private & Custom Groups
                 </Link>
               </li>
             </ul>
           </div>
 
-          {/* Founders & Community */}
+          {/* Founder & Clinical Pillars */}
           <div className="md:col-span-2 space-y-3">
             <h4 className="text-xs uppercase tracking-[0.2em] font-semibold text-olive">
-              Founders & Voices
+              Foundation
             </h4>
             <ul className="space-y-2 text-xs text-sage/80">
               <li>
                 <Link href="/about" className="hover:text-terracotta transition-colors">
-                  Founders: Kareena & Armaan Islam
+                  Meet Kareena Islam
                 </Link>
               </li>
               <li>
-                <Link href="/about#cultural-integrations" className="hover:text-terracotta transition-colors">
-                  Cultural Integrations
+                <Link href="/about#clinical-science" className="hover:text-terracotta transition-colors">
+                  Clinical Restorative Science
                 </Link>
               </li>
               <li>
-                <Link href="/testimonials" className="hover:text-terracotta transition-colors">
-                  Testimonials & Past Retreat Photos
+                <Link href="/about#triad-of-care" className="hover:text-terracotta transition-colors">
+                  The Triad of Care
                 </Link>
               </li>
               <li>
@@ -195,7 +138,7 @@ export default function Footer() {
               </li>
               <li>
                 <Link href="/book" className="hover:text-terracotta transition-colors">
-                  Sanctuary Reservations & Waiver
+                  Sanctuary Reservations
                 </Link>
               </li>
             </ul>
@@ -207,7 +150,7 @@ export default function Footer() {
               Intimate Retreat Announcements
             </h4>
             <p className="text-xs text-sage/75 leading-relaxed">
-              Because our retreats maintain an intimate capacity of 12 to 16 guests, openings and new 2027 dates are released privately to our circle first.
+              Because our retreats maintain an intimate capacity of 12 to 14 guests, openings are released privately to our circle first.
             </p>
 
             {state.success ? (
@@ -254,7 +197,7 @@ export default function Footer() {
                   Curated with Grand Travel & Cruise
                 </span>
                 <span className="text-[11px] text-sage/70">
-                  25+ years of luxury travel mastery • Funjet 500 Club • <em>Future Leaders in Travel</em> Honoree.
+                  25+ years of luxury travel mastery. <em>Future Leaders in Travel</em> Honoree.
                 </span>
               </div>
             </div>
@@ -265,12 +208,22 @@ export default function Footer() {
         <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-6 text-[11px] text-sage/60 leading-relaxed">
           <div className="max-w-2xl">
             <p>
-              <strong className="font-medium text-sage/75">Clinical Somatics & Liability Notice:</strong> KAI Wellness Retreats provides restorative somatic movement, parasympathetic breathwork, endurance recovery, and cultural guidance led by Kareena Islam & Armaan Islam. Programming is designed for nervous system restoration and is not a substitute for acute diagnostic medical care.
+              <strong className="font-medium text-sage/75">Clinical Somatics Notice:</strong> KAI Wellness Retreats provides restorative somatic movement, parasympathetic breathwork, and wellness guidance led by Kareena Islam. Programming is designed for nervous system restoration and stress alleviation; it is not a substitute for diagnostic medical care or acute clinical intervention.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-4 text-center md:text-right shrink-0">
             <span>© {new Date().getFullYear()} KAI Wellness Retreats. All rights reserved.</span>
             <span>#LivingBIG • Be In Gratitude</span>
+            <a
+              href="/api/v1/health"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 hover:text-olive transition-colors text-[10px] text-sage/75"
+              title="FastAPI Backend Health & OpenAPI Documentation"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-olive animate-pulse" />
+              <span>API Engine: Active</span>
+            </a>
           </div>
         </div>
       </div>
