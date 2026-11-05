@@ -1,5 +1,5 @@
 // KAI Sanctuary & Travel Concierge - Offline Service Worker
-const CACHE_NAME = "kai-sanctuary-v1";
+const CACHE_NAME = "kai-sanctuary-v2";
 const OFFLINE_URL = "/offline";
 
 const PRECACHE_ASSETS = [
@@ -36,8 +36,14 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const { request } = event;
 
-  // Don't intercept POST/PUT/DELETE or API calls
-  if (request.method !== "GET" || request.url.includes("/api/")) {
+  // Don't intercept POST/PUT/DELETE, API calls, or private pages (session and magic-link URLs must never be cached)
+  const { pathname } = new URL(request.url);
+  if (
+    request.method !== "GET" ||
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/portal") ||
+    pathname.startsWith("/my-retreat")
+  ) {
     return;
   }
 

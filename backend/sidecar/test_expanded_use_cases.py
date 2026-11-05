@@ -32,6 +32,7 @@ from fastapi.testclient import TestClient
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from backend.main import app
+from backend.testing import admin_headers
 from backend.database import SessionLocal, init_db
 from backend.config import settings
 from backend.models import Booking, FlightConciergeRequest, CustomGroupInquiry, ActionDraft
@@ -54,11 +55,7 @@ from backend.sidecar.services.voice_transcriber import extract_entities_from_tra
 from backend.sidecar.services.continuity_service import generate_continuity_milestones
 from backend.sidecar.services.lead_gen import discover_and_stage_leads
 
-ADMIN_USER = settings.ADMIN_USERNAME or "kai_founder"
-ADMIN_PASS = settings.ADMIN_PASSWORD or "kai_sanctuary_2026"
-AUTH_HEADER = {
-    "Authorization": f"Basic {base64.b64encode(f'{ADMIN_USER}:{ADMIN_PASS}'.encode()).decode()}"
-}
+AUTH_HEADER = admin_headers()
 
 client = TestClient(app, headers=AUTH_HEADER)
 

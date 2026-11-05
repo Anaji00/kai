@@ -1,6 +1,11 @@
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from typing import Optional, Dict, Any, List
 from datetime import datetime
+from backend.sidecar.services.clinical_governance_engine import (
+    ClinicalEvaluationReport,
+    ClinicalFinding,
+    ClinicalSeverity,
+)
 
 
 # -----------------------------------------------------------------------------

@@ -4,7 +4,7 @@ from backend.database import get_db
 from backend.models import FlightConciergeRequest, ActionDraft
 from backend.schemas import FlightRequestCreate, FlightRequestResponse
 from backend.services.email_service import send_flight_request_alert
-from backend.sidecar.routers.webhooks import verify_admin
+from backend.dependencies.auth import get_current_admin
 
 router = APIRouter(prefix="/concierge", tags=["Grand Travel & Cruise Flight Desk"])
 
@@ -118,7 +118,7 @@ def submit_flight_request(data: FlightRequestCreate, db: Session = Depends(get_d
     )
 
 
-@router.get("/requests", dependencies=[Depends(verify_admin)])
+@router.get("/requests", dependencies=[Depends(get_current_admin)])
 def list_flight_requests(db: Session = Depends(get_db)):
     """Admin view of all active flight desk requests."""
     return db.query(FlightConciergeRequest).order_by(FlightConciergeRequest.created_at.desc()).all()

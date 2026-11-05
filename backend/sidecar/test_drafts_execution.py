@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 from fastapi.testclient import TestClient
 from backend.main import app
+from backend.testing import admin_headers
 from backend.database import SessionLocal, init_db
 from backend.models import ActionDraft, Booking, FlightConciergeRequest
 from backend.sidecar.models import (
@@ -25,8 +26,7 @@ class TestActionDraftExecution(unittest.TestCase):
     def setUpClass(cls):
         init_db()
         cls.unauth_client = TestClient(app)
-        auth_header = "Basic " + base64.b64encode(b"admin:kai_admin_2026").decode()
-        cls.client = TestClient(app, headers={"Authorization": auth_header})
+        cls.client = TestClient(app, headers=admin_headers())
         with SessionLocal() as db:
             seed_all_synthetic_data(db)
 

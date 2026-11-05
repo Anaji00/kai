@@ -14,8 +14,10 @@ import {
   Loader2,
   Send,
   Database,
+  ArrowRight,
 } from 'lucide-react';
 import { submitVoiceConsultationMemo, transcribeVoiceMemo, VoiceMemoResponse } from '@/lib/sidecar-api';
+import { dispatchFormFill } from '@/lib/portal-form-bus';
 
 interface VoiceConsultationModalProps {
   isOpen: boolean;
@@ -395,23 +397,55 @@ export default function VoiceConsultationModal({
           >
             {result ? 'Close' : 'Cancel'}
           </button>
-          <button
-            onClick={handleTranscribeAndStage}
-            disabled={loading || !transcript.trim()}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-neutral-950 font-medium text-xs tracking-wide transition-all shadow-md shadow-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span>Populating Software Records...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles className="w-4 h-4" />
-                <span>Populate Software Records from Voice Note</span>
-              </>
-            )}
-          </button>
+          {result ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  dispatchFormFill({
+                    form_type: "guest_intake",
+                    form_title: `Voice Consultation Intake: ${result.extracted_data.client_name}`,
+                    target_tab: "founder_studio",
+                    target_url: "/portal",
+                    fields: {
+                      client_name: result.extracted_data.client_name,
+                      sanctuary_slug: result.extracted_data.sanctuary_slug,
+                      room_tier: result.extracted_data.room_tier,
+                      email: result.extracted_data.email || `${result.extracted_data.client_name.toLowerCase().replace(/\s+/g, ".")}@example.com`,
+                      clinical_profile: result.extracted_data.clinical_profile || {},
+                      wellness_profile: result.extracted_data.wellness_profile || {},
+                      flight_request: result.extracted_data.flight_request || {},
+                    },
+                    summary: `Voice Memo Intake for ${result.extracted_data.client_name} at ${result.extracted_data.sanctuary_slug}`,
+                    requires_approval: true
+                  });
+                  onClose();
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs tracking-wide transition-all shadow-md cursor-pointer"
+              >
+                <span>Open Pre-Filled Intake</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleTranscribeAndStage}
+              disabled={loading || !transcript.trim()}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 text-neutral-950 font-medium text-xs tracking-wide transition-all shadow-md shadow-amber-500/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Populating Software Records...</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-4 h-4" />
+                  <span>Populate Software Records from Voice Note</span>
+                </>
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>

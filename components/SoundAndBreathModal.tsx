@@ -276,7 +276,7 @@ export default function SoundAndBreathModal({
 
                 <div className="mt-6 max-w-xs space-y-1">
                   <p className="text-xs text-sage-muted">
-                    Clinical grounding: The 4-7-8 cadence gently stimulates the vagus nerve, immediately signaling the brain to calm fight-or-flight stress and invite restful ease.
+                    Slow breathing with a long exhale can help calm your nervous system and ease stress. Stop if you feel lightheaded.
                   </p>
                   <p className="text-xs text-olive font-medium">
                     Cycles completed: {completedCycles}
@@ -359,7 +359,7 @@ export default function SoundAndBreathModal({
                         : "bg-sand text-sage hover:bg-sand-muted"
                     }`}
                   >
-                    432 Hz • Cellular Harmony
+                    432 Hz • Low and Warm
                   </button>
                   <button
                     onClick={() => changeFrequency(528)}
@@ -369,12 +369,12 @@ export default function SoundAndBreathModal({
                         : "bg-sand text-sage hover:bg-sand-muted"
                     }`}
                   >
-                    528 Hz • Miraculous Repair
+                    528 Hz • Bright and Clear
                   </button>
                 </div>
 
                 <p className="mt-4 max-w-xs text-xs text-sage-muted">
-                  Curated in homage to Kareena Islam’s crystal singing bowl sound healing sessions. Acoustic waves promote theta brainwave synchronization for profound restorative calm.
+                  Inspired by Kareena Islam’s crystal singing bowl sessions. Put on headphones, close your eyes, and take a few minutes for yourself.
                 </p>
               </div>
             )}

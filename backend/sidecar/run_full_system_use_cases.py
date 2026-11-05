@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 from fastapi.testclient import TestClient
 from backend.main import app
+from backend.testing import admin_headers, signed_webhook_request
 from backend.config import settings
 from backend.database import SessionLocal
 from backend.models import NewsletterSubscriber, ActionDraft
@@ -33,11 +34,7 @@ from backend.sidecar.models import VendorSupplierRecord, StagedLead, WebhookEven
 
 client = TestClient(app)
 
-ADMIN_USER = settings.ADMIN_USERNAME or "kai_founder"
-ADMIN_PASS = settings.ADMIN_PASSWORD or "kai_sanctuary_2026"
-AUTH_HEADER = {
-    "Authorization": f"Basic {base64.b64encode(f'{ADMIN_USER}:{ADMIN_PASS}'.encode()).decode()}"
-}
+AUTH_HEADER = admin_headers()
 
 def banner(title: str):
     print("\n" + "=" * 70)
@@ -160,8 +157,6 @@ def test_suite_3_vendor_registry():
 
 def test_suite_4_flight_radar_delay_webhook():
     banner("Aspect 4: Cirium Flight Delay Radar & Chauffeur Rescheduling")
-    settings.WEBHOOK_SECRET = "whsec_kai_sanctuary_2026"
-
     # Ingest flight delay webhook
     delay_payload = {
         "provider": "cirium_flights",
@@ -175,8 +170,7 @@ def test_suite_4_flight_radar_delay_webhook():
 
     res_wh = client.post(
         "/api/v1/sidecar/webhooks/flight-desk",
-        json=delay_payload,
-        headers={"X-Webhook-Secret": "whsec_kai_sanctuary_2026"}
+        **signed_webhook_request(delay_payload)
     )
     assert res_wh.status_code == 200
     wh_data = res_wh.json()
@@ -202,8 +196,6 @@ def test_suite_4_flight_radar_delay_webhook():
 
 def test_suite_5_hospitality_hotel_webhook():
     banner("Aspect 5: Expedia EPS / Hotel PMS Gateway Hospitality Ingestion")
-    settings.WEBHOOK_SECRET = "whsec_kai_sanctuary_2026"
-
     hotel_payload = {
         "provider": "expedia_pms",
         "event_type": "hospitality.hotel_confirmed",
@@ -218,8 +210,7 @@ def test_suite_5_hospitality_hotel_webhook():
 
     res_hosp = client.post(
         "/api/v1/sidecar/webhooks/hospitality",
-        json=hotel_payload,
-        headers={"X-Webhook-Secret": "whsec_kai_sanctuary_2026"}
+        **signed_webhook_request(hotel_payload)
     )
     assert res_hosp.status_code == 200
     hosp_data = res_hosp.json()

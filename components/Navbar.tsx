@@ -36,6 +36,9 @@ export default function Navbar() {
     { label: "Reserve", href: "/book" },
   ];
 
+  // The portal has its own header.
+  if (pathname === "/portal" || pathname.startsWith("/portal/")) return null;
+
   return (
     <>
       <header

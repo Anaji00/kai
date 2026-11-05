@@ -16,6 +16,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
 from backend.main import app
+from backend.testing import admin_headers
 from backend.database import SessionLocal, get_db
 from backend.models import ActionDraft
 from backend.sidecar.models import StagingIntake, GuestPortalSession, GuestSomaticPulse
@@ -31,7 +32,7 @@ from backend.sidecar.services.guest_portal_service import (
 )
 
 client = TestClient(app)
-ADMIN_HEADERS = {"Authorization": "Basic YWRtaW46a2FpX2FkbWluXzIwMjY="}
+ADMIN_HEADERS = admin_headers()
 
 
 @pytest.fixture

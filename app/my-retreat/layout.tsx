@@ -1,10 +1,12 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "My Sanctuary Companion | KAI Wellness Retreats",
-  description:
-    "Your personal KAI Wellness Retreats companion. Access your somatic schedule, flight tracking, live weather, packing checklist, and breathwork tools.",
-  robots: { index: false, follow: false },
+  title: "Sanctuary Guest Companion | KAI Wellness Retreats",
+  description: "Private retreat itinerary, flight concierge, and somatic schedule companion for registered sanctuary guests.",
+  robots: {
+    index: false,
+    follow: false,
+  },
 };
 
 export default function MyRetreatLayout({

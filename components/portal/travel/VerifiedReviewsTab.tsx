@@ -160,7 +160,7 @@ export default function VerifiedReviewsTab({ sanctuarySlug }: VerifiedReviewsTab
             className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-purple-900 bg-purple-50 hover:bg-purple-100 border border-purple-200 rounded-md transition-colors shadow-2xs"
           >
             <Send className="w-3.5 h-3.5 text-purple-700" />
-            <span>{simulating ? "Scoring..." : "Simulate Survey Webhook"}</span>
+            <span>{simulating ? "Scoring..." : "Test Guest Review Form"}</span>
           </button>
           <button
             onClick={() => setShowAddModal(true)}
@@ -233,7 +233,7 @@ export default function VerifiedReviewsTab({ sanctuarySlug }: VerifiedReviewsTab
       <div className="space-y-4">
         {reviews.length === 0 ? (
           <div className="p-12 text-center bg-white rounded-xl border border-[#E5DDD0] text-xs text-[#5C6B5E]">
-            No guest reflections published yet. Click &ldquo;Simulate Survey Webhook&rdquo; to test review ingestion.
+            No guest reflections published yet. Click &ldquo;Test Guest Review Form&rdquo; to see how reviews appear.
           </div>
         ) : (
           reviews.map(rev => (

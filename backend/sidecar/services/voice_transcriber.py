@@ -108,7 +108,9 @@ def extract_entities_from_transcript(transcript: str) -> Dict[str, Any]:
     # 7. Elevated Clinical Screening (Specialized Feature Flag)
     clinical_screening_enabled = False
     clinical_flags = []
-    clinical_notes = "No acute medical contraindications flagged during consultation."
+    # The clinical engine reads these notes, so they carry what was actually dictated. A summary here would
+    # hide allergies and medications from it.
+    clinical_notes = f"Dictated in consultation: {text}"
 
     for trigger in CONTRAINDICATION_TRIGGERS:
         if trigger in text_lower:
@@ -117,7 +119,7 @@ def extract_entities_from_transcript(transcript: str) -> Dict[str, Any]:
             clinical_flags.append(flag_name)
 
     if clinical_screening_enabled:
-        clinical_notes = f"Elevated clinical review active for {client_name}: flagged considerations regarding {', '.join(clinical_flags)}."
+        clinical_notes = f"Elevated clinical review active for {client_name}: flagged considerations regarding {', '.join(clinical_flags)}. {clinical_notes}"
 
     # 8. Try structured LLM parsing with Groq when configured, fallback cleanly to rule-based
     try:
@@ -127,7 +129,7 @@ def extract_entities_from_transcript(transcript: str) -> Dict[str, Any]:
 Extract the GUEST details (the guest being consulted, NOT the founder Kareena Islam). Return ONLY a JSON object with:
 {{
   "guest_name": "string or null",
-  "sanctuary_slug": "nosara | amalfi | bali | riviera-maya or null",
+  "sanctuary_slug": "puerto-vallarta-2027 | nosara | amalfi | bali | riviera-maya or null",
   "room_tier": "string or null",
   "primary_focus": "string or null",
   "nutrition_preferences": "string or null",

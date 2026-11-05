@@ -17,6 +17,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 from fastapi.testclient import TestClient
 from backend.main import app
+from backend.testing import admin_headers, signed_webhook_request
 from backend.config import settings
 from backend.database import SessionLocal
 from backend.models import Booking, FlightConciergeRequest, ActionDraft
@@ -24,11 +25,7 @@ from backend.sidecar.models import StagingIntake, StagedEmail
 
 client = TestClient(app)
 
-ADMIN_USER = settings.ADMIN_USERNAME or "kai_founder"
-ADMIN_PASS = settings.ADMIN_PASSWORD or "kai_sanctuary_2026"
-AUTH_HEADER = {
-    "Authorization": f"Basic {base64.b64encode(f'{ADMIN_USER}:{ADMIN_PASS}'.encode()).decode()}"
-}
+AUTH_HEADER = admin_headers()
 
 def print_banner(title: str):
     print("\n" + "=" * 70)
@@ -117,7 +114,6 @@ def run_use_case_2_flight_concierge(booking_ref: str):
 
 def run_use_case_3_inbound_email_voucher_triage():
     print_banner("Use Case 3: Inbound Concierge Email Triage & Flight Voucher Parsing")
-    settings.EMAIL_WEBHOOK_SECRET = "whsec_email_kai_sanctuary_2026"
 
     email_payload = {
         "sender": "reservations@grandtravel.com",
@@ -133,8 +129,7 @@ def run_use_case_3_inbound_email_voucher_triage():
 
     res = client.post(
         "/api/v1/sidecar/email-in/ingest",
-        json=email_payload,
-        headers={"X-Email-Webhook-Secret": "whsec_email_kai_sanctuary_2026"}
+        **signed_webhook_request(email_payload)
     )
     assert res.status_code in [200, 201]
     staged = res.json()
@@ -214,7 +209,24 @@ def run_use_case_5_whatsapp_operator_dispatch():
     reply_data = res_reply.json()
     assert reply_data["success"] is True
 
-    # 4. 1-Tap Button Click: Authorize & Commit to Sanctuary CRM
+    # 4. A clinical hold blocks the 1-tap commit until a nurse clearance is on record
+    res_detail = client.get(f"/api/v1/sidecar/intakes/{intake_id}", headers=AUTH_HEADER)
+    evaluation = (res_detail.json().get("consultation_thesis") or {}).get("deterministic_clinical_evaluation") or {}
+    if evaluation.get("hard_hold"):
+        res_blocked = client.post(
+            "/api/v1/sidecar/webhook/whatsapp/simulate",
+            json={"intake_id": intake_id, "action": "CLICK_BUTTON", "button_id": f"approve_sync_{intake_id}", "operator_name": "Kareena Islam"},
+            headers=AUTH_HEADER
+        )
+        assert res_blocked.json()["updated_intake"]["status"] != "CONFIRMED_IN_CRM"
+        res_clear = client.post(
+            f"/api/v1/sidecar/intakes/{intake_id}/clinical-hold/override",
+            json={"reason": "Reviewed by nurse; contraindicated modalities removed from the plan."},
+            headers=AUTH_HEADER
+        )
+        assert res_clear.status_code == 200
+
+    # 5. 1-Tap Button Click: Authorize & Commit to Sanctuary CRM
     res_click = client.post(
         "/api/v1/sidecar/webhook/whatsapp/simulate",
         json={
@@ -246,7 +258,7 @@ def run_use_case_6_travel_logistics_and_dossier():
     assert len(dossier["packing_checklist"]) >= 5
 
     # 2. Curated Dining
-    res_dining = client.get("/api/v1/sidecar/travel/dining?sanctuary_slug=nosara", headers=AUTH_HEADER)
+    res_dining = client.get("/api/v1/sidecar/travel/dining?sanctuary_slug=puerto-vallarta", headers=AUTH_HEADER)
     assert res_dining.status_code == 200
     dining = res_dining.json()
     assert len(dining) >= 3
@@ -288,7 +300,7 @@ def run_use_case_7_action_draft_lifecycle():
     res_app = client.post(f"/api/v1/drafts/{draft_to_approve['id']}/approve", headers=AUTH_HEADER)
     assert res_app.status_code == 200
     app_data = res_app.json()
-    assert app_data["status"] == "success"
+    assert app_data["status"] == "approved"
     assert app_data["dispatch_result"] is not None
 
     # 3. Discard draft_to_discard

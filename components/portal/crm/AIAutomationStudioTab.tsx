@@ -187,14 +187,14 @@ export default function AIAutomationStudioTab({
             <div>
               <div className="flex items-center space-x-2 flex-wrap">
                 <h2 className="font-serif text-xl font-bold text-stone-50">
-                  AI Assistants &amp; Scenario Automation Command Center
+                  Retreat Staff Assistants &amp; Automation Tools
                 </h2>
                 <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
-                  {telemetry?.journal_mode || "SQLite WAL Native"}
+                  Direct Sanctuary Database
                 </span>
               </div>
               <p className="text-xs text-stone-400 mt-1">
-                Powered by 5 specialized AI Assistant Personas &amp; 15 Database-Backed Playbooks distilled from our 36 Stress-Test Use Cases (`ai_automation_playbooks` + `ai_automation_execution_logs` + `ai_copilot_conversation_logs`).
+                Equipped with 5 specialized Retreat Advisor Roles &amp; 15 One-Touch Workflows to draft guest schedules, coordinate flights, and prepare clinical safety reviews.
               </p>
             </div>
           </div>
@@ -226,56 +226,56 @@ export default function AIAutomationStudioTab({
           </div>
         </div>
 
-        {/* Database Table Telemetry Strip */}
+        {/* Live System Overview */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
           <div className="p-3 rounded-xl bg-stone-950/80 border border-stone-800">
             <span className="text-[10px] font-mono uppercase text-stone-400 block">
-              `ai_automation_playbooks`
+              Automation Recipes
             </span>
             <div className="text-lg font-serif font-bold text-amber-300 mt-0.5">
-              {telemetry?.total_playbooks_configured ?? playbooks.length} Playbooks
+              {telemetry?.total_playbooks_configured ?? playbooks.length} Workflows
             </div>
-            <span className="text-[10px] text-stone-500">Pre-configured from Stress Tests</span>
+            <span className="text-[10px] text-stone-500">Ready for 1-click execution</span>
           </div>
 
           <div className="p-3 rounded-xl bg-stone-950/80 border border-stone-800">
             <span className="text-[10px] font-mono uppercase text-stone-400 block">
-              `ai_automation_execution_logs`
+              Completed Tasks
             </span>
             <div className="text-lg font-serif font-bold text-emerald-400 mt-0.5">
               {telemetry?.total_automation_runs_logged ?? executions.length} Runs Logged
             </div>
-            <span className="text-[10px] text-stone-500">Immutable Audit &amp; Draft Links</span>
+            <span className="text-[10px] text-stone-500">Activity history &amp; draft links</span>
           </div>
 
           <div className="p-3 rounded-xl bg-stone-950/80 border border-stone-800">
             <span className="text-[10px] font-mono uppercase text-stone-400 block">
-              `ai_copilot_conversation_logs`
+              Staff Briefings
             </span>
             <div className="text-lg font-serif font-bold text-blue-400 mt-0.5">
               {telemetry?.total_copilot_conversations_logged ?? 0} Briefings
             </div>
-            <span className="text-[10px] text-stone-500">RAG + Deterministic Synthesis</span>
+            <span className="text-[10px] text-stone-500">Accurate Guidelines &amp; Exact Math</span>
           </div>
 
           <div className="p-3 rounded-xl bg-stone-950/80 border border-stone-800">
             <span className="text-[10px] font-mono uppercase text-stone-400 block">
-              Human-in-the-Loop Gate
+              Review &amp; Approval Safety
             </span>
             <div className="text-lg font-serif font-bold text-stone-100 mt-0.5">
-              100% Enforced
+              100% In Your Control
             </div>
-            <span className="text-[10px] text-stone-500">Zero Autonomous External Writes</span>
+            <span className="text-[10px] text-stone-500">Nothing Sent Without Your Approval</span>
           </div>
         </div>
 
-        {/* Inline AI Chief of Staff & Clinical Copilot Console */}
+        {/* Inline AI Assistant Console */}
         <div className="p-4 rounded-xl bg-stone-950 border border-stone-800 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center space-x-2">
               <Sparkles className="w-4 h-4 text-amber-400" />
               <span className="text-xs font-bold uppercase tracking-wider text-stone-200">
-                Interactive AI Assistant Bench (Logged to `ai_copilot_conversation_logs`)
+                Staff Assistant Console
               </span>
             </div>
             <div className="flex items-center gap-1.5 text-[11px]">
@@ -339,7 +339,7 @@ export default function AIAutomationStudioTab({
               disabled={assistantLoading || !assistantPrompt.trim()}
               className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-stone-950 text-xs font-bold flex items-center space-x-1.5 cursor-pointer disabled:opacity-50"
             >
-              <span>{assistantLoading ? "Synthesizing..." : "Consult AI"}</span>
+              <span>{assistantLoading ? "Thinking..." : "Ask Assistant"}</span>
               <Send className="w-3.5 h-3.5" />
             </button>
           </form>

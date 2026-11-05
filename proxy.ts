@@ -1,91 +1,146 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { backendOrigin } from "./lib/backend-origin";
 
-// Staff Operations Portal Gateway.
-// Sign-in requirement removed per configuration:
-// - Direct access to /portal, /portal/* is immediately granted with zero authentication barriers.
-// - All backend requests (/api/v1/*, /api/portal/*) have operator credentials injected server-side.
-// - /staff-sanctuary-gate redirects directly to /portal with no password prompt.
+// Gatekeeper for the operator portal and guest companion. It checks that a session token is
+// well signed and unexpired so pages redirect quickly; the backend remains the authority and
+// also checks revocation on every API call. The portal is internal and admin-only: guests use
+// /my-retreat, and a guest session never opens a portal page.
 
-const SESSION_COOKIE = "kai_portal_session";
-const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days
+const ACCESS_COOKIE = "kai_access_token";
+const REFRESH_COOKIE = "kai_refresh_token";
+const CSRF_COOKIE = "kai_csrf_token";
+const GUEST_COOKIE = "kai_guest_session";
 
-export const HIDDEN_PORTAL_ENDPOINT =
-  process.env.HIDDEN_PORTAL_ENDPOINT || "/staff-sanctuary-gate";
+const SECURITY_HEADERS: Record<string, string> = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(self), geolocation=()",
+};
 
-function getAdminCredentials(): { username: string; password: string } {
-  const username = process.env.ADMIN_USERNAME || "admin";
-  const password = process.env.ADMIN_PASSWORD || "kai_admin_2026";
-  return { username, password };
+function authSecret(): string | null {
+  if (process.env.AUTH_SECRET_KEY) return process.env.AUTH_SECRET_KEY;
+  return process.env.NODE_ENV === "production" ? null : "kai_dev_only_auth_secret_do_not_use_in_production";
 }
 
-function basicHeader(username: string, password: string): string {
-  return `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+function base64UrlToBytes(value: string): Uint8Array<ArrayBuffer> {
+  const binary = atob(value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "="));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+// Verifies an HS256 token with Web Crypto (constant-time) and returns whether it is valid for this role.
+async function tokenIsValid(token: string | undefined, secret: string, type: string, role: string): Promise<boolean> {
+  if (!token) return false;
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+  try {
+    const header = JSON.parse(new TextDecoder().decode(base64UrlToBytes(parts[0])));
+    if (header.alg !== "HS256") return false;
+    const key = await crypto.subtle.importKey(
+      "raw",
+      new TextEncoder().encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    const signed = new TextEncoder().encode(`${parts[0]}.${parts[1]}`);
+    if (!(await crypto.subtle.verify("HMAC", key, base64UrlToBytes(parts[2]), signed))) return false;
+    const claims = JSON.parse(new TextDecoder().decode(base64UrlToBytes(parts[1])));
+    return claims.typ === type && claims.role === role && typeof claims.exp === "number" && claims.exp * 1000 > Date.now();
+  } catch {
+    return false;
+  }
+}
+
+function withSecurityHeaders(response: NextResponse): NextResponse {
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) response.headers.set(name, value);
+  return response;
+}
+
+function redirectToLogin(request: NextRequest, loginPath: string): NextResponse {
+  const url = new URL(loginPath, request.url);
+  url.search = "";
+  const { pathname, search } = request.nextUrl;
+  if (pathname !== loginPath) url.searchParams.set("next", `${pathname}${search}`);
+  return withSecurityHeaders(NextResponse.redirect(url));
+}
+
+// Rotates the session for a full page navigation and passes the new cookies to the browser.
+// Only navigations do this: parallel prefetches would present the same refresh token and trip replay detection.
+async function refreshedResponse(request: NextRequest): Promise<NextResponse | null> {
+  const csrf = request.cookies.get(CSRF_COOKIE)?.value;
+  if (!csrf) return null;
+  try {
+    const res = await fetch(`${backendOrigin()}/api/auth/operator/refresh`, {
+      method: "POST",
+      headers: { cookie: request.headers.get("cookie") ?? "", "X-KAI-CSRF-Token": csrf },
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const next = NextResponse.next();
+    for (const cookie of res.headers.getSetCookie()) next.headers.append("set-cookie", cookie);
+    return next;
+  } catch {
+    return null;
+  }
+}
+
+function isDocumentNavigation(request: NextRequest): boolean {
+  return request.headers.get("sec-fetch-mode") === "navigate" && !request.headers.has("next-router-prefetch");
 }
 
 export async function proxy(request: NextRequest) {
-  const creds = getAdminCredentials();
-  const pathname = request.nextUrl.pathname;
+  const response = await route(request);
+  // Private areas stay out of search results, without naming them in the public robots.txt.
+  if (/^\/(portal|my-retreat)(\/|$)/.test(request.nextUrl.pathname)) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  }
+  return response;
+}
 
-  const isHiddenGate =
-    pathname === HIDDEN_PORTAL_ENDPOINT ||
-    pathname.startsWith(`${HIDDEN_PORTAL_ENDPOINT}/`) ||
-    pathname === "/staff-sanctuary-gate" ||
-    pathname === "/ops-gate";
+async function route(request: NextRequest): Promise<NextResponse> {
+  const { pathname, searchParams } = request.nextUrl;
+  const isPortal = pathname === "/portal" || pathname.startsWith("/portal/");
+  const isGuest = pathname === "/my-retreat" || pathname.startsWith("/my-retreat/");
 
-  // 1. Staff accesses the hidden endpoint -> redirect directly into /portal
-  if (isHiddenGate) {
-    const res = NextResponse.redirect(new URL("/portal", request.url));
-    res.cookies.set(SESSION_COOKIE, "open-session", {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: SESSION_MAX_AGE_SECONDS,
-    });
-    return res;
+  // Retired open-access gateways.
+  if (pathname === "/staff-sanctuary-gate" || pathname === "/ops-gate") {
+    return withSecurityHeaders(NextResponse.redirect(new URL("/portal/login", request.url)));
   }
 
-  // 2. Direct access to /portal or /api/portal:
-  // Open access enabled: allow immediate entry without 404 or auth challenge.
-  const isPortal =
-    pathname === "/portal" ||
-    pathname.startsWith("/portal/") ||
-    pathname.startsWith("/api/portal");
+  if (isPortal || isGuest) {
+    const secret = authSecret();
+    if (!secret) {
+      return withSecurityHeaders(new NextResponse("Sign-in is not configured (AUTH_SECRET_KEY is missing).", { status: 503 }));
+    }
 
-  if (isPortal) {
-    const headers = new Headers(request.headers);
-    headers.set("authorization", basicHeader(creds.username, creds.password));
-    const res = NextResponse.next({ request: { headers } });
-    res.cookies.set(SESSION_COOKIE, "open-session", {
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: SESSION_MAX_AGE_SECONDS,
-    });
-    return res;
+    if (isPortal) {
+      const signedIn = await tokenIsValid(request.cookies.get(ACCESS_COOKIE)?.value, secret, "access", "ADMIN");
+      if (pathname === "/portal/reset-password") {
+        // Opened from an emailed link, usually signed out. The token in the link is the credential.
+      } else if (pathname === "/portal/login") {
+        // With ?next= the API has just rejected this token as revoked, so show the form rather than loop.
+        if (signedIn && !searchParams.has("next")) return withSecurityHeaders(NextResponse.redirect(new URL("/portal", request.url)));
+      } else if (!signedIn) {
+        if (!request.cookies.has(REFRESH_COOKIE)) return redirectToLogin(request, "/portal/login");
+        if (!isDocumentNavigation(request)) return withSecurityHeaders(NextResponse.next()); // the client refreshes on its first API 401
+        return withSecurityHeaders((await refreshedResponse(request)) ?? redirectToLogin(request, "/portal/login"));
+      }
+    } else if (pathname !== "/my-retreat/login") {
+      // A magic link (?token=) is exchanged by the page, and proposal links (?ref=) carry their own reference.
+      const carriesCredential = searchParams.has("token") || searchParams.has("ref");
+      if (!carriesCredential && !(await tokenIsValid(request.cookies.get(GUEST_COOKIE)?.value, secret, "guest", "SANCTUARY_GUEST"))) {
+        return redirectToLogin(request, "/my-retreat/login");
+      }
+    }
   }
 
-  // 3. /api/v1/* backend calls:
-  // Inject operator credentials automatically so backend endpoints never reject with 401.
-  const headers = new Headers(request.headers);
-  if (!headers.has("authorization")) {
-    headers.set("authorization", basicHeader(creds.username, creds.password));
-  }
-
-  return NextResponse.next({ request: { headers } });
+  return withSecurityHeaders(NextResponse.next());
 }
 
 export const config = {
-  matcher: [
-    "/portal/:path*",
-    "/portal",
-    "/api/portal/:path*",
-    "/api/v1/:path*",
-    "/staff-sanctuary-gate",
-    "/staff-sanctuary-gate/:path*",
-    "/ops-gate",
-    "/ops-gate/:path*",
-  ],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|sw.js|manifest.webmanifest).*)"],
 };

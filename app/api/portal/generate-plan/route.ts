@@ -18,19 +18,6 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const username = process.env.ADMIN_USERNAME || "admin";
-    const password =
-      process.env.ADMIN_PASSWORD ||
-      (process.env.NODE_ENV !== "production" ? "kai_admin_2026" : "");
-
-    if (!password) {
-      return NextResponse.json(
-        { error: "Staff portal credentials are not configured." },
-        { status: 503 }
-      );
-    }
-
-    const basicAuth = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
     const backendUrl = backendOrigin();
 
     const res = await fetch(
@@ -39,7 +26,8 @@ export async function POST(request: NextRequest) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: basicAuth,
+          cookie: request.headers.get("cookie") ?? "",
+          "X-KAI-CSRF-Token": request.headers.get("X-KAI-CSRF-Token") ?? "",
         },
       }
     );

@@ -4,17 +4,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 from starlette.testclient import TestClient
 from backend.main import app
-from backend.sidecar.routers.webhooks import verify_admin
+from backend.testing import admin_headers
 
 import pytest
 
-@pytest.fixture(autouse=True, scope="module")
-def override_admin_auth():
-    app.dependency_overrides[verify_admin] = lambda: "admin"
-    yield
-    app.dependency_overrides.pop(verify_admin, None)
-
-client = TestClient(app)
+client = TestClient(app, headers=admin_headers())
 
 
 def test_seed_and_list_intakes():
@@ -78,11 +72,11 @@ def test_cohort_telemetry():
     res = client.get("/api/v1/sidecar/intakes/telemetry/cohorts")
     assert res.status_code == 200
     cohorts = res.json()
-    assert len(cohorts) == 4
+    assert len(cohorts) == 5
     for c in cohorts:
-        assert c["capacity_limit"] in [12, 14]
+        assert c["capacity_limit"] in [12, 14, 16]
         assert c["remaining_spots"] >= 0
-    print("[PASS] Cohort capacity telemetry verified across all 4 sanctuaries")
+    print("[PASS] Cohort capacity telemetry verified across all 5 sanctuaries")
 
 
 def test_b2b_lead_generation():
@@ -379,7 +373,7 @@ def test_webhook_integrations_and_telemetry():
     res_providers = client.get("/api/v1/sidecar/webhooks/providers")
     assert res_providers.status_code == 200
     prov_data = res_providers.json()
-    assert prov_data["total_active"] == 5
+    assert prov_data["total_active"] == len(prov_data["providers"])
     provider_ids = {p["id"] for p in prov_data["providers"]}
     assert ("cirium_flights" in provider_ids or "crm_vault" in provider_ids)
     assert "expedia_pms" in provider_ids

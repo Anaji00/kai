@@ -445,7 +445,7 @@ export default function MicroclimateWeatherTab({
               <div className="text-sm text-[#5C6B5E] mt-0.5 flex items-center space-x-2">
                 <CloudSun className="w-4 h-4 text-amber-600" />
                 <span>
-                  Live Telemetry: {weather.conditions} • Target Retreat Window:{" "}
+                  Current Conditions: {weather.conditions} • Target Retreat Window:{" "}
                   <strong className="text-[#2D3E35]">{wp?.targetWindow}</strong>
                 </span>
               </div>

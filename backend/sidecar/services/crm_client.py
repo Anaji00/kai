@@ -52,7 +52,7 @@ class KaiTravelCRMClient:
         Synchronizes an approved intake natively into the local Travel CRM database:
         1. Creates or updates the native CRMClient contact record.
         2. Creates or updates the native CRMTrip itinerary and financial record.
-        3. Formats clinical tags: VAGAL_DYSREGULATION, CORTISOL_RESET, LIE_FLAT_AIR, BLUE_ZONE_DIET.
+        3. Applies operational tags only; clinical flags stay on the intake and never become CRM tags.
         4. Generates native portal deep-links for instant advisor access.
         """
         from backend.database import SessionLocal
@@ -65,8 +65,6 @@ class KaiTravelCRMClient:
         if flight_request and flight_request.get("departure_airport"):
             tags.append("LIE_FLAT_AIR")
 
-        if consultation_thesis and consultation_thesis.get("clinical_flags"):
-            tags.extend(consultation_thesis.get("clinical_flags"))
 
         tags = sorted(list(set(tags)))
 

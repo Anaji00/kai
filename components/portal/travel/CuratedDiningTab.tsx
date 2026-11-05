@@ -13,7 +13,8 @@ import {
   CheckCircle2,
   RefreshCw,
   Search,
-  ExternalLink
+  ExternalLink,
+  Printer
 } from "lucide-react";
 import {
   CuratedDiningSpot,
@@ -90,6 +91,133 @@ export default function CuratedDiningTab({ sanctuarySlug }: CuratedDiningTabProp
     }
   };
 
+  const handleExportDietaryMatrix = () => {
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      alert("Please allow popups to generate the Private Chef Dietary Matrix.");
+      return;
+    }
+
+    const htmlContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <title>KAI Sanctuary - Private Chef Dietary Banquet Matrix</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; color: #2D3E35; background: #FAF7F2; padding: 32px; line-height: 1.5; }
+    h1 { font-family: Georgia, serif; font-size: 24px; margin-bottom: 4px; color: #2D3E35; }
+    .badge { display: inline-block; background: #2D3E35; color: #FAF7F2; font-size: 10px; font-weight: bold; padding: 2px 8px; border-radius: 4px; text-transform: uppercase; }
+    .policy-box { background: #F2ECE4; border: 1px solid #E5DDD0; border-radius: 8px; padding: 16px; margin: 20px 0; font-size: 13px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 16px; font-size: 12px; }
+    th { background: #2D3E35; color: #FAF7F2; text-align: left; padding: 10px; font-weight: 600; }
+    td { padding: 10px; border-bottom: 1px solid #E5DDD0; background: white; }
+    .safe { color: #166534; font-weight: 600; }
+    .alert { color: #991b1b; font-weight: 600; }
+    .footer { margin-top: 32px; font-size: 11px; color: #5C6B5E; text-align: center; border-top: 1px solid #E5DDD0; padding-top: 16px; }
+    @media print {
+      body { background: white; padding: 0; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <div>
+      <span class="badge">Executive Culinary Operations</span>
+      <h1>Private Villa Chef Dietary Banquet Matrix</h1>
+      <p style="font-size: 13px; color: #5C6B5E; margin: 4px 0 0 0;">
+        Sanctuary: <strong>${sanctuarySlug.toUpperCase().replace("-", " ")}</strong> &middot; Cohort Date: <strong>November 14–21, 2026</strong>
+      </p>
+    </div>
+    <div class="no-print">
+      <button onclick="window.print()" style="background:#2D3E35; color:#FAF7F2; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-weight:600;">Print Matrix</button>
+    </div>
+  </div>
+
+  <div class="policy-box">
+    <strong>Sovereign Kitchen Standard: 100% Zero-Seed-Oils</strong><br/>
+    Cooking exclusively with cold-pressed extra-virgin olive oil (Greek Kalamata) & cold-pressed virgin organic coconut oil. Zero canola, soybean, sunflower, corn, or vegetable oils allowed on premises. Separate dedicated cookware for severe anaphylaxis & celiac guests.
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Guest Name</th>
+        <th>Suite Allocation</th>
+        <th>Dietary Baseline</th>
+        <th>Severe Allergens / Intolerances</th>
+        <th>Safe Chef Substitutions</th>
+        <th>Seed-Oil Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Lady Elena Vance</strong></td>
+        <td>Master Ocean Canopy Villa 1A</td>
+        <td>Strict Celiac Gluten-Free</td>
+        <td><span class="alert">Gluten, Wheat, Barley, Nightshades</span></td>
+        <td>Cassava/coconut flour flatbreads, wild coastal dorado, roasted fennel</td>
+        <td><span class="safe">✓ Verified 100% Zero-Seed-Oil</span></td>
+      </tr>
+      <tr>
+        <td><strong>Dr. Julian Sterling</strong></td>
+        <td>Garden Canopy Suite 4A</td>
+        <td>Low-Histamine / Whole Food</td>
+        <td><span class="alert">Nut Anaphylaxis (EpiPen), SSRI Safe</span></td>
+        <td>Zero peanuts/tree nuts in prep galley; no St. John's Wort; pumpkin seed crunch</td>
+        <td><span class="safe">✓ Verified 100% Zero-Seed-Oil</span></td>
+      </tr>
+      <tr>
+        <td><strong>Sofia Chen</strong></td>
+        <td>Oceanfront Villa Suite 3A</td>
+        <td>Plant-Forward Vegan</td>
+        <td><span class="alert">Allium-Free (No Garlic/Onion)</span></td>
+        <td>Hing (asafoetida) mineral broth, fresh ginger root, lemongrass coconut curry</td>
+        <td><span class="safe">✓ Verified 100% Zero-Seed-Oil</span></td>
+      </tr>
+      <tr>
+        <td><strong>Marcus Thorne</strong></td>
+        <td>Cliffside Sunset Pavilion 2B</td>
+        <td>Blue Zone High-Protein Paleo</td>
+        <td>Dairy Intolerance</td>
+        <td>Grass-fed pasture ribeye, bone broth reduction, poached avocado & sea salt</td>
+        <td><span class="safe">✓ Verified 100% Zero-Seed-Oil</span></td>
+      </tr>
+      <tr>
+        <td><strong>Claire Delacroix</strong></td>
+        <td>Cliffside Sunset Pavilion 1B</td>
+        <td>Pescatarian Mediterranean</td>
+        <td>Refined Sugars</td>
+        <td>Grilled wild seabass, cold-pressed olive tapenade, raw mountain wildflower honey</td>
+        <td><span class="safe">✓ Verified 100% Zero-Seed-Oil</span></td>
+      </tr>
+      <tr>
+        <td><strong>David & Rachel Kim</strong></td>
+        <td>Master Sanctuary Villa 5B</td>
+        <td>Anti-Inflammatory Low-FODMAP</td>
+        <td>Soy & Legume Sensitivity</td>
+        <td>Steamed wild snapper, bok choy in bone broth, toasted sesame & coconut aminos</td>
+        <td><span class="safe">✓ Verified 100% Zero-Seed-Oil</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top: 24px; padding: 14px; background: white; border: 1px solid #E5DDD0; border-radius: 8px; font-size: 12px;">
+    <strong>Evening Circadian Restorative Elixir Service (20:30 Daily):</strong><br/>
+    Warm organic reishi mushroom extraction, magnesium L-threonate, organic chamomile flowers & raw lavender infusion. Served in unglazed earthenware cups to prepare autonomic nervous system for deep delta sleep.
+  </div>
+
+  <div class="footer">
+    KAI Wellness Retreats &copy; 2026–2027 &middot; Clinical Somatic Hospitality &middot; Kareena Islam, BSN, RN Executive Approval
+  </div>
+</body>
+</html>
+    `;
+
+    printWindow.document.write(htmlContent);
+    printWindow.document.close();
+  };
+
   const DIETARY_FILTERS = [
     "ALL",
     "Gluten-Free",
@@ -115,7 +243,15 @@ export default function CuratedDiningTab({ sanctuarySlug }: CuratedDiningTabProp
           <p className="text-xs text-[#5C6B5E] mt-1">Farm-to-table dining, wild herbal teas, and soothing anti-inflammatory meals supporting deep sleep and easy digestion.</p>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleExportDietaryMatrix}
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-[#2D3E35] bg-[#F2ECE4] hover:bg-[#EBE3D8] border border-[#E5DDD0] rounded-md transition-colors shadow-2xs"
+            title="Open printable Private Chef Dietary Banquet Matrix"
+          >
+            <Printer className="w-3.5 h-3.5 text-[#C07D63]" />
+            <span>Private Chef Matrix</span>
+          </button>
           <button
             onClick={() => setShowAddModal(true)}
             className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-white bg-[#2D3E35] hover:bg-[#1F2C25] rounded-md transition-colors shadow-2xs"

@@ -135,10 +135,10 @@ export default function CampaignsPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="font-serif text-3xl font-bold text-[#2D3E35] tracking-tight">
-            SMS Alerts & Campaign Broadcast Staging Hub
+            Guest Text Messages &amp; Announcements
           </h1>
           <p className="text-sm text-[#5C6B5E] mt-1">
-            MANDATORY ZERO AUTONOMOUS DISPATCH: Every notification and SMS campaign terminates in staging for 1-click authorization.
+            Review Before Sending: Every guest text and retreat announcement is drafted here for your 1-click approval. Nothing is ever sent without your say-so.
           </p>
         </div>
 

@@ -25,12 +25,11 @@ services:
       GROQ_API_KEY: ${GROQ_API_KEY:-}
       GROQ_MODEL: ${GROQ_MODEL:-openai/gpt-oss-120b}
       ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-kai_admin_2026}
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-kai_sanctuary_jwt_secret_change_in_prod_2026}
-      EMAIL_WEBHOOK_SECRET: ${EMAIL_WEBHOOK_SECRET:-whsec_email_kai_sanctuary_2026}
-      CIRIUM_WEBHOOK_SECRET: ${CIRIUM_WEBHOOK_SECRET:-whsec_cirium_kai_2026}
-      EXPEDIA_WEBHOOK_SECRET: ${EXPEDIA_WEBHOOK_SECRET:-whsec_expedia_kai_2026}
-      WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:-kai_whatsapp_verify_token_2026}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@kaiwellnessretreats.com}
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:?Set AUTH_SECRET_KEY in .env}
+      WEBHOOK_HMAC_SECRET: ${WEBHOOK_HMAC_SECRET:?Set WEBHOOK_HMAC_SECRET in .env}
+      WHATSAPP_WEBHOOK_VERIFY_TOKEN: ${WHATSAPP_WEBHOOK_VERIFY_TOKEN:?Set WHATSAPP_WEBHOOK_VERIFY_TOKEN in .env}
     ports:
       - "${BACKEND_PORT:-8972}:8000"
     volumes:
@@ -56,9 +55,8 @@ services:
     environment:
       NODE_ENV: production
       FASTAPI_BACKEND_URL: http://backend:8000
-      # Portal gate (proxy.ts) and server-side admin calls; never exposed to the browser.
-      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-kai_admin_2026}
+      # proxy.ts verifies session tokens with this key; never exposed to the browser.
+      AUTH_SECRET_KEY: ${AUTH_SECRET_KEY:?Set AUTH_SECRET_KEY in .env}
     ports:
       - "${FRONTEND_PORT:-3536}:3000"
     depends_on:

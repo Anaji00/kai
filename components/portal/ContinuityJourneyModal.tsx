@@ -75,7 +75,7 @@ export default function ContinuityJourneyModal({
               <h2 className="text-lg font-serif text-white tracking-wide flex items-center gap-2">
                 30-Day Post-Sanctuary Continuity Arc
                 <span className="text-[10px] uppercase font-sans tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
-                  Zero Autonomous Writes
+                  Review &amp; Approve Required
                 </span>
               </h2>
               <p className="text-xs text-neutral-400">

@@ -7,6 +7,7 @@ backend/**/test_*.py
 backend/**/run_*.py
 backend/test_*.py
 backend/conftest.py
+backend/testing.py
 
 # Local state and container tooling
 *.db

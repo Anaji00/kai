@@ -21,7 +21,20 @@ import {
   Share2,
   Upload,
   CheckCircle2,
-  Clock
+  Clock,
+  DollarSign,
+  Plane,
+  Utensils,
+  HeartPulse,
+  Briefcase,
+  Command,
+  Table,
+  Printer,
+  Phone,
+  CloudSun,
+  MapPin,
+  HelpCircle,
+  FileText
 } from "lucide-react";
 import {
   chatWithCopilot,
@@ -36,23 +49,33 @@ interface ClinicalCopilotDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   guestContext?: Record<string, unknown>;
+  initialQuery?: string;
+  initialMode?: CopilotMode;
 }
 
 export type CopilotMode =
+  | "omniscient"
+  | "executive_finance"
+  | "travel_logistics"
+  | "b2b_sales"
+  | "chef_hospitality"
+  | "clinical_safety"
+  | "spreadsheet_crm"
   | "wellness_safety"
   | "itinerary_curation"
   | "concierge_prep"
   | "studio_ops"
-  | "clinical_safety"
   | "consult_prep"
   | "travel_concierge";
 
 export default function ClinicalCopilotDrawer({
   isOpen,
   onClose,
-  guestContext
+  guestContext,
+  initialQuery,
+  initialMode,
 }: ClinicalCopilotDrawerProps) {
-  const [activeMode, setActiveMode] = useState<CopilotMode>("wellness_safety");
+  const [activeMode, setActiveMode] = useState<CopilotMode>(initialMode || "omniscient");
   const [inputMessage, setInputMessage] = useState("");
   const [selectedTool, setSelectedTool] = useState("chat");
   const [loading, setLoading] = useState(false);
@@ -63,6 +86,7 @@ export default function ClinicalCopilotDrawer({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<unknown>(null);
+  const executedInitialRef = useRef<string | null>(null);
 
   const [messages, setMessages] = useState<
     Array<{
@@ -82,7 +106,7 @@ export default function ClinicalCopilotDrawer({
   >([
     {
       sender: "copilot",
-      text: "**Welcome, Kareena.** I am your AI Chief of Staff & Wellness Concierge.\n\nI am here to support you with restorative wellness intentions, curated travel logistics, preferred luxury supplier partnerships, scenic chauffeur transit, microclimate sun windows, and pre-arrival guest itineraries. Clinical contraindication screening is an elevated safety module whenever specialized medical flags arise.\n\nAll operational actions and communications require your direct review and authorization."
+      text: "**Welcome, Kareena & Sanctuary Team!** I am your Retreat Operations Assistant.\n\nI am here to help you run all aspects of our sanctuaries with ease:\n• **Billing & Invoices**: Villa buyout calculations, 30% deposit & 70% balance payment schedules, and currency conversions.\n• **Flights & Airport Rides**: Live flight tracking, driver pickup schedules, and mountain road updates.\n• **Partner Studios**: Pilates & yoga studio referrals, 15% partner thank-you commissions, and group proposals.\n• **Private Chef & Dining**: Healthy seed-oil-free meal plans, allergy safety charts, and farm-to-table menus.\n• **Guest Care & Health Safety**: Daily morning wellness checks, gentle breathing exercises, and health safety reviews.\n• **Retreat Guest Spreadsheet**: Easy-to-use spreadsheet rows, guest statuses, and room assignments.\n\nNothing is ever sent to a guest or partner without your review and approval. You are always in full control."
     }
   ]);
 
@@ -98,6 +122,21 @@ export default function ClinicalCopilotDrawer({
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (isOpen && initialQuery && executedInitialRef.current !== initialQuery) {
+      executedInitialRef.current = initialQuery;
+      if (initialMode) {
+        setActiveMode(initialMode);
+      }
+      setTimeout(() => {
+        handleSend(initialQuery);
+      }, 120);
+    }
+    if (!isOpen) {
+      executedInitialRef.current = null;
+    }
+  }, [isOpen, initialQuery, initialMode]);
 
   if (!isOpen) return null;
 
@@ -115,7 +154,7 @@ export default function ClinicalCopilotDrawer({
         if (!m.text || m.isDocument) return false;
         const lower = m.text.trim().toLowerCase();
         if (lower.startsWith("welcome") || lower.startsWith("**welcome")) return false;
-        if (lower.includes("ai chief of staff") || lower.includes("clinical somatic assistant") || lower.includes("i am here to support you")) return false;
+        if (lower.includes("retreat operations assistant") || lower.includes("chief of staff") || lower.includes("clinical somatic assistant") || lower.includes("i am here to support you")) return false;
         return true;
       })
       .slice(-2)
@@ -186,7 +225,7 @@ export default function ClinicalCopilotDrawer({
             setLoading(false);
           },
           onError: async (err) => {
-            console.warn("SSE stream failed, attempting synchronous copilot fallback:", err);
+            console.warn("Live stream paused, using direct assistant response:", err);
             if (!accumulatedText) {
               try {
                 const res: CopilotChatResponse = await chatWithCopilot(
@@ -217,14 +256,14 @@ export default function ClinicalCopilotDrawer({
                   return copy;
                 });
               } catch (fallbackErr) {
-                console.error("Fallback copilot failed:", fallbackErr);
+                console.error("Fallback assistant failed:", fallbackErr);
                 setMessages((prev) => {
                   const lastIdx = prev.length - 1;
                   if (lastIdx < 0) return prev;
                   const copy = [...prev];
                   copy[lastIdx] = {
                     sender: "copilot",
-                    text: "I encountered a momentary connection issue. Please ensure the KAI API service is running.",
+                    text: "I encountered a momentary connection pause. Please ensure the KAI API service is running.",
                     safety_screened: false
                   };
                   return copy;
@@ -243,7 +282,7 @@ export default function ClinicalCopilotDrawer({
           const copy = [...prev];
           copy[lastIdx] = {
             sender: "copilot",
-            text: "I encountered a momentary connection issue. Please ensure the KAI API service is running.",
+            text: "I encountered a momentary connection pause. Please ensure the KAI API service is running.",
             safety_screened: false
           };
           return copy;
@@ -278,12 +317,11 @@ export default function ClinicalCopilotDrawer({
 
     setUploading(true);
     const fileName = file.name;
-    // Add user note that file is uploading
     setMessages((prev) => [
       ...prev,
       {
         sender: "user",
-        text: `📎 Uploaded Document for Clinical Intake: ${fileName}`,
+        text: `📎 Attached Document for Guest Intake: ${fileName}`,
         isDocument: true
       }
     ]);
@@ -300,20 +338,20 @@ export default function ClinicalCopilotDrawer({
         safetyLevel = "CONTRAINDICATION_ALERT";
       }
 
-      let responseText = `**Document Ingested & Clinically Analyzed:** \`${parsed.filename}\`\n\n`;
-      responseText += `**Executive Summary:**\n${parsed.extracted_summary}\n\n`;
+      let responseText = `**Document Read & Organized:** \`${parsed.filename}\`\n\n`;
+      responseText += `**Quick Summary:**\n${parsed.extracted_summary}\n\n`;
 
       if (parsed.associated_guest_name) {
-        responseText += `• **Guest Identified:** ${parsed.associated_guest_name}\n`;
+        responseText += `• **Guest Name:** ${parsed.associated_guest_name}\n`;
       }
       if (parsed.clinical_notes_found && parsed.clinical_notes_found.length > 0) {
-        responseText += `• ⚠️ **Health Considerations Detected:**\n${parsed.clinical_notes_found.map((n: string) => `  - ${n}`).join("\n")}\n`;
+        responseText += `• ⚠️ **Health Notes Found:**\n${parsed.clinical_notes_found.map((n: string) => `  - ${n}`).join("\n")}\n`;
       }
       if (parsed.travel_details_found && parsed.travel_details_found.length > 0) {
-        responseText += `• **Travel Manifest Notes:**\n${parsed.travel_details_found.map((t: string) => `  - ${t}`).join("\n")}\n`;
+        responseText += `• **Travel & Flight Notes:**\n${parsed.travel_details_found.map((t: string) => `  - ${t}`).join("\n")}\n`;
       }
 
-      responseText += `\n*Screened under Kareena Islam BSN, RN clinical oversight guidelines.*`;
+      responseText += `\n*Screened according to Nurse Kareena Islam's clinical safety guidelines.*`;
 
       setMessages((prev) => [
         ...prev,
@@ -321,11 +359,11 @@ export default function ClinicalCopilotDrawer({
           sender: "copilot",
           text: responseText,
           safety_level: safetyLevel,
-          citations: ["Clinical Document Parsing", "Vagal Nerve Safety Standards"],
+          citations: ["Guest Care Guidelines", "Nervous System Safety Standards"],
           suggested_followups: [
-            `Create gentle adaptation for ${parsed.associated_guest_name || "this guest"}`,
-            "Draft empathetic inquiry to guest regarding medical history",
-            "Screen for cold plunge and breathwork compatibility"
+            `Create gentle schedule for ${parsed.associated_guest_name || "this guest"}`,
+            "Draft friendly email to guest regarding medical history",
+            "Check cold plunge and breathwork comfort"
           ]
         }
       ]);
@@ -335,7 +373,7 @@ export default function ClinicalCopilotDrawer({
         ...prev,
         {
           sender: "copilot",
-          text: `⚠️ **Document Analysis Notice**: Could not process \`${fileName}\`. Please ensure it is a PDF, PNG, JPG, or CSV under 10MB.`,
+          text: `⚠️ **Document Notice**: Could not read \`${fileName}\`. Please check that it is a PDF, PNG, JPG, or CSV under 10MB.`,
           safety_level: "CLEAR"
         }
       ]);
@@ -426,11 +464,10 @@ export default function ClinicalCopilotDrawer({
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
         await navigator.share({
-          title: "KAI Clinical Care Note",
+          title: "KAI Sanctuary Note",
           text: text
         });
       } catch {
-        // Fallback to clipboard
         navigator.clipboard.writeText(text);
       }
     } else if (typeof navigator !== "undefined" && navigator.clipboard) {
@@ -440,69 +477,137 @@ export default function ClinicalCopilotDrawer({
   };
 
   const QUICK_PROMPTS: Record<string, string[]> = {
-    wellness_safety: [
-      "Scenario #21: Triage morning Somatic Pulse spike (Sleep 2/10, Ease 2/10)",
-      "Scenario #32: Post-plunge hypothermia & SpO2 88% hard lockout protocol",
-      "Scenario #7: Screen guest with SVT arrhythmia & nut anaphylaxis",
-      "Scenario #13: Mid-stay emergency medical freeze & Hospital Joya handover"
+    omniscient: [
+      "💰 Calculate villa buyout and payment breakdown for 14 guests at Nosara",
+      "✈️ Group delayed airport arrivals into luxury van pickups (<=35 min wait)",
+      "🍽️ Create Private Chef allergy-safe menu (Celiac, Onion/Garlic-free, Seed-Oil-Free)",
+      "🤝 Draft partnership agreement for luxury Pilates studio (15% thank-you commission)",
+      "🩺 Check guest health notes for heart rate & nut allergies (Nurse recommendations)",
+      "👥 Add a new guest row for Sarah Jenkins in retreat spreadsheet",
+      "📊 Calculate 30% deposit and 70% final balance on $11,500 villa stay",
+      "📋 Check room availability and pricing for upcoming 7-day retreat"
+    ],
+    executive_finance: [
+      "Calculate villa buyout and payment breakdown for 14 guests at Nosara",
+      "Calculate 30% deposit and 70% balance payment schedule for $11,500 stay",
+      "Reconcile international bank wires vs credit card processing fees",
+      "Generate profit margins report across all 4 retreats"
+    ],
+    travel_logistics: [
+      "Group delayed airport arrivals into luxury van pickups (<=35 min wait)",
+      "Check private jet luggage weight & pilot duty hours",
+      "Create 1-click WhatsApp driver schedule for Nosara arrivals",
+      "Plan 4WD mountain route around river during seasonal rain"
+    ],
+    b2b_sales: [
+      "Draft partnership agreement for luxury Manhattan Pilates studio",
+      "Calculate 15% partner thank-you commission for functional medicine clinic",
+      "Draft executive wellness retreat proposal for 12 corporate leaders",
+      "Write outreach email to Beverly Hills integrative cardiology practice"
+    ],
+    chef_hospitality: [
+      "Create Private Chef allergy chart (Celiac, Onion/Garlic-free, Vegan, Seed-Oil-Free)",
+      "Plan 7-day seed-oil-free healthy menu for Nosara retreat",
+      "Draft local organic farm shopping list for retreat chef",
+      "Create evening relaxing herbal tea and elixir pairing"
     ],
     clinical_safety: [
-      "Scenario #21: Triage morning Somatic Pulse spike (Sleep 2/10, Ease 2/10)",
-      "Scenario #32: Post-plunge hypothermia & SpO2 88% hard lockout protocol",
-      "Scenario #7: Screen guest with SVT arrhythmia & nut anaphylaxis",
-      "Scenario #13: Mid-stay emergency medical freeze & Hospital Joya handover"
+      "Check guest health notes for heart rate & nut allergies (Nurse recommendations)",
+      "Check morning guest wellness score (Sleep 2/10, Energy 2/10)",
+      "Cold plunge safety protocol: gentle warming if guest feels dizzy",
+      "Emergency medical freeze and hospital handover steps"
+    ],
+    wellness_safety: [
+      "Check guest health notes for heart rate & nut allergies (Nurse recommendations)",
+      "Check morning guest wellness score (Sleep 2/10, Energy 2/10)",
+      "Cold plunge safety protocol: gentle warming if guest feels dizzy",
+      "Emergency medical freeze and hospital handover steps"
+    ],
+    spreadsheet_crm: [
+      "Add a new guest row for Sarah Jenkins in retreat spreadsheet",
+      "Add new partner lead for Align Pilates NYC with 15% commission",
+      "Show all guests arriving in the next 14 days",
+      "Export retreat spreadsheet to Excel / CSV for arrival team"
     ],
     itinerary_curation: [
-      "Scenario #23: Cluster delayed PVR arrivals into Escalade/Sprinter waves (<=35m wait)",
-      "Scenario #26: Audit Gulfstream G650ER weight & FAA Part 135 14h crew duty",
-      "Scenario #28: Pivot outdoor beach pranayama to indoor Geodesic Sound Domes (95% rain)",
-      "Scenario #34: Check 180-day international passport validity gate"
+      "Group delayed airport arrivals into luxury van pickups (<=35 min wait)",
+      "Check private jet luggage weight & pilot duty hours",
+      "Move outdoor beach session to indoor Sound Dome if rain forecast > 90%",
+      "Check 6-month passport validity for international guests"
     ],
     travel_concierge: [
-      "Scenario #23: Cluster delayed PVR arrivals into Escalade/Sprinter waves (<=35m wait)",
-      "Scenario #26: Audit Gulfstream G650ER weight & FAA Part 135 14h crew duty",
-      "Scenario #28: Pivot outdoor beach pranayama to indoor Geodesic Sound Domes (95% rain)",
-      "Scenario #31: Provision $0 5-piece organic capsule wardrobe for lost luggage"
+      "Group delayed airport arrivals into luxury van pickups (<=35 min wait)",
+      "Check private jet luggage weight & pilot duty hours",
+      "Move outdoor beach session to indoor Sound Dome if rain forecast > 90%",
+      "Provide emergency organic clothing set if airline loses luggage"
     ],
     concierge_prep: [
-      "Draft restorative welcome email for Sarah Jenkins (Nosara Reset)",
-      "Review guest intake and intentions for Eleanor Vance",
-      "What are the top 3 talk tracks for hesitant executives seeking deep rest?",
-      "Explain 12–14 guest intimate group restorative experience"
+      "Draft warm welcome email for Sarah Jenkins (Nosara retreat)",
+      "Review guest intentions and rest goals for Eleanor Vance",
+      "What are the top 3 talking points for executives who need deep rest?",
+      "Explain the intimate 12–14 guest restorative experience"
     ],
     consult_prep: [
-      "Draft consultation email for Sarah Jenkins (Nosara Reset)",
+      "Draft consultation email for Sarah Jenkins (Nosara retreat)",
       "Draft consultation follow-up for Eleanor Vance (Executive Burnout)",
-      "What are the top 3 talk tracks for hesitant executives?",
-      "Explain 12–14 guest intimate group safety"
+      "What are the top 3 talking points for hesitant executives?",
+      "Explain the intimate 12–14 guest restorative experience"
     ],
     studio_ops: [
-      "Show our registered preferred suppliers in Nosara",
-      "Add a new vendor: Pacific Alchemy sound bowls in Nosara, 15% commission",
+      "Show our trusted local suppliers in Nosara",
+      "Add a new supplier: Pacific Alchemy sound bowls in Nosara, 15% commission",
       "Explain KAI Vendor & Supplier Directory",
-      "Explain Personalized Founder Approval (Zero Autonomous Writes)",
-      "What is the status of our upcoming 12–14 guest retreat groups?"
+      "Explain how founder review keeps all communications safe",
+      "What is the booking status for our upcoming 12–14 guest groups?"
     ]
   };
+
+  const PILLAR_MODES: Array<{
+    id: CopilotMode;
+    label: string;
+    icon: React.ElementType;
+    badge: string;
+  }> = [
+    { id: "omniscient", label: "✨ All-in-One (All Areas)", icon: Sparkles, badge: "All Areas Active" },
+    { id: "executive_finance", label: "💰 Billing & Invoices", icon: DollarSign, badge: "Buyouts & Payments" },
+    { id: "travel_logistics", label: "✈️ Flights & Airport Rides", icon: Plane, badge: "Flights & Drivers" },
+    { id: "chef_hospitality", label: "🍽️ Private Chef & Meals", icon: Utensils, badge: "Allergies & Menus" },
+    { id: "b2b_sales", label: "🤝 Partner Studios", icon: Briefcase, badge: "15% Commissions" },
+    { id: "clinical_safety", label: "🩺 Guest Health Safety", icon: HeartPulse, badge: "Nurse Care" },
+    { id: "spreadsheet_crm", label: "👥 Guest Spreadsheet", icon: Table, badge: "Guest Rows" },
+    { id: "studio_ops", label: "🌿 Sanctuary Operations", icon: Building, badge: "Retreat Capacities" },
+  ];
+
+  const QUICK_COMMAND_CHIPS = [
+    { label: "/finance", hint: "Villa buyouts & payment schedules", icon: DollarSign },
+    { label: "/radar", hint: "Flight tracking & driver schedules", icon: Plane },
+    { label: "/chef", hint: "Allergy charts & healthy menus", icon: Utensils },
+    { label: "/b2b", hint: "Studio partnership proposals & 15% commissions", icon: Briefcase },
+    { label: "/clinical", hint: "Health check & gentle care tips", icon: HeartPulse },
+    { label: "/attendee", hint: "Add guest to spreadsheet", icon: Table },
+    { label: "/book", hint: "Check room prices & dates", icon: Sparkles },
+    { label: "/vendor", hint: "Trusted local suppliers", icon: Building },
+    { label: "/draft", hint: "Warm welcome email to guest", icon: Mail },
+  ];
 
   return (
     <div className="fixed inset-0 z-50 overflow-hidden bg-black/50 backdrop-blur-xs flex justify-end animate-in fade-in duration-200">
       <div className="relative w-full max-w-xl h-full bg-stone-900 border-l border-stone-800 shadow-2xl flex flex-col text-stone-200">
         {/* Header */}
-        <div className="p-5 border-b border-stone-800 bg-stone-950/80 backdrop-blur flex items-center justify-between">
+        <div className="p-4 sm:p-5 border-b border-stone-800 bg-stone-950/80 backdrop-blur flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
               <Sparkles className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-base font-serif text-stone-100 flex items-center gap-2">
-                AI Chief of Staff & Wellness Concierge
+                Retreat Operations Assistant
                 <span className="text-[10px] font-sans px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 font-medium">
-                  KAI Brain
+                  All-in-One Helper
                 </span>
               </h2>
               <p className="text-xs text-stone-400">
-                Kareena Islam · Restorative Wellness, Curated Travel & Founder Ops
+                Billing · Flights & Rides · Partner Studios · Private Chef · Guest Health Safety
               </p>
             </div>
           </div>
@@ -514,63 +619,39 @@ export default function ClinicalCopilotDrawer({
           </button>
         </div>
 
-        {/* 4 Mode Tabs */}
-        <div className="grid grid-cols-4 gap-1 p-2 bg-stone-950/90 border-b border-stone-800/80 text-[11px] font-medium">
-          <button
-            onClick={() => setActiveMode("wellness_safety")}
-            className={`py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center gap-1 ${
-              activeMode === "wellness_safety" || activeMode === "clinical_safety"
-                ? "bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold"
-                : "text-stone-400 hover:text-stone-200 hover:bg-stone-900"
-            }`}
-          >
-            <ShieldCheck className="w-3.5 h-3.5" />
-            <span>Wellness & Safety</span>
-          </button>
+        {/* Fluid Business Pillar Ribbon */}
+        <div className="flex items-center gap-1.5 p-2 bg-stone-950/90 border-b border-stone-800/80 text-[11px] font-medium overflow-x-auto no-scrollbar">
+          {PILLAR_MODES.map((pm) => {
+            const Icon = pm.icon;
+            const isMatch =
+              activeMode === pm.id ||
+              (pm.id === "clinical_safety" && activeMode === "wellness_safety") ||
+              (pm.id === "travel_logistics" && (activeMode === "itinerary_curation" || activeMode === "travel_concierge")) ||
+              (pm.id === "concierge_prep" && activeMode === "consult_prep");
 
-          <button
-            onClick={() => setActiveMode("itinerary_curation")}
-            className={`py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center gap-1 ${
-              activeMode === "itinerary_curation" || activeMode === "travel_concierge"
-                ? "bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold"
-                : "text-stone-400 hover:text-stone-200 hover:bg-stone-900"
-            }`}
-          >
-            <Compass className="w-3.5 h-3.5" />
-            <span>Travel & Itinerary</span>
-          </button>
-
-          <button
-            onClick={() => setActiveMode("concierge_prep")}
-            className={`py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center gap-1 ${
-              activeMode === "concierge_prep" || activeMode === "consult_prep"
-                ? "bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold"
-                : "text-stone-400 hover:text-stone-200 hover:bg-stone-900"
-            }`}
-          >
-            <Mail className="w-3.5 h-3.5" />
-            <span>Concierge & Intake</span>
-          </button>
-
-          <button
-            onClick={() => setActiveMode("studio_ops")}
-            className={`py-2 px-1 rounded-lg text-center transition-all flex flex-col items-center gap-1 ${
-              activeMode === "studio_ops"
-                ? "bg-amber-500/15 text-amber-300 border border-amber-500/30 font-semibold"
-                : "text-stone-400 hover:text-stone-200 hover:bg-stone-900"
-            }`}
-          >
-            <Building className="w-3.5 h-3.5" />
-            <span>Sanctuary Ops</span>
-          </button>
+            return (
+              <button
+                key={pm.id}
+                onClick={() => setActiveMode(pm.id)}
+                className={`py-1.5 px-2.5 rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 ${
+                  isMatch
+                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold shadow-xs"
+                    : "text-stone-400 hover:text-stone-200 hover:bg-stone-900 border border-transparent"
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{pm.label}</span>
+              </button>
+            );
+          })}
         </div>
 
         {/* Quick Suggestion Chips */}
         <div className="p-3 bg-stone-950/40 border-b border-stone-800/60 overflow-x-auto flex items-center gap-2 no-scrollbar">
           <span className="text-[10px] text-stone-500 uppercase tracking-wider font-semibold shrink-0">
-            Suggested:
+            {activeMode === "omniscient" ? "Popular Requests:" : "Helpful Prompts:"}
           </span>
-          {(QUICK_PROMPTS[activeMode] || QUICK_PROMPTS.wellness_safety).map((prompt, idx) => (
+          {(QUICK_PROMPTS[activeMode] || QUICK_PROMPTS.omniscient).map((prompt, idx) => (
             <button
               key={idx}
               onClick={() => handleSend(prompt)}
@@ -602,24 +683,24 @@ export default function ClinicalCopilotDrawer({
                     {m.safety_level === "CONTRAINDICATION_ALERT" ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 border border-rose-500/40 text-rose-400">
                         <AlertTriangle className="w-3 h-3" />
-                        HEALTH CONSIDERATION ALERT (FOUNDER REVIEW REQUIRED)
+                        Health Note · Review with Nurse Kareena Before Confirming
                       </span>
                     ) : m.safety_level === "MODERATE_REVIEW" ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 border border-amber-500/40 text-amber-300">
                         <AlertTriangle className="w-3 h-3" />
-                        CLINICAL MODIFICATION RECOMMENDED
+                        Gentle Adjustment Suggested for Guest Comfort
                       </span>
                     ) : m.safety_level === "CLEAR" && m.safety_screened ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
                         <ShieldCheck className="w-3 h-3" />
-                        CLINICAL CLEARANCE VERIFIED
+                        Health Safety Check Passed
                       </span>
                     ) : <span />}
 
                     {m.latency_ms !== undefined && (
                       <span className="text-[9px] font-mono text-stone-400 bg-stone-900 border border-stone-800 px-2 py-0.5 rounded-full flex items-center gap-1">
                         <Clock className="w-2.5 h-2.5 text-amber-400" />
-                        {(m.latency_ms / 1000).toFixed(1)}s{m.model_used ? ` · ${m.model_used}` : ""}
+                        Ready in {(m.latency_ms / 1000).toFixed(1)}s
                       </span>
                     )}
                   </div>
@@ -636,10 +717,10 @@ export default function ClinicalCopilotDrawer({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-300 uppercase tracking-wide">
                         <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Founder Review Required</span>
+                        <span>Review &amp; Approval Required</span>
                       </div>
                       <span className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-200">
-                        {m.proposal_authorized ? "Authorized" : "Action Staged"}
+                        {m.proposal_authorized ? "Approved by You" : "Ready for Review"}
                       </span>
                     </div>
 
@@ -664,12 +745,12 @@ export default function ClinicalCopilotDrawer({
                         {m.proposal_authorized ? (
                           <>
                             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>Authorized by Founder</span>
+                            <span>Approved by You</span>
                           </>
                         ) : (
                           <>
                             <Sparkles className="w-3.5 h-3.5" />
-                            <span>Review & Approve Proposal</span>
+                            <span>Review &amp; Approve This Update</span>
                           </>
                         )}
                       </button>
@@ -681,32 +762,104 @@ export default function ClinicalCopilotDrawer({
                 {m.citations && m.citations.length > 0 && (
                   <div className="mt-3 pt-2.5 border-t border-stone-800/80 flex items-center gap-1.5 text-[10px] text-stone-400">
                     <BookOpen className="w-3 h-3 text-amber-400" />
-                    <span>Protocols: {m.citations.join(" · ")}</span>
+                    <span>Based on: {m.citations.join(" · ")}</span>
                   </div>
                 )}
 
-                {/* Copy / Share Actions for Copilot Messages */}
+                {/* Specialized Reactive In-Message Action Buttons */}
                 {m.sender === "copilot" && (
-                  <div className="mt-3 pt-2 border-t border-stone-800 flex justify-end items-center gap-2">
-                    <button
-                      onClick={() => copyToClipboard(m.text, idx)}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded bg-stone-800 hover:bg-stone-700 text-stone-300 text-[11px] transition-colors"
-                    >
-                      {copiedIdx === idx ? (
-                        <Check className="w-3 h-3 text-emerald-400" />
-                      ) : (
-                        <Copy className="w-3 h-3" />
+                  <div className="mt-3 pt-2.5 border-t border-stone-800/80 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      {/* Buyout / Installment / Margins */}
+                      {(m.text.includes("Buyout") || m.text.includes("Deposit") || m.text.includes("Installment") || m.text.includes("Folio")) && (
+                        <button
+                          onClick={() => copyToClipboard(m.text, idx)}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-[11px] font-medium transition-colors"
+                        >
+                          <DollarSign className="w-3 h-3" />
+                          <span>Copy Billing Summary</span>
+                        </button>
                       )}
-                      <span>{copiedIdx === idx ? "Copied" : "Copy"}</span>
-                    </button>
 
-                    <button
-                      onClick={() => shareContent(m.text)}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded bg-stone-800 hover:bg-stone-700 text-stone-300 text-[11px] transition-colors"
-                    >
-                      <Share2 className="w-3 h-3" />
-                      <span>Share</span>
-                    </button>
+                      {/* WhatsApp / Chauffeur Run-Sheet */}
+                      {(m.text.includes("Chauffeur") || m.text.includes("WhatsApp") || m.text.includes("Wave") || m.text.includes("Flight") || m.text.includes("Driver")) && (
+                        <button
+                          onClick={() => {
+                            copyToClipboard(m.text, idx);
+                            if (typeof window !== "undefined") {
+                              const encoded = encodeURIComponent(m.text);
+                              window.open(`https://wa.me/?text=${encoded}`, "_blank");
+                            }
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-[11px] font-medium transition-colors"
+                        >
+                          <Phone className="w-3 h-3" />
+                          <span>Copy Driver Schedule for WhatsApp</span>
+                        </button>
+                      )}
+
+                      {/* Dietary Matrix / Allergens */}
+                      {(m.text.includes("Dietary") || m.text.includes("Allergen") || m.text.includes("Banquet Matrix") || m.text.includes("Seed-Oil-Free") || m.text.includes("Menu")) && (
+                        <button
+                          onClick={() => {
+                            const printWin = window.open("", "_blank");
+                            if (printWin) {
+                              printWin.document.write(`<html><head><title>KAI Private Chef Dietary & Allergy Chart</title><style>body{font-family:sans-serif;padding:24px;line-height:1.5;color:#1c1917;}table{border-collapse:collapse;width:100%;margin-top:16px;}th,td{border:1px solid #d6d3d1;padding:8px;text-align:left;}th{background:#f5f5f4;}</style></head><body><h1>KAI Sanctuary · Private Chef Dietary & Allergy Chart</h1><pre style="white-space:pre-wrap;font-family:inherit;">${m.text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre></body></html>`);
+                              printWin.document.close();
+                              printWin.print();
+                            }
+                          }}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/30 text-teal-300 text-[11px] font-medium transition-colors"
+                        >
+                          <Printer className="w-3 h-3" />
+                          <span>Print Dietary &amp; Allergy Chart</span>
+                        </button>
+                      )}
+
+                      {/* B2B Syndicate */}
+                      {(m.text.includes("Syndicate") || m.text.includes("Commission") || m.text.includes("B2B") || m.text.includes("Partner")) && (
+                        <button
+                          onClick={() => copyToClipboard(m.text, idx)}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 text-[11px] font-medium transition-colors"
+                        >
+                          <Briefcase className="w-3 h-3" />
+                          <span>Copy Partnership Proposal</span>
+                        </button>
+                      )}
+
+                      {/* Clinical Safety / Contraindication */}
+                      {(m.safety_screened || m.text.includes("Clinical") || m.text.includes("Contraindication") || m.text.includes("Health")) && (
+                        <button
+                          onClick={() => copyToClipboard(m.text, idx)}
+                          className="flex items-center gap-1 px-2.5 py-1 rounded bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 text-[11px] font-medium transition-colors"
+                        >
+                          <HeartPulse className="w-3 h-3" />
+                          <span>Copy Health Care Note</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-1.5 ml-auto">
+                      <button
+                        onClick={() => copyToClipboard(m.text, idx)}
+                        className="flex items-center gap-1 px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-stone-300 text-[11px] transition-colors"
+                      >
+                        {copiedIdx === idx ? (
+                          <Check className="w-3 h-3 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                        <span>{copiedIdx === idx ? "Copied" : "Copy"}</span>
+                      </button>
+
+                      <button
+                        onClick={() => shareContent(m.text)}
+                        className="flex items-center gap-1 px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-stone-300 text-[11px] transition-colors"
+                      >
+                        <Share2 className="w-3 h-3" />
+                        <span>Share</span>
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -731,19 +884,45 @@ export default function ClinicalCopilotDrawer({
           {loading && (
             <div className="flex items-center gap-2 text-xs text-amber-400/80 py-2">
               <RefreshCw className="w-4 h-4 animate-spin" />
-              <span>Synthesizing clinical knowledge, routes & travel inventory...</span>
+              <span>Calculating exact pricing, flight schedules, and retreat details...</span>
             </div>
           )}
 
           {uploading && (
             <div className="flex items-center gap-2 text-xs text-amber-400/80 py-2">
               <Upload className="w-4 h-4 animate-bounce" />
-              <span>Analyzing document for health considerations & travel notes...</span>
+              <span>Reading your document for guest notes, dietary requests, and flight times...</span>
             </div>
           )}
         </div>
 
-        {/* Input Bar with Voice & File Attachment */}
+        {/* Quick Slash-Command Action Bar */}
+        <div className="px-4 py-2 bg-stone-950/80 border-t border-stone-800/80 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+          <span className="text-[10px] font-mono text-amber-400/80 uppercase font-semibold shrink-0 mr-1 flex items-center gap-1">
+            <Command className="w-3 h-3 text-amber-400" />
+            <span>Shortcuts:</span>
+          </span>
+          {QUICK_COMMAND_CHIPS.map((chip) => {
+            const Icon = chip.icon;
+            return (
+              <button
+                key={chip.label}
+                type="button"
+                onClick={() => {
+                  setInputMessage(`${chip.label} `);
+                  setSelectedTool(chip.label);
+                }}
+                className="px-2 py-1 rounded-md bg-stone-900 hover:bg-amber-500/20 hover:text-amber-300 border border-stone-800 hover:border-amber-500/40 text-[11px] font-mono text-stone-300 flex items-center gap-1 transition-colors shrink-0"
+                title={chip.hint}
+              >
+                <Icon className="w-3 h-3 text-amber-400/70" />
+                <span>{chip.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Input Bar with Voice, Tools & File Attachment */}
         <div className="p-4 border-t border-stone-800 bg-stone-950">
           <form
             onSubmit={(e) => {
@@ -766,7 +945,7 @@ export default function ClinicalCopilotDrawer({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading || loading}
-              title="Upload intake PDF, doctor note, voucher, or CSV manifest"
+              title="Upload guest intake PDF, doctor note, voucher, or CSV spreadsheet"
               className="p-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 border border-stone-700/80 text-stone-400 hover:text-amber-300 transition-colors disabled:opacity-50"
             >
               <Paperclip className="w-4 h-4" />
@@ -803,13 +982,18 @@ export default function ClinicalCopilotDrawer({
               className="pl-3 pr-8 py-2.5 text-xs bg-stone-900 border border-stone-700/80 rounded-xl text-stone-200 focus:outline-none focus:border-amber-500/50 appearance-none cursor-pointer shrink-0"
               style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23a8a29e%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px top 50%', backgroundSize: '8px auto' }}
             >
-              <option value="chat">Chat</option>
-              <option value="/sales">💰 Sales</option>
-              <option value="/screen">🩺 Screen</option>
-              <option value="/draft">📝 Draft</option>
-              <option value="/route">🗺️ Route</option>
-              <option value="/weather">🌤️ Weather</option>
-              <option value="/vendors">🏬 Vendors</option>
+              <option value="chat">💬 Chat with Assistant</option>
+              <option value="/finance">💰 /finance · Villa Buyouts &amp; Payments</option>
+              <option value="/radar">✈️ /radar · Flights &amp; Driver Pickups</option>
+              <option value="/chef">🍽️ /chef · Allergy Charts &amp; Chef Menus</option>
+              <option value="/b2b">🤝 /b2b · Partner Studios &amp; Commissions</option>
+              <option value="/clinical">🩺 /clinical · Nurse Health Check &amp; Safety</option>
+              <option value="/book">📋 /book · Room Prices &amp; Dates</option>
+              <option value="/attendee">👥 /attendee · Add Guest to Spreadsheet</option>
+              <option value="/vendor">🏬 /vendor · Trusted Local Suppliers</option>
+              <option value="/draft">📝 /draft · Warm Welcome Email</option>
+              <option value="/route">🗺️ /route · Scenic Driving Routes</option>
+              <option value="/weather">🌤️ /weather · Local Weather Forecast</option>
             </select>
 
             {/* Text Input */}
@@ -823,13 +1007,19 @@ export default function ClinicalCopilotDrawer({
                 }
               }}
               placeholder={
-                activeMode === "clinical_safety"
-                  ? "Screen guest medical conditions or symptoms..."
-                  : activeMode === "consult_prep"
-                    ? "Ask about a guest's care plan, draft an email, or consult prep..."
-                    : activeMode === "travel_concierge"
-                      ? "Ask about routes, weather windows, dining, reviews..."
-                      : "Ask about tools, retreat groups, or operations..."
+                activeMode === "executive_finance"
+                  ? "Calculate villa buyout, 30% deposit, or payment plan..."
+                  : activeMode === "travel_logistics"
+                    ? "Check flight arrivals, airport drivers, or scenic driving routes..."
+                    : activeMode === "chef_hospitality"
+                      ? "Create allergy-safe menus, local produce lists, or tea elixirs..."
+                      : activeMode === "b2b_sales"
+                        ? "Draft partnership proposals, 15% commissions, or group rates..."
+                        : activeMode === "clinical_safety"
+                          ? "Check guest health considerations, medications, or gentle breathwork..."
+                          : activeMode === "spreadsheet_crm"
+                            ? "Add guest row, lookup reservation, or check room assignment..."
+                            : "Ask a question in plain English, or type a shortcut like /finance, /radar, /chef..."
               }
               className="flex-1 px-3.5 py-2.5 text-xs bg-stone-900 border border-stone-700/80 rounded-xl text-stone-200 placeholder-stone-500 focus:outline-none focus:border-amber-500/50"
             />
@@ -838,7 +1028,7 @@ export default function ClinicalCopilotDrawer({
             <button
               type="submit"
               disabled={loading || uploading || !inputMessage.trim()}
-              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-stone-950 font-semibold text-xs flex items-center gap-1.5 transition-colors"
+              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-stone-950 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
             >
               <span>Ask</span>
               <Send className="w-3.5 h-3.5" />
@@ -846,7 +1036,7 @@ export default function ClinicalCopilotDrawer({
           </form>
 
           <p className="text-[10px] text-stone-500 text-center mt-2">
-            Founder Sanctuary Studio · Clinical Voice & Intake Parser Active · Personalized Founder Approval Enforced
+            Protected by Review · Nothing is sent without your approval · 100% in your control
           </p>
         </div>
       </div>

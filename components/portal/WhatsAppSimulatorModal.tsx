@@ -185,7 +185,7 @@ export default function WhatsAppSimulatorModal({
                 <ShieldCheck className="w-3 h-3 text-emerald-300" />
               </div>
               <div className="text-[10px] text-emerald-100/90 font-mono">
-                Operator Dispatch &middot; Mobile Webhook
+                Guest Concierge &middot; Live WhatsApp Link
               </div>
             </div>
           </div>
@@ -219,7 +219,7 @@ export default function WhatsAppSimulatorModal({
           {/* Encryption notice */}
           <div className="text-center">
             <span className="inline-block px-2.5 py-1 rounded bg-[#182229] text-[#8696A0] text-[9px] font-mono border border-slate-800">
-              🔒 End-to-end encrypted &middot; Zero Autonomous Writes Enforced
+              🔒 Private &amp; Secure &middot; Review &amp; Approval Required Before Sending
             </span>
           </div>
 
@@ -277,7 +277,7 @@ export default function WhatsAppSimulatorModal({
           {loading && (
             <div className="flex items-center space-x-2 text-slate-400 text-xs italic p-2">
               <span className="animate-spin w-3 h-3 border-2 border-emerald-400 border-t-transparent rounded-full" />
-              <span>KAI Webhook Processing...</span>
+              <span>Connecting to WhatsApp...</span>
             </div>
           )}
         </div>

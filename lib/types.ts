@@ -35,6 +35,8 @@ export interface Retreat {
   country: string;
   locationDetails: string;
   dates: string;
+  startDate?: string;
+  endDate?: string;
   year: number;
   season?: string;
   duration: string;

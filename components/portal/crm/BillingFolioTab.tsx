@@ -14,7 +14,11 @@ import {
   ShieldCheck,
   Lock,
   FileCheck2,
+  Printer,
+  Sparkles,
 } from "lucide-react";
+import { printBillingFolio } from "@/lib/print-export";
+import { triggerExplainThis } from "@/lib/portal-form-bus";
 import {
   CRMTripItem,
   recordCrmTripSplitPayment,
@@ -276,23 +280,61 @@ export function BillingFolioTab({
       <div className="bg-white p-4 rounded-xl border border-[#E5DDD0] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <span className="text-[10px] font-mono uppercase font-bold text-[#C07D63] block">
-            Sanctuary Pay &amp; Back-Office Accounting Engine
+            Sanctuary Guest Payments &amp; Accounting Ledger
           </span>
           <h2 className="font-serif text-lg font-bold text-[#2D3E35]">
-            Select Active Traveler Sub-Trip for Ledger Operations
+            Select Guest Trip for Payment Ledger
           </h2>
         </div>
-        <select
-          value={activeTrip?.id || ""}
-          onChange={(e) => setSelectedTripId(e.target.value)}
-          className="px-3 py-2 text-xs rounded-lg border border-[#E5DDD0] bg-[#FAF7F2] text-[#2D3E35] font-semibold min-w-[280px]"
-        >
-          {trips.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.client_name} — {t.title} (${t.total_investment.toLocaleString()} · {t.status})
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-mono">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+            <span>Sanctuary Database Synced</span>
+          </div>
+
+          <button
+            onClick={() => {
+              if (!activeTrip) return;
+              printBillingFolio({
+                trip_id: activeTrip.id,
+                guest_name: activeTrip.client_name,
+                destination: activeTrip.title || "Puerto Vallarta Sanctuary",
+                currency: "USD",
+                total_investment: activeTrip.total_investment,
+                total_paid: activeTrip.paid_amount || 0,
+                remaining_balance: Math.max(0, activeTrip.total_investment - (activeTrip.paid_amount || 0)),
+                deposit_status: (activeTrip.paid_amount || 0) >= activeTrip.total_investment * 0.25 ? "PAID" : "PENDING",
+                final_balance_status: (activeTrip.paid_amount || 0) >= activeTrip.total_investment ? "SETTLED" : "OPEN",
+                transactions: [
+                  {
+                    date: new Date().toISOString().split("T")[0],
+                    description: "Direct Wire Settlement Record",
+                    method: paymentMethod,
+                    amount: activeTrip.paid_amount || 0,
+                    reference: txRef || `SOV-${activeTrip.id.substring(0, 6)}`
+                  }
+                ]
+              });
+            }}
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#FAF7F2] hover:bg-[#F2ECE4] text-[#2D3E35] border border-[#E5DDD0] transition-colors cursor-pointer"
+            title="Print or export PDF of itemized folio"
+          >
+            <Printer className="w-3.5 h-3.5 text-[#2D3E35]" />
+            <span>Print Folio Receipt</span>
+          </button>
+
+          <select
+            value={activeTrip?.id || ""}
+            onChange={(e) => setSelectedTripId(e.target.value)}
+            className="px-3 py-2 text-xs rounded-lg border border-[#E5DDD0] bg-[#FAF7F2] text-[#2D3E35] font-semibold min-w-[280px]"
+          >
+            {trips.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.client_name} — {t.title} (${t.total_investment.toLocaleString()} · {t.status})
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -302,11 +344,11 @@ export function BillingFolioTab({
             <div className="flex items-center space-x-2">
               <Globe className="w-4 h-4 text-emerald-700" />
               <h3 className="font-serif text-base font-bold text-[#2D3E35]">
-                Multi-Currency FX &amp; Installment Terminal
+                International Wire &amp; Installment Terminal
               </h3>
             </div>
             <span className="text-[10px] font-mono bg-emerald-50 text-emerald-900 border border-emerald-200 px-2 py-0.5 rounded">
-              Zero Penny Drift
+              Exact Balance Matched (Zero Penny Drift)
             </span>
           </div>
 
@@ -314,7 +356,7 @@ export function BillingFolioTab({
             <div className="grid grid-cols-3 gap-2.5">
               <div>
                 <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">
-                  Origin Currency
+                  Payment Currency
                 </label>
                 <select
                   value={currency}
@@ -330,7 +372,7 @@ export function BillingFolioTab({
               </div>
               <div>
                 <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">
-                  Foreign Amount
+                  Received Amount
                 </label>
                 <input
                   type="number"
@@ -343,7 +385,7 @@ export function BillingFolioTab({
               </div>
               <div>
                 <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">
-                  USD Settlement
+                  USD Equivalent (Settled)
                 </label>
                 <div className="w-full px-2.5 py-1.5 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-950 font-mono font-bold">
                   ${convertedUsdPreview.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -394,9 +436,19 @@ export function BillingFolioTab({
 
           {lastPaymentResult && (
             <div className="p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-xs space-y-1">
-              <div className="font-bold text-emerald-950">
-                Posted ${lastPaymentResult.amount_recorded.toLocaleString()} USD &middot; Total Paid: $
-                {lastPaymentResult.total_paid.toLocaleString()} USD
+              <div className="flex items-center justify-between">
+                <div className="font-bold text-emerald-950">
+                  Posted ${lastPaymentResult.amount_recorded.toLocaleString()} USD &middot; Total Paid: $
+                  {lastPaymentResult.total_paid.toLocaleString()} USD
+                </div>
+                <button
+                  type="button"
+                  onClick={() => triggerExplainThis(`Explain currency conversion and wire ledger settlement for ${activeTrip?.client_name}: ${currency} ${fxAmount} converted to $${lastPaymentResult.amount_recorded} USD @ ${currentFxRate}. Remaining balance: $${lastPaymentResult.remaining_balance} USD.`, "studio_ops")}
+                  className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[10px] font-semibold cursor-pointer shrink-0 ml-2"
+                >
+                  <Sparkles className="w-2.5 h-2.5 text-emerald-700" />
+                  <span>Explain Payment</span>
+                </button>
               </div>
               <div className="text-[11px] text-emerald-900">
                 Remaining Balance: <strong>${lastPaymentResult.remaining_balance.toLocaleString()} USD</strong>{" "}
@@ -657,7 +709,7 @@ export function BillingFolioTab({
             disabled={busy !== null}
             className="px-4 py-2 rounded-lg bg-[#2D3E35] hover:bg-[#1f2c25] text-[#FAF7F2] text-xs font-semibold transition-colors cursor-pointer shrink-0"
           >
-            {busy === "splitfolio" ? "Splitting Folio..." : "Execute 50/25/25 Villa Split ($22,000)"}
+            {busy === "splitfolio" ? "Calculating Guest Shares..." : "Split Villa Stay Between Guests ($22,000)"}
           </button>
         </div>
 
@@ -672,8 +724,15 @@ export function BillingFolioTab({
                 <div className="text-sm font-serif font-bold text-[#2D3E35]">
                   ${s.share_amount_usd.toLocaleString(undefined, { minimumFractionDigits: 2 })} USD
                 </div>
-                <div className="text-[11px] text-[#5C6B5E]">
-                  {s.payment_method} &middot; <span className="font-mono">{s.reference}</span>
+                <div className="text-[11px] text-[#5C6B5E] flex items-center justify-between">
+                  <span>{s.payment_method} &middot; <span className="font-mono">{s.reference}</span></span>
+                  <button
+                    type="button"
+                    onClick={() => triggerExplainThis(`Explain proportional villa split share for ${s.guest_name}: ${s.percentage_share}% ($${s.share_amount_usd} USD) via ${s.payment_method}. Check zero-penny balance reconciliation.`, "studio_ops")}
+                    className="text-[10px] text-stone-600 hover:text-stone-900 font-semibold underline cursor-pointer shrink-0 ml-1"
+                  >
+                    Explain Guest Share
+                  </button>
                 </div>
               </div>
             ))}

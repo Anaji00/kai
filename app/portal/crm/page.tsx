@@ -26,6 +26,7 @@ import {
   Edit3,
   CalendarPlus,
   SlidersHorizontal,
+  FileSpreadsheet,
 } from "lucide-react";
 import {
   fetchCrmClients,
@@ -39,6 +40,7 @@ import {
   CRMClientDetailResponse,
   CRMTripDetailResponse,
 } from "@/lib/sidecar-api";
+import AttendeeSpreadsheetTab from "@/components/portal/crm/AttendeeSpreadsheetTab";
 import CohortCommandTab from "@/components/portal/crm/CohortCommandTab";
 import BillingFolioTab from "@/components/portal/crm/BillingFolioTab";
 import ClinicalSafetyTelemetryTab from "@/components/portal/crm/ClinicalSafetyTelemetryTab";
@@ -49,8 +51,8 @@ import TripBuilderModal from "@/components/portal/crm/TripBuilderModal";
 
 export default function NativeTravelCRMPage() {
   const [activeTab, setActiveTab] = useState<
-    "clients" | "trips" | "cohorts" | "billing" | "clinical" | "ai_playbooks"
-  >("clients");
+    "attendees" | "clients" | "trips" | "cohorts" | "billing" | "clinical" | "ai_playbooks"
+  >("attendees");
   const [clients, setClients] = useState<CRMClientItem[]>([]);
   const [trips, setTrips] = useState<CRMTripItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -229,14 +231,14 @@ export default function NativeTravelCRMPage() {
         <div>
           <div className="flex items-center space-x-2 flex-wrap">
             <h1 className="font-serif text-3xl font-bold text-[#2D3E35] tracking-tight">
-              KAI Sanctuary Travel &amp; Clinical CRM Studio
+              KAI Sanctuary Retreat Operations &amp; Guest Management
             </h1>
             <span className="text-[10px] font-mono uppercase bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded-full font-bold">
-              SQLite WAL Native &middot; 36 Operational Workflows
+              Direct Sanctuary Database &middot; 36 Staff Workflows
             </span>
           </div>
           <p className="text-sm text-[#5C6B5E] mt-1">
-            KAI Native Travel CRM &middot; Group Cohorts, Sub-Trips, Multi-Currency FX Folios, Aviation Desk &amp; RN Somatic Telemetry
+            Guest Travel &amp; Retreat Care &middot; Manage Attendees, Bookings, Rooming, Payments &amp; Wellness Intakes
           </p>
         </div>
 
@@ -247,7 +249,7 @@ export default function NativeTravelCRMPage() {
             className="inline-flex items-center space-x-2 px-3.5 py-2 text-xs font-semibold text-[#2D3E35] bg-[#F2ECE4] hover:bg-[#EBE3D8] border border-[#E5DDD0] rounded-md transition-all shadow-xs cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span>Sync CRM Ledger</span>
+            <span>Refresh Guest List</span>
           </button>
         </div>
       </div>
@@ -256,47 +258,62 @@ export default function NativeTravelCRMPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] shadow-xs">
           <div className="flex items-center justify-between text-[#5C6B5E]">
-            <span className="text-xs font-semibold uppercase tracking-wider">CRM Contacts</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Guest Contacts</span>
             <Users className="w-4 h-4 text-[#2D3E35]" />
           </div>
           <div className="mt-2 text-2xl font-serif font-bold text-[#2D3E35]">{clients.length}</div>
-          <div className="text-[11px] text-[#5C6B5E] mt-0.5">360&deg; Guest Dossiers (`crm_clients`)</div>
+          <div className="text-[11px] text-[#5C6B5E] mt-0.5">Detailed Profiles &amp; Notes</div>
         </div>
 
         <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] shadow-xs">
           <div className="flex items-center justify-between text-[#5C6B5E]">
-            <span className="text-xs font-semibold uppercase tracking-wider">Traveler Sub-Trips</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Retreat Bookings</span>
             <Layers className="w-4 h-4 text-[#C07D63]" />
           </div>
           <div className="mt-2 text-2xl font-serif font-bold text-[#2D3E35]">{trips.length}</div>
-          <div className="text-[11px] text-[#5C6B5E] mt-0.5">Group Cohort Sub-Trips (`crm_trips`)</div>
+          <div className="text-[11px] text-[#5C6B5E] mt-0.5">Current &amp; Upcoming Vacations</div>
         </div>
 
         <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] shadow-xs">
           <div className="flex items-center justify-between text-[#5C6B5E]">
-            <span className="text-xs font-semibold uppercase tracking-wider">Pipeline Volume</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Total Revenue Tracked</span>
             <CreditCard className="w-4 h-4 text-emerald-700" />
           </div>
           <div className="mt-2 text-2xl font-serif font-bold text-[#2D3E35]">
             ${totalLifetimeSpend.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
           </div>
-          <div className="text-[11px] text-[#5C6B5E] mt-0.5">30/70 Installments &amp; Multi-Currency FX</div>
+          <div className="text-[11px] text-[#5C6B5E] mt-0.5">Paid Deposits &amp; Outstanding Balances</div>
         </div>
 
         <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] shadow-xs">
           <div className="flex items-center justify-between text-[#5C6B5E]">
-            <span className="text-xs font-semibold uppercase tracking-wider">Smart Flight Desk</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Flight &amp; Chauffeur Arrivals</span>
             <Plane className="w-4 h-4 text-blue-700" />
           </div>
           <div className="mt-2 text-2xl font-serif font-bold text-[#2D3E35]">{activeFlightsCount}</div>
-          <div className="text-[11px] text-[#5C6B5E] mt-0.5">Cirium &amp; Part 135 Charter Tracking</div>
+          <div className="text-[11px] text-[#5C6B5E] mt-0.5">Flight Numbers &amp; Airport Transfers</div>
         </div>
       </div>
 
-      {/* 6-Tab Workspace Navigation Bar */}
+      {/* 7-Tab Workspace Navigation Bar */}
       <div className="bg-white p-4 rounded-xl border border-[#E5DDD0] shadow-xs space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-[#E5DDD0]/60 pb-3">
           <div className="flex flex-wrap bg-[#F2ECE4] rounded-lg p-1 text-xs border border-[#E5DDD0] gap-1">
+            <button
+              onClick={() => setActiveTab("attendees")}
+              className={`px-3.5 py-1.5 rounded-md font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer ${
+                activeTab === "attendees"
+                  ? "bg-white text-[#2D3E35] shadow-xs"
+                  : "text-[#5C6B5E] hover:text-[#2D3E35]"
+              }`}
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-[#1A73E8]" />
+              <span>Attendee Spreadsheet</span>
+              <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full font-bold ml-0.5">
+                Monday.com Grid
+              </span>
+            </button>
+
             <button
               onClick={() => setActiveTab("clients")}
               className={`px-3.5 py-1.5 rounded-md font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer ${
@@ -306,7 +323,7 @@ export default function NativeTravelCRMPage() {
               }`}
             >
               <Users className="w-3.5 h-3.5 text-[#2D3E35]" />
-              <span>360&deg; Client Dossiers ({clients.length})</span>
+              <span>Guest Profiles ({clients.length})</span>
             </button>
 
             <button
@@ -318,7 +335,7 @@ export default function NativeTravelCRMPage() {
               }`}
             >
               <Compass className="w-3.5 h-3.5 text-blue-700" />
-              <span>Sub-Trips &amp; Itineraries ({trips.length})</span>
+              <span>Vacations &amp; Itineraries ({trips.length})</span>
             </button>
 
             <button
@@ -330,7 +347,7 @@ export default function NativeTravelCRMPage() {
               }`}
             >
               <Layers className="w-3.5 h-3.5 text-[#C07D63]" />
-              <span>Group Cohorts &amp; Operations</span>
+              <span>Rooming &amp; Group Logistics</span>
             </button>
 
             <button
@@ -342,7 +359,7 @@ export default function NativeTravelCRMPage() {
               }`}
             >
               <CreditCard className="w-3.5 h-3.5 text-emerald-700" />
-              <span>Sanctuary Pay, FX &amp; Split Folios</span>
+              <span>Payments &amp; Villa Folios</span>
             </button>
 
             <button
@@ -354,7 +371,7 @@ export default function NativeTravelCRMPage() {
               }`}
             >
               <HeartPulse className="w-3.5 h-3.5 text-rose-700" />
-              <span>RN Clinical &amp; Somatic Telemetry</span>
+              <span>Nurse Health &amp; Dietary Care</span>
             </button>
 
             <button
@@ -366,7 +383,7 @@ export default function NativeTravelCRMPage() {
               }`}
             >
               <Bot className="w-3.5 h-3.5 text-amber-500" />
-              <span>AI Copilots &amp; Playbooks (15)</span>
+              <span>Retreat Assistant Tools</span>
             </button>
           </div>
 
@@ -451,6 +468,15 @@ export default function NativeTravelCRMPage() {
           </div>
         )}
       </div>
+
+      {/* TAB: ATTENDEE & VACATION SPREADSHEET (MONDAY.COM GRID) */}
+      {activeTab === "attendees" && (
+        <AttendeeSpreadsheetTab
+          clients={clients}
+          trips={trips}
+          onRefreshData={loadData}
+        />
+      )}
 
       {/* TAB 0: AI ASSISTANTS & SCENARIO PLAYBOOKS */}
       {activeTab === "ai_playbooks" && (
@@ -698,7 +724,7 @@ export default function NativeTravelCRMPage() {
                 className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-[#5C6B5E] hover:text-[#2D3E35] bg-[#FAF7F2] hover:bg-[#F2ECE4] border border-[#E5DDD0] rounded-lg transition-colors cursor-pointer"
               >
                 <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span>{showConcurrencyTest ? "Hide Concurrency Simulator" : "Cohort Capacity Simulator"}</span>
+                <span>{showConcurrencyTest ? "Hide Capacity Checker" : "Test Room & Group Limit (12–14 Guests)"}</span>
               </button>
               <button
                 type="button"
@@ -714,17 +740,17 @@ export default function NativeTravelCRMPage() {
             </div>
           </div>
 
-          {/* Optional Collapsible Concurrency Simulator */}
+          {/* Optional Collapsible Capacity Checker */}
           {showConcurrencyTest && (
             <div className="bg-white p-5 rounded-xl border border-[#E5DDD0] shadow-xs space-y-3 animate-in fade-in">
               <div className="flex items-center justify-between">
                 <div>
                   <h4 className="font-serif text-sm font-bold text-[#2D3E35] flex items-center space-x-2">
                     <UserPlus className="w-4 h-4 text-[#C07D63]" />
-                    <span>Atomic Cohort Enrollment &amp; 12-Spot Capacity Gate (`_cohort_reservation_lock`)</span>
+                    <span>Intimate Group Size Safety Check (Guarantees max 12–14 guests per retreat)</span>
                   </h4>
                   <p className="text-xs text-[#5C6B5E]">
-                    Stress-tests concurrent enrollment with mutex lock protection; shifts #13+ to Priority Waitlist with $0 hold.
+                    Checks that guest enrollment automatically honors retreat villa limits; shifts #13+ guests to a priority waitlist without extra charge.
                   </p>
                 </div>
               </div>

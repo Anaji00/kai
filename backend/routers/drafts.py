@@ -1,12 +1,15 @@
+import json
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
 
 from backend.database import get_db
+from backend.dependencies.auth import get_current_admin
+from backend.services.auth_service import AdminPrincipal, record_audit
 from backend.models import ActionDraft, Booking, FlightConciergeRequest, NewsletterSubscriber
 from backend.sidecar.models import (
     StagingIntake,
@@ -35,6 +38,7 @@ class ActionDraftUpdate(BaseModel):
 class ActionDraftApproveRequest(BaseModel):
     updated_content: Optional[str] = None
     operator_name: Optional[str] = "Kareena Islam"
+    force_override: bool = False
 
 
 class ActionDraftBatchApproveRequest(BaseModel):
@@ -422,22 +426,89 @@ def execute_draft_dispatch(db: Session, draft: ActionDraft, operator_name: str =
 
 
 APPROVABLE_STATUSES = ("pending_review", "SCHEDULED")
+DISPATCHING_STATUS = "dispatching"
+DISPATCH_CLAIM_EXPIRY_MINUTES = 5
 
 
-def _approve_and_dispatch(db: Session, draft: ActionDraft, operator_name: str) -> Dict[str, Any]:
+def _approve_and_dispatch(db: Session, draft: ActionDraft, operator: AdminPrincipal, force_override: bool = False) -> Dict[str, Any]:
     """
     Single approval path for every endpoint: enforces the status guard, dispatches once,
     and records dispatch_failed (with the error) instead of approved when delivery fails.
+    Enforces Cryptographic Optimistic Concurrency Control (OCC) against live records.
     """
-    if draft.status not in APPROVABLE_STATUSES:
+    stale_cutoff = datetime.now(timezone.utc) - timedelta(minutes=DISPATCH_CLAIM_EXPIRY_MINUTES)
+    if draft.status not in APPROVABLE_STATUSES and draft.status != DISPATCHING_STATUS:
         raise HTTPException(status_code=409, detail=f"Action draft cannot be approved from status '{draft.status}'.")
 
+    # A clinical hold blocks every CRM commit until a nurse clearance is recorded.
+    if draft.type in ("guest_intake", "booking_hold", "crm_booking_review", "crm_sync_review"):
+        from backend.sidecar.services.clinical_governance_engine import active_clinical_hold, clinical_hold_conflict
+        hold_intake = None
+        if draft.target_entity_type == "staging_intakes" and draft.target_entity_id:
+            hold_intake = db.query(StagingIntake).filter(StagingIntake.id == draft.target_entity_id).first()
+        if hold_intake is None:
+            hold_intake = db.query(StagingIntake).filter(_name_is(StagingIntake.client_name, draft.guest_name)).first()
+        hold = active_clinical_hold(hold_intake.consultation_thesis) if hold_intake else None
+        if hold:
+            raise HTTPException(status_code=409, detail=clinical_hold_conflict(hold))
+
+    # Cryptographic OCC Drift Verification
+    if draft.target_entity_version_hash and draft.target_entity_type and draft.target_entity_id:
+        from backend.sidecar.services.clinical_governance_engine import (
+            HITLDraftConcurrencyGuard,
+            StateDriftConflict,
+        )
+        live_entity_data = None
+        if draft.target_entity_type == "staging_intakes":
+            live_intake = db.query(StagingIntake).filter(StagingIntake.id == draft.target_entity_id).first()
+            if live_intake:
+                live_entity_data = {
+                    "id": str(live_intake.id),
+                    "client_name": live_intake.client_name,
+                    "email": live_intake.email,
+                    "phone": live_intake.phone,
+                    "sanctuary_slug": live_intake.sanctuary_slug,
+                    "room_tier": live_intake.room_tier,
+                    "status": live_intake.status,
+                }
+        if draft.target_entity_type == "staging_intakes" and not live_entity_data:
+            raise HTTPException(status_code=409, detail="The guest record this draft was prepared for no longer exists.")
+        if live_entity_data:
+            try:
+                HITLDraftConcurrencyGuard.verify_and_detect_drift(
+                    staged_hash=draft.target_entity_version_hash,
+                    live_entity_data=live_entity_data,
+                    staged_base_data=(json.loads(draft.staged_patch_json).get("base") if draft.staged_patch_json else None),
+                    force_override=force_override,
+                )
+            except StateDriftConflict as e:
+                raise HTTPException(status_code=409, detail=e.diff_payload)
+
+    # Atomic claim: of any number of simultaneous approvals, one wins, so messages go out once.
+    # A claim left behind by a crashed process expires and can be retried.
+    claimed = db.query(ActionDraft).filter(
+        ActionDraft.id == draft.id,
+        or_(
+            ActionDraft.status.in_(APPROVABLE_STATUSES),
+            and_(ActionDraft.status == DISPATCHING_STATUS, ActionDraft.reviewed_at < stale_cutoff),
+        ),
+    ).update({"status": DISPATCHING_STATUS, "reviewed_at": datetime.now(timezone.utc)}, synchronize_session=False)
+    if not claimed:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="This draft is already being approved.")
+    db.commit()
+    db.refresh(draft)
+
     try:
-        dispatch_result = execute_draft_dispatch(db, draft, operator_name=operator_name)
+        dispatch_result = execute_draft_dispatch(db, draft, operator_name=operator.full_name)
+        now = datetime.now(timezone.utc)
         draft.status = "approved"
-        draft.dispatched_at = datetime.now(timezone.utc)
-        draft.dispatched_by = operator_name
+        draft.dispatched_at = now
+        draft.dispatched_by = operator.email
+        draft.reviewed_by_operator_id = operator.id
+        draft.reviewed_at = now
         draft.dispatch_error = None
+        record_audit(db, operator, "draft.approved", "action_draft", draft.id, {"type": draft.type, "force_override": force_override}, commit=False)
         db.commit()
     except Exception as e:
         logger.error(f"Downstream dispatch failure for draft #{draft.id}: {e}", exc_info=True)
@@ -446,6 +517,9 @@ def _approve_and_dispatch(db: Session, draft: ActionDraft, operator_name: str) -
         draft.content = edited_content
         draft.status = "dispatch_failed"
         draft.dispatch_error = str(e)
+        draft.reviewed_by_operator_id = operator.id
+        draft.reviewed_at = datetime.now(timezone.utc)
+        record_audit(db, operator, "draft.dispatch_failed", "action_draft", draft.id, {"error": str(e)[:500]}, commit=False)
         db.commit()
         raise HTTPException(status_code=502, detail=f"Downstream dispatch failed: {str(e)}")
     return dispatch_result
@@ -481,16 +555,17 @@ def get_action_drafts(
             "channel_target": meta["channel_target"],
             "channel_badge": meta["channel_badge"],
             "icon": meta["icon"],
+            "target_entity_type": d.target_entity_type,
+            "target_entity_id": d.target_entity_id,
+            "target_entity_version_hash": d.target_entity_version_hash,
         })
     return results
 
 
 @router.get("/stats", response_model=Dict[str, Any])
 def get_draft_stats(db: Session = Depends(get_db)):
-    all_drafts = db.query(ActionDraft).all()
-    pending = [d for d in all_drafts if d.status == "pending_review"]
-    approved = [d for d in all_drafts if d.status == "approved"]
-    discarded = [d for d in all_drafts if d.status == "discarded"]
+    rows = db.query(ActionDraft.status, ActionDraft.type, func.count(ActionDraft.id)).group_by(ActionDraft.status, ActionDraft.type).all()
+    count_for = lambda status: sum(count for row_status, _, count in rows if row_status == status)
 
     categories = {
         "travel": 0,
@@ -504,19 +579,17 @@ def get_draft_stats(db: Session = Depends(get_db)):
         "general": 0,
     }
 
-    for d in pending:
-        meta = get_channel_metadata(d.type)
-        badge = meta["channel_badge"]
-        if badge in categories:
-            categories[badge] += 1
-        else:
-            categories["general"] += 1
+    for row_status, draft_type, count in rows:
+        if row_status != "pending_review":
+            continue
+        badge = get_channel_metadata(draft_type)["channel_badge"]
+        categories[badge if badge in categories else "general"] += count
 
     return {
-        "total_pending": len(pending),
-        "total_approved": len(approved),
-        "total_discarded": len(discarded),
-        "total_all": len(all_drafts),
+        "total_pending": count_for("pending_review"),
+        "total_approved": count_for("approved"),
+        "total_discarded": count_for("discarded"),
+        "total_all": sum(count for _, _, count in rows),
         "by_category": categories
     }
 
@@ -524,7 +597,8 @@ def get_draft_stats(db: Session = Depends(get_db)):
 @router.post("/batch-approve")
 def batch_approve_drafts(
     payload: Optional[ActionDraftBatchApproveRequest] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    operator: AdminPrincipal = Depends(get_current_admin)
 ):
     """
     Batch approves action drafts for rapid founder triage.
@@ -534,7 +608,7 @@ def batch_approve_drafts(
     - Clinical contraindications and clinical document reviews NEVER blanket-approve;
       they require explicit draft_ids selection or are bypassed with a safety notice.
     """
-    operator_name = payload.operator_name if payload and payload.operator_name else "Kareena Islam"
+    operator_name = operator.full_name
     draft_ids = payload.draft_ids if payload and payload.draft_ids else []
     category = payload.category if payload and payload.category else "routine"
 
@@ -560,7 +634,7 @@ def batch_approve_drafts(
     failed_results = []
     for d in target_drafts:
         try:
-            dispatch_res = _approve_and_dispatch(db, d, operator_name)
+            dispatch_res = _approve_and_dispatch(db, d, operator)
         except HTTPException as e:
             failed_results.append({"draft_id": d.id, "type": d.type, "guest_name": d.guest_name, "error": e.detail})
             continue
@@ -609,7 +683,8 @@ def dispatch_drafts_whatsapp_digest(
 def approve_and_dispatch_draft(
     draft_id: int,
     payload: Optional[ActionDraftApproveRequest] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    operator: AdminPrincipal = Depends(get_current_admin)
 ):
     draft = db.query(ActionDraft).filter(ActionDraft.id == draft_id).first()
     if not draft:
@@ -625,11 +700,11 @@ def approve_and_dispatch_draft(
             "dispatch_result": {"channel": "ALREADY_APPROVED", "status": "ALREADY_APPROVED"}
         }
 
-    operator_name = payload.operator_name if payload and payload.operator_name else "Kareena Islam"
+    force_override = payload.force_override if payload else False
     if payload and payload.updated_content:
         draft.content = payload.updated_content
 
-    dispatch_result = _approve_and_dispatch(db, draft, operator_name)
+    dispatch_result = _approve_and_dispatch(db, draft, operator, force_override=force_override)
 
     return {
         "status": "approved",
@@ -645,13 +720,17 @@ def approve_and_dispatch_draft(
 def discard_draft(
     draft_id: int,
     payload: Optional[ActionDraftDiscardRequest] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    operator: AdminPrincipal = Depends(get_current_admin)
 ):
     draft = db.query(ActionDraft).filter(ActionDraft.id == draft_id).first()
     if not draft:
         raise HTTPException(status_code=404, detail="Action draft not found")
 
     draft.status = "discarded"
+    draft.reviewed_by_operator_id = operator.id
+    draft.reviewed_at = datetime.now(timezone.utc)
+    record_audit(db, operator, "draft.rejected", "action_draft", draft.id, {"reason": payload.reason if payload else None}, commit=False)
     db.commit()
 
     return {
@@ -662,7 +741,12 @@ def discard_draft(
 
 
 @router.patch("/{draft_id}")
-def update_draft(draft_id: int, payload: ActionDraftUpdate, db: Session = Depends(get_db)):
+def update_draft(
+    draft_id: int,
+    payload: ActionDraftUpdate,
+    db: Session = Depends(get_db),
+    operator: AdminPrincipal = Depends(get_current_admin)
+):
     draft = db.query(ActionDraft).filter(ActionDraft.id == draft_id).first()
     if not draft:
         raise HTTPException(status_code=404, detail="Draft not found")
@@ -673,9 +757,12 @@ def update_draft(draft_id: int, payload: ActionDraftUpdate, db: Session = Depend
     draft.content = payload.content
     dispatch_result = None
     if payload.status == "approved":
-        dispatch_result = _approve_and_dispatch(db, draft, operator_name="Kareena Islam")
+        dispatch_result = _approve_and_dispatch(db, draft, operator)
     else:
         draft.status = payload.status
+        draft.reviewed_by_operator_id = operator.id
+        draft.reviewed_at = datetime.now(timezone.utc)
+        record_audit(db, operator, f"draft.{payload.status}", "action_draft", draft.id, commit=False)
         db.commit()
 
     return {
@@ -686,11 +773,16 @@ def update_draft(draft_id: int, payload: ActionDraftUpdate, db: Session = Depend
 
 
 @router.delete("/{draft_id}")
-def delete_draft(draft_id: int, db: Session = Depends(get_db)):
+def delete_draft(
+    draft_id: int,
+    db: Session = Depends(get_db),
+    operator: AdminPrincipal = Depends(get_current_admin)
+):
     draft = db.query(ActionDraft).filter(ActionDraft.id == draft_id).first()
     if not draft:
         raise HTTPException(status_code=404, detail="Draft not found")
 
+    record_audit(db, operator, "draft.deleted", "action_draft", draft.id, {"type": draft.type, "guest": draft.guest_name}, commit=False)
     db.delete(draft)
     db.commit()
     return {"status": "success", "message": f"Draft #{draft_id} deleted"}

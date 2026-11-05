@@ -3,6 +3,7 @@ import uuid
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Header
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.sidecar.models import WebhookEventLog
@@ -13,57 +14,26 @@ from backend.config import settings
 
 logger = logging.getLogger("kai_webhooks_router")
 
-import hashlib
-import hmac
-import secrets
-from fastapi import Cookie
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
-
-security = HTTPBasic(auto_error=False)
-
-PORTAL_SESSION_COOKIE = "kai_portal_session"
+from backend.dependencies.auth import get_current_admin, verify_webhook_signature
 
 
-def portal_session_token() -> str:
-    """Same HMAC proxy.ts issues after the /portal login; changes whenever the admin password does."""
-    key = f"{settings.ADMIN_USERNAME}:{settings.ADMIN_PASSWORD}".encode()
-    return hmac.new(key, b"kai-portal-session-v1", hashlib.sha256).hexdigest()
-
-
-def verify_admin(
-    credentials: Optional[HTTPBasicCredentials] = Depends(security),
-    portal_session: Optional[str] = Cookie(None, alias=PORTAL_SESSION_COOKIE),
-):
-    """
-    Open access / sign-in requirement removed. Automatically verifies operator access.
-    """
-    if credentials and credentials.username:
-        return credentials.username
-    return settings.ADMIN_USERNAME
-
-
-def verify_webhook_secret(
-    x_webhook_secret: Optional[str] = Header(None, alias="X-Webhook-Secret"),
-):
-    """
-    Validates inbound webhook secret for external integrations (Cirium, Expedia, Resend).
-    """
-    if x_webhook_secret:
-        valid_secrets = [
-            s for s in [
-                getattr(settings, "CIRIUM_WEBHOOK_SECRET", None),
-                getattr(settings, "EXPEDIA_WEBHOOK_SECRET", None),
-                getattr(settings, "EMAIL_WEBHOOK_SECRET", None),
-            ] if s
-        ]
-        if valid_secrets and not any(secrets.compare_digest(x_webhook_secret, s) for s in valid_secrets):
-            raise HTTPException(status_code=401, detail="Invalid webhook secret")
-        return True
-
-    if settings.ENVIRONMENT == "production":
-        logger.error("Production security gate: Missing X-Webhook-Secret on inbound webhook")
-        raise HTTPException(status_code=401, detail="Missing required X-Webhook-Secret header in production")
-    return True
+def _commit_event_or_duplicate(db: Session, provider_event_id: Any, provider: str) -> Optional[Dict[str, Any]]:
+    """Commits a new event. If a simultaneous delivery of it won the insert, returns the duplicate reply."""
+    try:
+        db.commit()
+        return None
+    except IntegrityError:
+        db.rollback()
+    existing = db.query(WebhookEventLog).filter(WebhookEventLog.provider_event_id == str(provider_event_id)).first()
+    if not existing:
+        raise HTTPException(status_code=409, detail="Could not record this webhook event.")
+    return {
+        "success": True,
+        "duplicate": True,
+        "log_id": existing.id,
+        "provider": provider,
+        "message": f"Event {provider_event_id} already processed.",
+    }
 
 
 router = APIRouter(
@@ -116,7 +86,7 @@ INTEGRATION_PROVIDERS = [
 ]
 
 
-@router.get("/providers", dependencies=[Depends(verify_admin)])
+@router.get("/providers", dependencies=[Depends(get_current_admin)])
 def get_provider_status():
     """
     Returns health status and connection metadata for all 4 external travel & communication providers.
@@ -128,7 +98,7 @@ def get_provider_status():
     }
 
 
-@router.get("/events", response_model=List[WebhookEventLogResponse], dependencies=[Depends(verify_admin)])
+@router.get("/events", response_model=List[WebhookEventLogResponse], dependencies=[Depends(get_current_admin)])
 def list_webhook_events(
     provider: Optional[str] = Query(None, description="Filter by provider"),
     status: Optional[str] = Query(None, description="Filter by status (PROCESSED, PENDING, FAILED)"),
@@ -190,7 +160,7 @@ def list_webhook_events(
     ]
 
 
-@router.post("/hospitality", dependencies=[Depends(verify_webhook_secret)])
+@router.post("/hospitality", dependencies=[Depends(verify_webhook_signature)])
 def handle_hospitality_webhook(
     payload: Dict[str, Any],
     x_event_id: Optional[str] = Header(None, alias="X-Event-ID"),
@@ -229,7 +199,9 @@ def handle_hospitality_webhook(
         processed_at=datetime.now(timezone.utc)
     )
     db.add(log)
-    db.commit()
+    duplicate = _commit_event_or_duplicate(db, provider_event_id, provider)
+    if duplicate:
+        return duplicate
 
     return {
         "success": True,
@@ -238,7 +210,7 @@ def handle_hospitality_webhook(
     }
 
 
-@router.post("/flight-desk", dependencies=[Depends(verify_webhook_secret)])
+@router.post("/flight-desk", dependencies=[Depends(verify_webhook_signature)])
 def handle_flight_desk_webhook(
     payload: Dict[str, Any],
     x_event_id: Optional[str] = Header(None, alias="X-Event-ID"),
@@ -293,7 +265,9 @@ def handle_flight_desk_webhook(
         status="pending_review"
     )
     db.add(draft)
-    db.commit()
+    duplicate = _commit_event_or_duplicate(db, provider_event_id, "cirium_flights")
+    if duplicate:
+        return duplicate
 
     logger.info(f"Logged inbound Cirium flight webhook & staged draft: {event_type} ({log_id})")
     return {
@@ -305,7 +279,7 @@ def handle_flight_desk_webhook(
     }
 
 
-@router.post("/simulate", dependencies=[Depends(verify_admin)])
+@router.post("/simulate", dependencies=[Depends(get_current_admin)])
 def simulate_webhook(
     req: WebhookSimulateRequest,
     db: Session = Depends(get_db)

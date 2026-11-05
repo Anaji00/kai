@@ -7,7 +7,9 @@ import {
   AlertTriangle,
   CheckCircle2,
   Upload,
+  Sparkles,
 } from "lucide-react";
+import { triggerExplainThis } from "@/lib/portal-form-bus";
 import {
   parseVoucher,
   runManifestDiff,
@@ -365,8 +367,17 @@ export default function ReconciliationPage() {
                       >
                         {d.severity}
                       </span>
-                      <div className="flex-1">
+                      <div className="flex-1 flex items-center justify-between">
                         <div className="font-medium">{d.message}</div>
+                        <button
+                          type="button"
+                          onClick={() => triggerExplainThis(`Explain reconciliation discrepancy for sanctuary ${activeDiffResult.sanctuary_slug}: "${d.message}" (Severity: ${d.severity}). Detail the root cause, ledger impact, and recommended remediation.`, "studio_ops")}
+                          className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-[10px] font-medium transition-colors ml-2 shrink-0 cursor-pointer"
+                          title="Explain discrepancy via Copilot"
+                        >
+                          <Sparkles className="w-2.5 h-2.5 text-amber-700" />
+                          <span>Explain</span>
+                        </button>
                       </div>
                     </div>
                   ))}

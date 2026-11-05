@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2 } from "lucide-react";
 import { RETREATS } from "@/lib/retreats";
-import RetreatCard from "@/components/RetreatCard";
+import RetreatGrid from "@/components/RetreatGrid";
 
 export default function RetreatsPage() {
   const [filter, setFilter] = useState<"all" | "2027" | "2026">("all");
@@ -30,10 +30,10 @@ export default function RetreatsPage() {
         </p>
 
         {/* Filter Pills */}
-        <div className="pt-4 flex items-center justify-center gap-2">
+        <div className="pt-4 flex flex-wrap items-center justify-center gap-2">
           <button
             onClick={() => setFilter("all")}
-            className={`rounded-full px-5 py-2 text-xs uppercase tracking-wider transition-all font-medium ${
+            className={`whitespace-nowrap rounded-full px-4 sm:px-5 py-2 text-xs uppercase tracking-wider transition-all font-medium ${
               filter === "all"
                 ? "bg-sage text-linen shadow-sm"
                 : "bg-sand text-sage hover:bg-sand-muted border border-sand-border"
@@ -43,40 +43,40 @@ export default function RetreatsPage() {
           </button>
           <button
             onClick={() => setFilter("2027")}
-            className={`rounded-full px-5 py-2 text-xs uppercase tracking-wider transition-all font-medium ${
+            className={`whitespace-nowrap rounded-full px-4 sm:px-5 py-2 text-xs uppercase tracking-wider transition-all font-medium ${
               filter === "2027"
                 ? "bg-sage text-linen shadow-sm"
                 : "bg-sand text-sage hover:bg-sand-muted border border-sand-border"
             }`}
           >
-            2027 Flagship Calendar ({RETREATS.filter((r) => r.year === 2027).length})
+            2027 Flagship ({RETREATS.filter((r) => r.year === 2027).length})
           </button>
           <button
             onClick={() => setFilter("2026")}
-            className={`rounded-full px-5 py-2 text-xs uppercase tracking-wider transition-all font-medium ${
+            className={`whitespace-nowrap rounded-full px-4 sm:px-5 py-2 text-xs uppercase tracking-wider transition-all font-medium ${
               filter === "2026"
                 ? "bg-sage text-linen shadow-sm"
                 : "bg-sand text-sage hover:bg-sand-muted border border-sand-border"
             }`}
           >
-            2026 Upcoming ({RETREATS.filter((r) => r.year === 2026).length})
+            2026 ({RETREATS.filter((r) => r.year === 2026).length})
           </button>
         </div>
       </div>
 
       {/* Retreats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {filteredRetreats.map((retreat, idx) => (
-          <RetreatCard key={retreat.id} retreat={retreat} priority={idx < 3} />
-        ))}
-      </div>
+      <RetreatGrid
+        retreats={filteredRetreats}
+        priorityCount={3}
+        className="grid grid-flow-row-dense grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+      />
 
       {/* Private Group & Custom Curation Section */}
       <section className="mt-24 rounded-3xl border border-sand-border bg-sand/60 p-8 sm:p-12">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
           <div className="lg:col-span-8 space-y-4">
             <span className="text-xs uppercase tracking-[0.2em] font-semibold text-terracotta">
-              Bespoke Sanctuary Curation
+              Private Group Retreats
             </span>
             <h2 className="font-serif text-3xl sm:text-4xl text-sage font-light">
               Private Group & Executive Restorative Journeys
@@ -127,7 +127,7 @@ export default function RetreatsPage() {
           <div className="space-y-4">
             <div className="rounded-2xl border border-sand-border bg-linen p-6 space-y-2">
               <h4 className="font-serif text-xl text-sage">
-                How are retreat groups curated?
+                How are retreat groups put together?
               </h4>
               <p className="text-xs sm:text-sm text-sage/80 leading-relaxed">
                 Because KAI retreat groups are limited to 12 to 14 guests, Kareena personally reviews every inquiry. We ensure a harmonious dynamic where all participants share an intention for rest, respect, and nervous system restoration.

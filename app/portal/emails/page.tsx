@@ -97,10 +97,10 @@ export default function EmailsTriagePage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="font-serif text-3xl font-bold text-[#2D3E35] tracking-tight">
-            Inbound Concierge Email Ingestion & Triage
+            Guest Concierge Inbox &amp; Message Queue
           </h1>
           <p className="text-sm text-[#5C6B5E] mt-1">
-            AI Agent analyzes inbound concierge messages, extracts confirmation codes & flights, and stages triage actions for 1-click execution.
+            AI Assistant automatically reads guest emails, organizes flight details &amp; booking numbers, and drafts replies for your 1-click review.
           </p>
         </div>
 
@@ -125,7 +125,7 @@ export default function EmailsTriagePage() {
           </div>
           <span className="text-[11px] font-medium text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 flex items-center space-x-1">
             <ShieldCheck className="w-3 h-3 text-emerald-600" />
-            <span>Parsed into PENDING_APPROVAL</span>
+            <span>Prepared for Your Review (Not Sent Yet)</span>
           </span>
         </div>
 

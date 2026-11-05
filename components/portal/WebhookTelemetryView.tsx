@@ -13,8 +13,10 @@ import {
   MessageSquare,
   Mail,
   Check,
-  Code
+  Code,
+  Sparkles,
 } from "lucide-react";
+import { triggerExplainThis } from "@/lib/portal-form-bus";
 import {
   fetchIntegrationProviders,
   fetchWebhookEventLogs,
@@ -116,13 +118,13 @@ export default function WebhookTelemetryView() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-stone-900/80 border border-stone-800">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-xl font-serif text-stone-100">External Travel & Service Connections</h1>
+            <h1 className="text-xl font-serif text-stone-100">External Travel &amp; Service Connections</h1>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-medium">
               5 Active Connectors
             </span>
           </div>
           <p className="text-xs text-stone-400 mt-1">
-            Real-time webhooks and live status for KAI Sanctuary Platform, Expedia / Hotel PMS, Grand Travel Flight Desk, and WhatsApp.
+            Live connections for your sanctuary apps: Grand Travel Flight Tracker, Hotel PMS, WhatsApp Concierge, and Guest Intake Forms.
           </p>
         </div>
 
@@ -263,8 +265,9 @@ export default function WebhookTelemetryView() {
                   <th className="p-3.5 pl-5">Provider</th>
                   <th className="p-3.5">Event Type</th>
                   <th className="p-3.5">Status</th>
-                  <th className="p-3.5">Payload Preview</th>
-                  <th className="p-3.5 pr-5">Timestamp</th>
+                  <th className="p-3.5">Message Details</th>
+                  <th className="p-3.5">Timestamp</th>
+                  <th className="p-3.5 pr-5 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-stone-800/60 text-stone-300">
@@ -293,8 +296,19 @@ export default function WebhookTelemetryView() {
                       <td className="p-3.5 font-mono text-[11px] text-stone-400 max-w-xs truncate">
                         {JSON.stringify(log.payload)}
                       </td>
-                      <td className="p-3.5 pr-5 text-stone-500 whitespace-nowrap">
+                      <td className="p-3.5 text-stone-500 whitespace-nowrap">
                         {dateStr}
+                      </td>
+                      <td className="p-3.5 pr-5 text-right whitespace-nowrap">
+                        <button
+                          type="button"
+                          onClick={() => triggerExplainThis(`Explain incoming notification from service ${log.provider}: event "${log.event_type}" with details: ${JSON.stringify(log.payload)}. Explain guest record impact and recommended staff steps.`, "studio_ops")}
+                          className="inline-flex items-center space-x-1 px-2 py-1 rounded bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 border border-amber-500/30 text-[10px] font-sans font-medium transition-colors cursor-pointer"
+                          title="Ask Assistant to explain this update in plain English"
+                        >
+                          <Sparkles className="w-3 h-3 text-amber-400" />
+                          <span>Explain</span>
+                        </button>
                       </td>
                     </tr>
                   );

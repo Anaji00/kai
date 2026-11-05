@@ -68,17 +68,18 @@ class SuggestedRetreatPlanSchema(BaseModel):
 
 
 class BookingCreate(BaseModel):
-    fullName: str = Field(..., min_length=2, description="Full legal name of the guest")
+    clientReference: Optional[str] = Field(None, pattern=r"^KAI-[A-Z0-9]{5,8}$", description="Idempotency reference from the site, so a retried submission never creates a second booking")
+    fullName: str = Field(..., min_length=2, max_length=200, description="Full legal name of the guest")
     email: EmailStr = Field(..., description="Valid email address for reservation communication")
-    phone: str = Field(..., min_length=7, description="Contact phone number")
+    phone: str = Field(..., min_length=7, max_length=40, description="Contact phone number")
     retreatId: str = Field(..., min_length=1, description="Selected retreat identifier")
     roomPreference: str = Field("private-suite", description="private-suite, shared-luxury, or flexible")
     movementExperience: str = Field("all-levels", description="Movement & yoga experience tier")
     passportValid: str = Field("yes-valid-6mo", description="Passport validity declaration")
-    healthNotes: Optional[str] = Field(None, description="Dietary requirements, health or mobility notes")
-    intentions: Optional[str] = Field(None, description="Personal intention for renewal")
+    healthNotes: Optional[str] = Field(None, max_length=5000, description="Dietary requirements, health or mobility notes")
+    intentions: Optional[str] = Field(None, max_length=5000, description="Personal intention for renewal")
     waiverAccepted: bool = Field(True, description="Release of liability checkbox acceptance")
-    electronicSignature: Optional[str] = Field(None, description="Typed full legal name as electronic signature")
+    electronicSignature: Optional[str] = Field(None, max_length=200, description="Typed full legal name as electronic signature")
 
 
 class BookingResponse(BaseModel):

@@ -23,31 +23,70 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://kaiwellnessretreats.com"),
   manifest: "/manifest.webmanifest",
   title: {
-    default: "KAI Sanctuary & Wellness Retreats | Restorative Wellness & Curated Luxury Travel",
+    default: "KAI Sanctuary & Wellness Retreats | Small, Nurse-Led Luxury Wellness Travel",
     template: "%s | KAI Wellness Retreats",
   },
   description:
-    "Founded by Kareena Islam. Intimate, quiet luxury wellness retreats blending restorative circadian vitality, anatomical yoga, crystal singing bowl sound healing, and bespoke Grand Travel curation.",
+    "Founded by Kareena Islam, BSN, RN. Intimate, quiet luxury wellness retreats with yoga, crystal singing bowl sound baths, cultural experiences, and travel planning by Grand Travel & Cruise.",
   keywords: [
     "KAI Wellness Retreats",
     "Kareena Islam",
     "Nurse led retreat",
     "Somatic retreats",
-    "Quiet luxury wellness",
+    "Quiet luxury wellness retreats",
     "Costa Rica wellness retreat",
     "Amalfi Coast retreat",
     "Bali somatic retreat",
+    "Puerto Vallarta luxury retreat",
     "Crystal singing bowl sound bath",
-    "Vagus nerve reset",
+        "Autonomic nervous system recovery",
     "Grand Travel and Cruise",
+    "Luxury wellness travel",
   ],
+  authors: [
+    { name: "Kareena Islam, BSN, RN", url: "https://kaiwellnessretreats.com/about" },
+    { name: "Armaan Islam", url: "https://kaiwellnessretreats.com/about" },
+  ],
+  creator: "Kareena Islam, BSN, RN",
+  publisher: "KAI Wellness Retreats",
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
+  },
   alternates: {
-    canonical: "/",
+    canonical: "https://kaiwellnessretreats.com",
+    languages: {
+      "en-US": "https://kaiwellnessretreats.com",
+      "x-default": "https://kaiwellnessretreats.com",
+    },
+  },
+  category: "travel",
+  classification: "Luxury Wellness Retreats & Clinical Somatic Care",
+  verification: {
+    google: process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION || undefined,
+  },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "KAI Sanctuary",
+  },
+  robots: {
+    index: true,
+    follow: true,
+    nocache: false,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
   },
   openGraph: {
     title: "KAI Wellness Retreats | Where Clinical Science Meets Somatic Restoration",
     description:
-      "Curated by Kareena Islam. Restorative wellness retreats in Nosara, Amalfi Coast, Bali, and Riviera Maya.",
+      "Led by Kareena Islam, BSN, RN. Intimate, quiet luxury wellness sanctuaries in Puerto Vallarta, Nosara, Amalfi Coast, Bali, and Sedona.",
     url: "https://kaiwellnessretreats.com",
     siteName: "KAI Wellness Retreats",
     locale: "en_US",
@@ -57,7 +96,7 @@ export const metadata: Metadata = {
         url: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80",
         width: 1200,
         height: 630,
-        alt: "KAI Wellness Retreats",
+        alt: "KAI Sanctuary & Wellness Retreats — Tranquil Pacific Coastline",
       },
     ],
   },
@@ -65,7 +104,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "KAI Wellness Retreats | Clinical Science & Somatic Restoration",
     description:
-      "Nurse-led luxury sanctuaries in Costa Rica, Amalfi Coast, Bali, and Riviera Maya.",
+      "Nurse-led luxury sanctuaries in Puerto Vallarta, Costa Rica, Amalfi Coast, Bali, and Riviera Maya.",
     images: [
       "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80",
     ],
@@ -74,20 +113,94 @@ export const metadata: Metadata = {
 
 const organizationJsonLd = {
   "@context": "https://schema.org",
-  "@type": "HealthAndBeautyBusiness",
+  "@type": ["HealthAndBeautyBusiness", "TravelAgency"],
   name: "KAI Wellness Retreats",
+  alternateName: ["KAI Sanctuaries", "KAI Sanctuary Travel", "KAI Wellness"],
   url: "https://kaiwellnessretreats.com",
   logo: "https://kaiwellnessretreats.com/icon.png",
+  image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80",
+  email: "concierge@kaiwellnessretreats.com",
+  priceRange: "$$$$",
   founder: {
     "@type": "Person",
     name: "Kareena Islam",
-    jobTitle: "Founder, Registered Nurse & Clinical Director",
+    jobTitle: "Founder, Registered Nurse & Somatic Director",
+    sameAs: [
+      "https://www.instagram.com/kareenatravelrn/",
+    ],
+  },
+  founderPerson: {
+    "@type": "Person",
+    name: "Armaan Islam",
+    jobTitle: "Co-Founder & Strategic Director",
   },
   description:
-    "Intimate, quiet luxury wellness retreats blending clinical autonomic science, anatomical yoga, crystal singing bowl sound healing, and bespoke luxury travel curation.",
+    "Intimate, quiet luxury wellness retreats with yoga, crystal singing bowl sound baths, and luxury travel planning.",
+  knowsAbout: [
+    "Somatic Movement",
+    "Autonomic Nervous System Regulation",
+        "432Hz Crystal Sound Healing",
+    "High-Altitude & Tropical Microclimate Acclimatization",
+    "Luxury Wellness Travel",
+  ],
   sameAs: [
     "https://www.instagram.com/kaiwellnessretreats/",
     "https://www.instagram.com/kareenatravelrn/",
+  ],
+};
+
+const websiteJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: "KAI Wellness Retreats",
+  url: "https://kaiwellnessretreats.com",
+  alternateName: ["KAI", "KAI Sanctuaries"],
+};
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: [
+    {
+      "@type": "Question",
+      name: "How does KAI differ from typical wellness or yoga retreats?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "KAI was founded by Kareena Islam, BSN, RN to treat the root of modern burnout: chronic nervous system stress and exhaustion. Every schedule, breathwork cadence, Yin pose, and 432Hz crystal bowl frequency is clinical-grade and intentionally sequenced to shift your body from chronic fight-or-flight tension into deep, restful peace.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Do I need previous experience in yoga, breathwork, or sound healing?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Not at all. With Kareena’s clinical nursing background and RYT certifications, movement practices prioritize orthopedic safety, anatomical modifications, and restorative myofascial release. Every session meets your body exactly where it is.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Why are retreat groups strictly limited to 12–14 participants?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "True nervous system relaxation and deep restoration require psychological safety and genuine intimacy. Small retreat groups allow Kareena to provide individualized somatic attention and preserve the sacred stillness needed for profound rest.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "How does Grand Travel & Cruise secure the best rates and private estate access?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "With over 25 years as a host agency powerhouse and elite Funjet 500 Club recognition under Jay Islam, Grand Travel & Cruise commands high-volume global purchasing power, negotiating full private estate buyouts, preferred group air contracts, and exclusive industry rates.",
+      },
+    },
+    {
+      "@type": "Question",
+      name: "Can dietary preferences, allergies, or restrictions be accommodated?",
+      acceptedAnswer: {
+        "@type": "Answer",
+        text: "Yes, completely. Prior to arrival, you complete a comprehensive clinical wellness and dietary intake form. Our chefs prepare organic, anti-inflammatory, farm-to-table meals tailored precisely to gluten-free, vegan, vegetarian, dairy-free, or specific allergy profiles.",
+      },
+    },
   ],
 };
 
@@ -101,9 +214,19 @@ export default function RootLayout({
       <head>
         <link rel="manifest" href="/manifest.webmanifest" />
         <meta name="theme-color" content="#2D3E35" />
+        <link rel="preconnect" href="https://images.unsplash.com" />
+        <link rel="dns-prefetch" href="https://images.unsplash.com" />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd).replace(/</g, "\\u003c") }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd).replace(/</g, "\\u003c") }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd).replace(/</g, "\\u003c") }}
         />
       </head>
       <body className="flex min-h-screen flex-col bg-linen text-sage antialiased selection:bg-olive selection:text-linen">

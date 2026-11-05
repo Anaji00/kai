@@ -1,6 +1,9 @@
+import os
 import logging
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy.engine import make_url
+from sqlalchemy.pool import NullPool
 from backend.config import settings
 
 logger = logging.getLogger("kai_database")
@@ -9,8 +12,25 @@ db_url = settings.DATABASE_URL
 # Automatically normalize legacy postgres:// URLs to postgresql://
 if db_url.startswith("postgres://"):
     db_url = db_url.replace("postgres://", "postgresql://", 1)
+# Name the installed driver explicitly: newer SQLAlchemy releases default bare postgresql:// to psycopg 3.
+if db_url.startswith("postgresql://"):
+    db_url = db_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+
+is_vercel = os.getenv("VERCEL") == "1"
+is_serverless = is_vercel or bool(os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
 
 if "sqlite" in db_url:
+    # Serverless runtime hygiene: Vercel / Lambda filesystems outside /tmp are read-only
+    if is_serverless:
+        # /tmp is per-instance and wiped on cold start, so bookings written there silently disappear.
+        if settings.ENVIRONMENT == "production":
+            raise RuntimeError(
+                "DATABASE_URL must point at PostgreSQL in production on serverless hosting; "
+                "SQLite would lose every booking on the next cold start."
+            )
+        db_url = "sqlite:////tmp/kai_sanctuary.db"
+        logger.warning(f"Serverless preview without DATABASE_URL (VERCEL={is_vercel}): using ephemeral {db_url}. Data will not persist.")
+
     engine = create_engine(
         db_url,
         connect_args={"check_same_thread": False},
@@ -25,15 +45,27 @@ if "sqlite" in db_url:
         cursor.close()
 else:
     # Production-ready PostgreSQL connection pooling
-    engine = create_engine(
-        db_url,
-        pool_size=10,
-        max_overflow=20,
-        pool_pre_ping=True,
-        pool_recycle=3600,
-        echo=False
-    )
-    logger.info("Configured production PostgreSQL connection pool with pre-ping and recycle hooks.")
+    # In serverless/Vercel environments or PgBouncer transaction pooling, use NullPool to prevent connection leaks
+    _parsed_db_url = make_url(db_url)
+    is_pgbouncer = _parsed_db_url.port == 6543 or "pgbouncer" in _parsed_db_url.query
+    if is_serverless or is_pgbouncer:
+        engine = create_engine(
+            db_url,
+            poolclass=NullPool,
+            pool_pre_ping=True,
+            echo=False
+        )
+        logger.info("Configured serverless PostgreSQL engine with NullPool and pre-ping.")
+    else:
+        engine = create_engine(
+            db_url,
+            pool_size=10,
+            max_overflow=20,
+            pool_pre_ping=True,
+            pool_recycle=3600,
+            echo=False
+        )
+        logger.info("Configured production PostgreSQL connection pool with pre-ping and recycle hooks.")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -48,7 +80,26 @@ def get_db():
         db.close()
 
 
+# Arbitrary fixed key for pg_advisory_xact_lock; identifies "KAI schema init" across all processes.
+_SCHEMA_INIT_LOCK_KEY = 4827163
+
+
 def init_db():
+    """
+    Creates and migrates the schema. On Postgres this holds an advisory lock, because several workers or
+    serverless instances starting together would otherwise race and crash on duplicate table creation.
+    A transaction-scoped lock also works through transaction-mode connection poolers.
+    """
+    if engine.dialect.name == "postgresql":
+        from sqlalchemy import text
+        with engine.begin() as lock_conn:
+            lock_conn.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": _SCHEMA_INIT_LOCK_KEY})
+            _init_db_schema()
+    else:
+        _init_db_schema()
+
+
+def _init_db_schema():
     import backend.models as core_models  # noqa: F401
     import backend.sidecar.models as sidecar_models  # noqa: F401
     Base.metadata.create_all(bind=engine)
@@ -74,6 +125,12 @@ def init_db():
             ("dispatched_at", _ddl(DateTime())),
             ("dispatched_by", _ddl(String(64))),
             ("dispatch_error", _ddl(Text())),
+            ("target_entity_type", _ddl(String(64))),
+            ("target_entity_id", _ddl(String(64))),
+            ("target_entity_version_hash", _ddl(String(64))),
+            ("staged_patch_json", _ddl(Text())),
+            ("reviewed_by_operator_id", _ddl(String(36))),
+            ("reviewed_at", _ddl(DateTime())),
         ],
         "webhook_event_logs": [
             ("provider_event_id", _ddl(String(128))),
@@ -129,3 +186,10 @@ def init_db():
     except Exception as e:
         logger.warning(f"SanctuaryCohort auto-seed notice: {e}")
 
+    # 5. First operator account
+    try:
+        from backend.services.auth_service import ensure_bootstrap_operator
+        with SessionLocal() as db:
+            ensure_bootstrap_operator(db)
+    except Exception as e:
+        logger.error(f"Bootstrap operator creation failed: {e}")

@@ -23,7 +23,17 @@ def parse_and_stage_email(
     """
     logger.info(f"Email agent parsing inbound message from '{sender}': '{subject}'")
 
-    body_lower = raw_body.lower()
+    from backend.sidecar.services.clinical_governance_engine import (
+        UntrustedInputSanitizer,
+        assert_channel_capability,
+        IngestionChannel,
+    )
+
+    # 0. Prompt-Injection Spotlighting and Control Character Sanitization
+    cleaned_body = UntrustedInputSanitizer.sanitize_text(raw_body)
+    has_injection, injection_markers = UntrustedInputSanitizer.detect_prompt_injection(cleaned_body)
+
+    body_lower = cleaned_body.lower()
     subject_lower = subject.lower()
 
     # 1. Intent Classification
@@ -97,17 +107,18 @@ def parse_and_stage_email(
 
     # 3. Immediate LLM Suggested Plan for Guest Inquiries
     from backend.sidecar.services.thesis_rag import generate_llm_suggested_plan
-    llm_plan = generate_llm_suggested_plan(
-        client_name=entities["extracted_name"],
-        retreat_id=sanctuary_slug or "puerto-vallarta-2027",
-        room_preference="private-suite",
-        movement_experience="all-levels",
-        health_notes="Inbound email inquiry",
-        intentions=raw_body[:300],
-    )
-    entities["llm_suggested_plan"] = llm_plan
 
     if intent == "GUEST_INTAKE_INQUIRY":
+        # Only inquiries get a plan: flight notices and vouchers should not spend free-tier model quota.
+        llm_plan = generate_llm_suggested_plan(
+            client_name=entities["extracted_name"],
+            retreat_id=sanctuary_slug or "puerto-vallarta-2027",
+            room_preference="private-suite",
+            movement_experience="all-levels",
+            health_notes="Inbound email inquiry",
+            intentions=raw_body[:300],
+        )
+        entities["llm_suggested_plan"] = llm_plan
         suggested_action = (
             f"Stage new guest intake for {entities['extracted_name']} ({sanctuary_slug or 'puerto-vallarta-2027'}). "
             f"Routed to kareena@grandtravelcruise.com & armaan@grandtravelcruise.com. "
@@ -148,10 +159,14 @@ def parse_and_stage_email(
 
     # Also stage in ActionDraft review queue with specialized routing type
     draft_type = "flight_coordination" if intent == "FLIGHT_TRANSFER_UPDATE" else "email_reply"
+    # Channel capability check: ensure INBOUND_EMAIL is authorized to stage this action
+    assert_channel_capability(IngestionChannel.INBOUND_EMAIL, draft_type)
+
+    security_prefix = "[PROMPT INJECTION DETECTED - REVIEW SAFELY] " if has_injection else ""
     draft = ActionDraft(
         type=draft_type,
         guest_name=entities["extracted_name"],
-        content=f"PROPOSED ACTION ({draft_type.upper()}):\n{suggested_action}",
+        content=f"{security_prefix}PROPOSED ACTION ({draft_type.upper()}):\n{suggested_action}",
         status="pending_review"
     )
     db.add(draft)

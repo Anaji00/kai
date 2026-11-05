@@ -48,6 +48,7 @@ export default function DraftsQueuePage() {
   const [sendingDigest, setSendingDigest] = useState(false);
   const [activeTab, setActiveTab] = useState<string>("all");
   const [selectedDraft, setSelectedDraft] = useState<ApiActionDraft | null>(null);
+  const [selectedConflict, setSelectedConflict] = useState<{ error_code?: string; message?: string; findings?: string[] } | null>(null);
   const [dispatchingId, setDispatchingId] = useState<number | null>(null);
   const [actionNotice, setActionNotice] = useState<{ message: string; type: "success" | "info" } | null>(null);
 
@@ -93,7 +94,16 @@ export default function DraftsQueuePage() {
       window.dispatchEvent(new Event("drafts-updated"));
       await loadData();
     } catch (err: any) {
-      alert(`Approval failed: ${err?.message || "Unknown error"}`);
+      if (err?.status === 409) {
+        setSelectedConflict(err.data ?? null);
+        setSelectedDraft(draft);
+        setActionNotice({
+          message: `Notice for Draft #${draft.id}: ${err.message} Please review it before approving.`,
+          type: "info"
+        });
+      } else {
+        alert(`Approval failed: ${err?.message || "Unknown error"}`);
+      }
     } finally {
       setDispatchingId(null);
       setTimeout(() => setActionNotice(null), 6000);
@@ -153,10 +163,10 @@ export default function DraftsQueuePage() {
     }
   };
 
-  const handleModalApprove = async (newContent: string) => {
+  const handleModalApprove = async (newContent: string, forceOverride?: boolean) => {
     if (!selectedDraft) return;
     try {
-      const res = await approveDraftAction(selectedDraft.id, newContent);
+      const res = await approveDraftAction(selectedDraft.id, newContent, undefined, forceOverride);
       setSelectedDraft(null);
       setActionNotice({
         message: `Approved & Dispatched Draft #${selectedDraft.id}: ${res.dispatch_result?.action_taken || "Executed"}`,
@@ -165,6 +175,9 @@ export default function DraftsQueuePage() {
       window.dispatchEvent(new Event("drafts-updated"));
       await loadData();
     } catch (err: any) {
+      if (err?.status === 409) {
+        throw err;
+      }
       alert(`Approval failed: ${err?.message || "Unknown error"}`);
     } finally {
       setTimeout(() => setActionNotice(null), 6000);
@@ -234,7 +247,7 @@ export default function DraftsQueuePage() {
             </span>
           </div>
           <p className="text-sm text-[#5C6B5E] mt-1">
-            All AI agents, flight desks, inbound webhooks, and concierge triggers stage actions here for explicit 1-click authorization by Founder Kareena Islam.
+            All automated guest inquiries, flight updates, partner notices, and concierge messages wait here for your review and 1-click approval before being sent.
           </p>
         </div>
 
@@ -294,7 +307,7 @@ export default function DraftsQueuePage() {
           <p className="text-2xl font-serif font-bold text-emerald-800 mt-1">{stats.total_approved}</p>
           <div className="flex items-center space-x-1 text-[11px] text-emerald-700 mt-1">
             <Check className="w-3 h-3" />
-            <span>Downstream verified</span>
+            <span>Delivered &amp; Sent</span>
           </div>
         </div>
 
@@ -313,6 +326,43 @@ export default function DraftsQueuePage() {
           <div className="flex items-center space-x-1 text-[11px] text-indigo-700 mt-1">
             <ShieldCheck className="w-3 h-3" />
             <span>Native tags sync</span>
+          </div>
+        </div>
+      </div>
+
+      {/* 3-Step Automation Ease Banner for Non-Technical Staff */}
+      <div className="bg-[#FAF7F2] border border-[#E5DDD0] rounded-2xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-start gap-3 flex-1">
+          <div className="w-7 h-7 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+            1
+          </div>
+          <div>
+            <p className="text-xs font-bold text-[#2D3E35]">AI Prepares the Draft</p>
+            <p className="text-[11px] text-[#5C6B5E]">Messages, airport driver schedules, and invoices are drafted automatically as inquiries arrive.</p>
+          </div>
+        </div>
+
+        <div className="hidden md:block w-px h-10 bg-[#E5DDD0]" />
+
+        <div className="flex items-start gap-3 flex-1">
+          <div className="w-7 h-7 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+            2
+          </div>
+          <div>
+            <p className="text-xs font-bold text-[#2D3E35]">You Review &amp; Edit</p>
+            <p className="text-[11px] text-[#5C6B5E]">Click any draft to read or tweak the wording in plain English before sending.</p>
+          </div>
+        </div>
+
+        <div className="hidden md:block w-px h-10 bg-[#E5DDD0]" />
+
+        <div className="flex items-start gap-3 flex-1">
+          <div className="w-7 h-7 rounded-full bg-teal-100 text-teal-800 flex items-center justify-center font-bold text-xs shrink-0 mt-0.5">
+            3
+          </div>
+          <div>
+            <p className="text-xs font-bold text-[#2D3E35]">1-Click Send</p>
+            <p className="text-[11px] text-[#5C6B5E]">Click Approve when ready. Nothing is ever sent to a guest without your say-so.</p>
           </div>
         </div>
       </div>
@@ -369,12 +419,12 @@ export default function DraftsQueuePage() {
         </div>
       ) : drafts.length === 0 ? (
         <div className="bg-white rounded-2xl border border-[#E5DDD0] p-16 text-center shadow-sm">
-          <div className="w-14 h-14 bg-[#F2ECE4] rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="w-14 h-14 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-100">
             <CheckCircle2 className="w-7 h-7 text-emerald-600" />
           </div>
-          <h3 className="text-xl font-serif text-[#2D3E35] mb-2">Inbox Zero Achieved</h3>
+          <h3 className="text-xl font-serif text-[#2D3E35] mb-2">All Caught Up! 🎉</h3>
           <p className="text-sm text-[#5C6B5E] max-w-md mx-auto">
-            All AI-staged drafts in this category have been authorized and dispatched or cleared. Zero unapproved messages are pending.
+            Every draft message in this category has been reviewed and approved. New drafts will appear here automatically when guests message or flight updates arrive.
           </p>
         </div>
       ) : (
@@ -385,7 +435,10 @@ export default function DraftsQueuePage() {
               <div 
                 key={draft.id} 
                 className="bg-white rounded-2xl border border-[#E5DDD0] p-5 hover:shadow-md transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:border-[#C07D63]/50"
-                onClick={() => setSelectedDraft(draft)}
+                onClick={() => {
+                  setSelectedConflict(null);
+                  setSelectedDraft(draft);
+                }}
               >
                 {/* Left: Icon & Description */}
                 <div className="flex items-start space-x-4 flex-1">
@@ -456,7 +509,9 @@ export default function DraftsQueuePage() {
       {/* Modal */}
       {selectedDraft && (
         <ActionReviewModal 
+          key={selectedDraft.id}
           draft={selectedDraft}
+          initialConflict={selectedConflict}
           onClose={() => setSelectedDraft(null)}
           onApprove={handleModalApprove}
           onDiscard={handleModalDiscard}

@@ -42,4 +42,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
     CMD sh -c 'curl -fsS "http://localhost:${PORT:-8000}/api/v1/health" || exit 1'
 
 # Hosts may inject PORT; behind a proxy, trust X-Forwarded-* so request.url reports https.
-CMD ["sh", "-c", "exec uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${UVICORN_WORKERS:-1} --proxy-headers --forwarded-allow-ips '*'"]
+CMD ["sh", "-c", "exec uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --workers ${UVICORN_WORKERS:-1} --proxy-headers --forwarded-allow-ips '*' --timeout-keep-alive 75"]

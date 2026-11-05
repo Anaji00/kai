@@ -61,7 +61,7 @@ const PAST_PHOTOS: PastPhotoItem[] = [
     location: "Riviera Maya Ocean Terrace",
     date: "Autumn Cohort",
     category: "somatic",
-    caption: "Kareena Islam guiding a 75-minute twilight acoustic sound journey to entrain beta brainwaves into restorative theta sleep.",
+    caption: "Kareena Islam leading a 75-minute crystal singing bowl session at twilight.",
   },
   {
     id: "photo-3",
@@ -111,8 +111,8 @@ const INITIAL_REVIEWS: GuestReviewItem[] = [
     date: "Verified Alumni",
     category: "somatic",
     rating: 5,
-    sleepMetric: "+42% Deep Sleep",
-    hrvMetric: "+24 ms HRV",
+    sleepMetric: "Deeper Sleep",
+    hrvMetric: "Felt Calmer",
     highlight: "First uninterrupted 8-hour sleep in six years",
     comment:
       "As an acute care physician, I spend my life in fight-or-flight. Most retreats offer superficial pampering, but Kareena's clinical understanding of nervous system calming and restorative sleep completely reset my physiology. The 432Hz crystal bowl sound sessions produced the first uninterrupted 8-hour sleep I've had in six years.",
@@ -127,8 +127,8 @@ const INITIAL_REVIEWS: GuestReviewItem[] = [
     date: "Verified Alumni",
     category: "endurance",
     rating: 5,
-    sleepMetric: "+35% REM Recovery",
-    hrvMetric: "+29 ms HRV",
+    sleepMetric: "More Rested",
+    hrvMetric: "Felt Calmer",
     highlight: "Ironman recovery science meets clinical nursing precision",
     comment:
       "Training for endurance races while running a firm left my nervous system redlined. Armaan's Ironman recovery protocols paired with Kareena's myofascial Yin and cultural immersion gave me a repeatable blueprint for sustainable peak output. Already reserved our suite for Marival Harmony in Puerto Vallarta this January!",
@@ -143,8 +143,8 @@ const INITIAL_REVIEWS: GuestReviewItem[] = [
     date: "Verified Alumni",
     category: "cultural",
     rating: 5,
-    sleepMetric: "9.9/10 Quietude",
-    hrvMetric: "+19 ms HRV",
+    sleepMetric: "Real Quiet",
+    hrvMetric: "Felt Renewed",
     highlight: "Where your peace within blends with the pieces around",
     comment:
       "Having an intimate group instead of 50 strangers made all the difference. Kareena and Armaan hold space with medical authority, business polish, and radiant warmth. Connecting with local artisans and cacao traditions made me feel deeply rooted in the place rather than a tourist.",
@@ -159,8 +159,8 @@ const INITIAL_REVIEWS: GuestReviewItem[] = [
     date: "Verified Alumni",
     category: "endurance",
     rating: 5,
-    sleepMetric: "+38% Sleep Efficiency",
-    hrvMetric: "+22 ms HRV",
+    sleepMetric: "Better Sleep",
+    hrvMetric: "Felt Renewed",
     highlight: "Zero-friction Grand Travel & Cruise VIP logistics",
     comment:
       "From the moment Grand Travel & Cruise coordinated our flights and private chauffeured airport pickup to the final sunrise breathwork circle on the beach, I didn't have to make a single stressful decision. My lower back psoas tightness from cycling vanished by Day 3.",
@@ -175,8 +175,8 @@ const INITIAL_REVIEWS: GuestReviewItem[] = [
     date: "Verified Alumni",
     category: "somatic",
     rating: 5,
-    sleepMetric: "+45% Vagal Tone",
-    hrvMetric: "+31 ms HRV",
+    sleepMetric: "Less Stress",
+    hrvMetric: "Felt Calmer",
     highlight: "Designed by a nurse who truly understands caregiver burnout",
     comment:
       "Healthcare workers rarely get cared for with clinical competence. Kareena's Texas A&M nursing background shines through every detail—from anti-inflammatory meals tailored to my dietary needs to anatomically safe yoga variations and pure 432Hz sound healing.",
@@ -191,8 +191,8 @@ const INITIAL_REVIEWS: GuestReviewItem[] = [
     date: "Verified Alumni",
     category: "cultural",
     rating: 5,
-    sleepMetric: "10/10 Hospitality",
-    hrvMetric: "+26 ms HRV",
+    sleepMetric: "Warm Hospitality",
+    hrvMetric: "Felt Renewed",
     highlight: "Personal founder hospitality & white-glove care",
     comment:
       "When we submitted our inquiry, Kareena and Armaan personally reviewed our preferences for Liam's athletic recovery and my sleep restoration. The cultural excursions and seasonal packing guidance were spot-on.",
@@ -227,7 +227,7 @@ export default function TestimonialsPage() {
       date: "Just Shared",
       category: "somatic",
       rating: 5,
-      sleepMetric: "+40% Restorative Calm",
+      sleepMetric: "Restful Calm",
       hrvMetric: "Verified Reflection",
       highlight: "Community Reflection",
       comment: newComment.trim(),
@@ -251,7 +251,7 @@ export default function TestimonialsPage() {
         </span>
 
         <h1 className="font-serif text-4xl sm:text-6xl text-sage font-light tracking-tight leading-tight">
-          Voices of Renewal &amp; Sanctuary Archive
+          Guest Stories &amp; Retreat Photos
         </h1>
 
         <p className="text-sm sm:text-base text-sage/80 font-light leading-relaxed max-w-3xl mx-auto">
@@ -267,15 +267,15 @@ export default function TestimonialsPage() {
             </span>
           </div>
           <div className="rounded-2xl border border-sand-border bg-linen p-5 text-center">
-            <span className="font-serif text-3xl text-terracotta font-medium block">+39%</span>
+            <span className="font-serif text-3xl text-terracotta font-medium block">Sleep</span>
             <span className="text-[11px] uppercase tracking-wider text-olive font-semibold">
-              Avg Deep Sleep Gain
+              Rest Built Into Every Day
             </span>
           </div>
           <div className="rounded-2xl border border-sand-border bg-linen p-5 text-center">
-            <span className="font-serif text-3xl text-sage font-medium block">+25 ms</span>
+            <span className="font-serif text-3xl text-sage font-medium block">Breath</span>
             <span className="text-[11px] uppercase tracking-wider text-olive font-semibold">
-              Avg HRV Vagal Elevation
+              Guided Daily Practice
             </span>
           </div>
           <div className="rounded-2xl border border-sand-border bg-linen p-5 text-center">

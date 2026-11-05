@@ -6,7 +6,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import { ArrowRight, Sparkles, Wind, ShieldCheck, Users, Compass, Activity, Heart, Award, Globe, Plane } from "lucide-react";
 import { RETREATS } from "@/lib/retreats";
-import RetreatCard from "@/components/RetreatCard";
+import RetreatGrid from "@/components/RetreatGrid";
 import SoundAndBreathModal from "@/components/SoundAndBreathModal";
 import TestimonialsSection from "@/components/TestimonialsSection";
 import FAQSection from "@/components/FAQSection";
@@ -69,7 +69,7 @@ export default function HomePage() {
             className="mx-auto mt-6 max-w-2xl text-base sm:text-lg text-sage/80 leading-relaxed font-light"
           >
             <em>Kai</em> means renewal in Japanese — a return to balance, to presence, to yourself. 
-            Immersive wellness sanctuaries grounded in restorative wellness and whole-body healing, crystal sound resonance, and quiet luxury travel.
+            Small, nurse-led retreats with yoga, sound baths, good food, and time to get to know the place you’re visiting.
           </motion.p>
 
           {/* CTAs */}
@@ -110,7 +110,7 @@ export default function HomePage() {
               <Users className="h-4 w-4 text-olive" /> Intimate Groups (12–14 Guests)
             </span>
             <span className="flex items-center gap-1.5">
-              <Compass className="h-4 w-4 text-olive" /> Grand Travel & Cruise Curated
+              <Compass className="h-4 w-4 text-olive" /> Planned with Grand Travel & Cruise
             </span>
           </motion.div>
         </div>
@@ -156,7 +156,7 @@ export default function HomePage() {
                   </p>
                 </div>
                 <p className="text-xs leading-relaxed text-sage/80">
-                  With deep clinical foundations in acute and surgical nursing across Texas medical centers (Memorial Hermann, HCA Healthcare, Texas A&M graduate), Kareena grounds every retreat in physiological science. We gently relieve chronic nervous system exhaustion, restore natural cortisol rhythms, and soothe full-body inflammation.
+                  With deep clinical foundations in acute and surgical nursing across Texas medical centers (Memorial Hermann, HCA Healthcare, Texas A&M graduate), Kareena brings a nurse’s eye to every retreat, from how the days are paced to how we plan around your health needs. Rest, daylight, movement, and slow breathing can help lower stress, ease tension, and improve sleep.
                 </p>
               </div>
 
@@ -164,11 +164,11 @@ export default function HomePage() {
                 <ul className="space-y-1.5 text-xs text-sage/75">
                   <li className="flex items-center gap-2">
                     <span className="h-1.5 w-1.5 rounded-full bg-olive" />
-                    <span>Vagus nerve stimulation protocols</span>
+                    <span>Breathwork that can help calm your nervous system</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="h-1.5 w-1.5 rounded-full bg-olive" />
-                    <span>Circadian melatonin & cortisol priming</span>
+                    <span>Daily rhythms that can help you sleep more deeply</span>
                   </li>
                   <li className="flex items-center gap-2">
                     <span className="h-1.5 w-1.5 rounded-full bg-olive" />
@@ -200,7 +200,7 @@ export default function HomePage() {
                   </p>
                 </div>
                 <p className="text-xs leading-relaxed text-sage/80">
-                  A certified yoga and somatic breathwork teacher, Kareena fuses precise orthopedic alignment with restorative Yin. Our sessions integrate pure 432Hz and 528Hz crystal singing bowls to shift brainwaves into deeply therapeutic theta states.
+                  A certified yoga and somatic breathwork teacher, Kareena fuses precise orthopedic alignment with restorative Yin. Evenings often end with a crystal singing bowl sound bath, which can help quiet a busy mind and ease you toward sleep.
                 </p>
               </div>
 
@@ -294,11 +294,7 @@ export default function HomePage() {
         </div>
 
         {/* 3 Flagship Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {featuredRetreats.map((retreat, idx) => (
-            <RetreatCard key={retreat.id} retreat={retreat} priority={idx === 0} />
-          ))}
-        </div>
+        <RetreatGrid retreats={featuredRetreats} className="grid grid-flow-row-dense grid-cols-1 md:grid-cols-3 gap-8" />
 
         {/* Fall 2026 Sneak Peek Banner */}
         <div className="mt-14 rounded-3xl border border-sand-border bg-sand/60 p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
@@ -331,7 +327,7 @@ export default function HomePage() {
             The Travel Insider Advantage
           </span>
           <h2 className="font-serif text-3xl sm:text-5xl text-sage font-light">
-            Unmatched Industry Buying Power & Deep Local Immersion
+            Strong Travel Partnerships and Real Local Connections
           </h2>
           <p className="text-xs sm:text-sm text-sage/80 leading-relaxed font-light">
             A truly restorative sanctuary cannot exist inside an isolated tourist bubble or an overpriced package. Backed by Grand Travel & Cruise and recognized by <em>Future Leaders in Travel</em>, Kareena Islam brings the luxury travel industry’s most coveted relationships directly to your retreat.
@@ -394,7 +390,7 @@ export default function HomePage() {
                 White-Glove Airport & Flight Desk
               </p>
               <p className="text-xs text-sage/80 leading-relaxed">
-                Travel stress and fatigue elevate cortisol before a retreat begins. Our dedicated concierge manages flight routing, schedule change protections, tarmac meet-and-greets, and private chauffeured transfers straight to sanctuary gates.
+                Travel can be stressful, and that stress can follow you to the retreat. Our concierge manages flight routing, schedule change protections, tarmac meet-and-greets, and private chauffeured transfers straight to sanctuary gates.
               </p>
             </div>
             <div className="pt-3 border-t border-sand-border/60 text-[11px] text-sage/70 font-medium">
@@ -489,10 +485,10 @@ export default function HomePage() {
             <div className="space-y-1.5">
               <span className="font-serif text-3xl text-sand-muted">02</span>
               <h4 className="text-xs font-semibold uppercase tracking-wider text-sand">
-                Acoustic Entrainment
+                Sound and Stillness
               </h4>
               <p className="text-xs text-sand-border/70 leading-relaxed">
-                432Hz crystal frequencies entrain racing beta brainwaves down into relaxed alpha and restorative theta states.
+                Sound baths can help you feel deeply relaxed, quiet a racing mind, and let go of the day.
               </p>
             </div>
 

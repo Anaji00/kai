@@ -10,8 +10,11 @@ class Settings(BaseSettings):
     ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
 
     # Admin Authentication
-    ADMIN_USERNAME: str = os.getenv("ADMIN_USERNAME", "admin")
+    # First operator, created at startup when none exists. Add more with backend/create_operator.py.
+    ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL", "admin@kaiwellnessretreats.com")
+    ADMIN_FULL_NAME: str = os.getenv("ADMIN_FULL_NAME", "KAI Administrator")
     ADMIN_PASSWORD: str = os.getenv("ADMIN_PASSWORD", "kai_admin_2026")
+    ENABLE_DEMO_AUTH: bool = os.getenv("ENABLE_DEMO_AUTH", "true").lower() in ("true", "1", "yes")
     
     # Database
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./kai_sanctuary.db")
@@ -29,6 +32,8 @@ class Settings(BaseSettings):
     # Email & Notifications (Dual Founder Routing: Kareena Islam & Armaan Islam)
     RESEND_API_KEY: str = os.getenv("RESEND_API_KEY", "")
     RESEND_FROM_EMAIL: str = os.getenv("RESEND_FROM_EMAIL", "KAI Sanctuary Reservations <inquiries@kaiwellnessretreats.com>")
+    # Base of links in staff emails. Taken from configuration, never from a request's Host header.
+    PUBLIC_SITE_URL: str = os.getenv("PUBLIC_SITE_URL") or os.getenv("NEXT_PUBLIC_SITE_URL") or "https://kaiwellnessretreats.com"
     RESEND_CONCIERGE_FROM_EMAIL: str = os.getenv("RESEND_CONCIERGE_FROM_EMAIL", "KAI Concierge Desk <concierge@kaiwellnessretreats.com>")
     KAREENA_ROUTING_EMAIL: str = os.getenv("KAREENA_ROUTING_EMAIL", "kareena@grandtravelcruise.com")
     ARMAAN_ROUTING_EMAIL: str = os.getenv("ARMAAN_ROUTING_EMAIL", "armaan@grandtravelcruise.com")
@@ -45,7 +50,6 @@ class Settings(BaseSettings):
     SMTP_USER: str = os.getenv("SMTP_USER", "")
     SMTP_PASSWORD: str = os.getenv("SMTP_PASSWORD", "")
     SMTP_USE_TLS: bool = os.getenv("SMTP_USE_TLS", "true").lower() in ("true", "1", "yes")
-    EMAIL_WEBHOOK_SECRET: str = os.getenv("EMAIL_WEBHOOK_SECRET", "whsec_email_kai_sanctuary_2026")
     RESEND_WEBHOOK_SECRET: str = os.getenv("RESEND_WEBHOOK_SECRET", "")
     
     # Grand Travel & Cruise Partner Metadata
@@ -62,6 +66,7 @@ class Settings(BaseSettings):
     WHATSAPP_PHONE_NUMBER_ID: str = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "")
     WHATSAPP_BUSINESS_ACCOUNT_ID: str = os.getenv("WHATSAPP_BUSINESS_ACCOUNT_ID", "")
     WHATSAPP_WEBHOOK_VERIFY_TOKEN: str = os.getenv("WHATSAPP_WEBHOOK_VERIFY_TOKEN", "kai_whatsapp_verify_token_2026")
+    WHATSAPP_APP_SECRET: str = os.getenv("WHATSAPP_APP_SECRET", "")
 
     TWILIO_ACCOUNT_SID: str = os.getenv("TWILIO_ACCOUNT_SID", "")
     TWILIO_AUTH_TOKEN: str = os.getenv("TWILIO_AUTH_TOKEN", "")
@@ -84,17 +89,19 @@ class Settings(BaseSettings):
     # Live Integration Toggles (Transitions communications from simulated logs to live delivery)
     ENABLE_LIVE_WHATSAPP_DISPATCH: bool = os.getenv("ENABLE_LIVE_WHATSAPP_DISPATCH", "false").lower() in ("true", "1", "yes")
     ENABLE_LIVE_EMAIL_DISPATCH: bool = os.getenv("ENABLE_LIVE_EMAIL_DISPATCH", "false").lower() in ("true", "1", "yes")
-    CIRIUM_WEBHOOK_SECRET: str = os.getenv("CIRIUM_WEBHOOK_SECRET", "whsec_cirium_kai_2026")
-    EXPEDIA_WEBHOOK_SECRET: str = os.getenv("EXPEDIA_WEBHOOK_SECRET", "whsec_expedia_kai_2026")
 
     # Cloud LLM Fallback (Tier 2 AI Resiliency)
     GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "")
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
 
-    # Security & JWT Tokens
-    JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "kai_sanctuary_jwt_secret_change_in_prod_2026")
-    JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
+    # Authentication (short-lived signed JWTs backed by revocable server-side sessions)
+    AUTH_SECRET_KEY: str = os.getenv("AUTH_SECRET_KEY", "kai_dev_only_auth_secret_do_not_use_in_production")
+    AUTH_ALGORITHM: str = "HS256"
+    WEBHOOK_HMAC_SECRET: str = os.getenv("WEBHOOK_HMAC_SECRET", "kai_dev_only_webhook_secret_do_not_use_in_production")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    REFRESH_SESSION_EXPIRE_DAYS: int = 7
+    GUEST_MAGIC_LINK_EXPIRE_MINUTES: int = 15
+    GUEST_SESSION_EXPIRE_HOURS: int = 72
 
     model_config = SettingsConfigDict(
         case_sensitive=True,
@@ -104,19 +111,22 @@ class Settings(BaseSettings):
 
     def insecure_default_secrets(self) -> List[str]:
         """Names of secrets still set to the development defaults committed in this repository."""
-        return [
+        insecure = [
             name for name, default in _DEV_DEFAULT_SECRETS.items()
             if not getattr(self, name) or getattr(self, name) == default
         ]
+        # Signing keys need at least 256 bits; 32 characters is the floor for a random value.
+        for name in ("AUTH_SECRET_KEY", "WEBHOOK_HMAC_SECRET"):
+            if name not in insecure and len(getattr(self, name)) < 32:
+                insecure.append(name)
+        return insecure
 
 
 # Secrets whose committed defaults are only acceptable for local development.
 _DEV_DEFAULT_SECRETS = {
     "ADMIN_PASSWORD": "kai_admin_2026",
-    "JWT_SECRET_KEY": "kai_sanctuary_jwt_secret_change_in_prod_2026",
-    "EMAIL_WEBHOOK_SECRET": "whsec_email_kai_sanctuary_2026",
-    "CIRIUM_WEBHOOK_SECRET": "whsec_cirium_kai_2026",
-    "EXPEDIA_WEBHOOK_SECRET": "whsec_expedia_kai_2026",
+    "AUTH_SECRET_KEY": "kai_dev_only_auth_secret_do_not_use_in_production",
+    "WEBHOOK_HMAC_SECRET": "kai_dev_only_webhook_secret_do_not_use_in_production",
     "WHATSAPP_WEBHOOK_VERIFY_TOKEN": "kai_whatsapp_verify_token_2026",
 }
 

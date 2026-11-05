@@ -3,6 +3,7 @@
  */
 
 import { backendOrigin } from "./backend-origin";
+import { authFetch } from "./auth-fetch";
 
 export interface ApiRetreatAvailability {
   id: string;
@@ -121,7 +122,7 @@ const getBaseUrl = (): string => {
 
 export async function fetchApiHealth(): Promise<ApiHealthResponse | null> {
   try {
-    const res = await fetch(`${getBaseUrl()}/health`, { next: { revalidate: 30 } });
+    const res = await authFetch(`${getBaseUrl()}/health`, { next: { revalidate: 30 } });
     if (!res.ok) return null;
     return await res.json();
   } catch {
@@ -131,7 +132,7 @@ export async function fetchApiHealth(): Promise<ApiHealthResponse | null> {
 
 export async function fetchRetreatAvailability(slugOrId: string): Promise<ApiRetreatAvailability | null> {
   try {
-    const res = await fetch(`${getBaseUrl()}/retreats/${slugOrId}/availability`, {
+    const res = await authFetch(`${getBaseUrl()}/retreats/${slugOrId}/availability`, {
       cache: "no-store",
     });
     if (!res.ok) return null;
@@ -144,7 +145,7 @@ export async function fetchRetreatAvailability(slugOrId: string): Promise<ApiRet
 export async function submitFlightConciergeRequest(
   payload: ApiFlightRequestPayload
 ): Promise<ApiFlightRequestResponse> {
-  const res = await fetch(`${getBaseUrl()}/concierge/flight-request`, {
+  const res = await authFetch(`${getBaseUrl()}/concierge/flight-request`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -159,7 +160,7 @@ export async function submitFlightConciergeRequest(
 export async function submitCustomGroupInquiry(
   payload: ApiCustomGroupPayload
 ): Promise<{ success: boolean; message: string; inquiryId: number }> {
-  const res = await fetch(`${getBaseUrl()}/retreats/custom-group`, {
+  const res = await authFetch(`${getBaseUrl()}/retreats/custom-group`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
@@ -173,7 +174,7 @@ export async function submitCustomGroupInquiry(
 
 export async function fetchWellnessFrequencies(): Promise<ApiWellnessFrequency[]> {
   try {
-    const res = await fetch(`${getBaseUrl()}/wellness/frequencies`, {
+    const res = await authFetch(`${getBaseUrl()}/wellness/frequencies`, {
       next: { revalidate: 3600 },
     });
     if (!res.ok) return [];
@@ -187,7 +188,7 @@ export async function assessSomaticStress(
   payload: ApiStressAssessmentPayload
 ): Promise<ApiStressAssessmentResponse | null> {
   try {
-    const res = await fetch(`${getBaseUrl()}/wellness/stress-assessment`, {
+    const res = await authFetch(`${getBaseUrl()}/wellness/stress-assessment`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

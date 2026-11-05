@@ -53,3 +53,10 @@ scratch/
 .pytest_cache/
 .claude/
 *.tsbuildinfo
+
+# Simulation and test scripts
+backend/**/test_*.py
+backend/**/run_*.py
+backend/test_*.py
+backend/conftest.py
+backend/testing.py

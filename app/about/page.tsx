@@ -95,11 +95,11 @@ export default function AboutPage() {
 
               <div className="p-6 sm:p-8 space-y-6">
                 <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
-                  <strong>Kareena Islam</strong> created KAI Wellness Retreats out of a clinical and personal imperative: modern high-performers are burning out at a cellular level, yet conventional vacations only mask exhaustion. A proud graduate of <strong>Texas A&amp;M University (BSN, RN)</strong> with intensive clinical experience in acute surgical and hospital care across premier Texas medical centers (including <strong>Memorial Hermann</strong> and <strong>HCA Healthcare</strong>), Kareena spent years caring for patients at their most vulnerable—observing firsthand how chronic sympathetic stress, broken circadian sleep, and unexpressed somatic tension erode cardiovascular and immune health.
+                  <strong>Kareena Islam</strong> created KAI Wellness Retreats out of a clinical and personal imperative: people are burning out, and a typical vacation rarely gives them the rest they need. A proud graduate of <strong>Texas A&amp;M University (BSN, RN)</strong> with intensive clinical experience in acute surgical and hospital care across premier Texas medical centers (including <strong>Memorial Hermann</strong> and <strong>HCA Healthcare</strong>), Kareena spent years caring for patients at their most vulnerable—observing firsthand how chronic sympathetic stress, broken circadian sleep, and unexpressed somatic tension erode cardiovascular and immune health.
                 </p>
 
                 <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
-                  Raised inside <strong>Grand Travel &amp; Cruise</strong>—a 25+ year luxury host agency powerhouse founded alongside Jay Islam (Funjet 500 Club)—and hand-selected nationally as a <strong><em>Future Leaders in Travel</em> Honoree</strong>, Kareena bridges evidence-based clinical restoration with anatomical yoga, 432Hz crystal singing bowl entrainment, and authentic cultural reverence.
+                  Raised inside <strong>Grand Travel &amp; Cruise</strong>—a 25+ year luxury host agency powerhouse founded alongside Jay Islam (Funjet 500 Club)—and hand-selected nationally as a <strong><em>Future Leaders in Travel</em> Honoree</strong>, Kareena bridges evidence-based clinical restoration with anatomical yoga, crystal singing bowl sound baths, and authentic cultural reverence.
                 </p>
 
                 {/* Dense Credential Matrix */}
@@ -110,7 +110,7 @@ export default function AboutPage() {
                     </span>
                     <p className="text-xs text-sage font-medium">Texas A&amp;M BSN, RN</p>
                     <p className="text-[11px] text-sage/75">
-                      Acute &amp; Surgical Nursing (Memorial Hermann, HCA); vagal tone &amp; cortisol regulation protocols.
+                      Acute &amp; Surgical Nursing (Memorial Hermann, HCA); stress and recovery education.
                     </p>
                   </div>
                   <div className="rounded-2xl bg-sand/50 border border-sand-border p-3.5 space-y-1">
@@ -119,7 +119,7 @@ export default function AboutPage() {
                     </span>
                     <p className="text-xs text-sage font-medium">RYT Yoga &amp; 432Hz Sound</p>
                     <p className="text-[11px] text-sage/75">
-                      Orthopedic alignment vinyasa, myofascial Yin release, 4-7-8 breathwork &amp; crystal bowl theta entrainment.
+                      Orthopedic alignment vinyasa, myofascial Yin release, 4-7-8 breathwork &amp; crystal bowl sound baths.
                     </p>
                   </div>
                   <div className="rounded-2xl bg-sand/50 border border-sand-border p-3.5 space-y-1">

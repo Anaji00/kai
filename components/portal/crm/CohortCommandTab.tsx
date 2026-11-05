@@ -14,7 +14,10 @@ import {
   Calendar,
   Sparkles,
   RefreshCw,
+  Printer,
+  ShieldCheck,
 } from "lucide-react";
+import { printCohortManifest } from "@/lib/print-export";
 import {
   CRMTripItem,
   fetchSanctuaryDietaryManifest,
@@ -376,7 +379,7 @@ export default function CohortCommandTab({
           <div>
             <div className="flex items-center space-x-2">
               <span className="px-2 py-0.5 text-[10px] font-mono uppercase font-bold bg-[#C07D63]/15 text-[#C07D63] border border-[#C07D63]/30 rounded">
-                Sanctuary Master Group Cohort
+                Sanctuary Retreat Group (Max 12–14 Guests)
               </span>
               <h2 className="font-serif text-xl font-bold text-[#2D3E35]">
                 {currentCohortMeta.title}
@@ -384,10 +387,38 @@ export default function CohortCommandTab({
             </div>
             <p className="text-xs text-[#5C6B5E] mt-1">
               {currentCohortMeta.location} &middot; {currentCohortMeta.dates} &middot;{" "}
-              <strong>{cohortTrips.length}</strong> Linked Traveler Sub-Trips
+              <strong>{cohortTrips.length}</strong> Registered Guests
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <div className="hidden sm:inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-mono">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Sanctuary Database Synced</span>
+            </div>
+            <button
+              onClick={() => {
+                printCohortManifest({
+                  title: currentCohortMeta.title,
+                  dates: currentCohortMeta.dates,
+                  location: currentCohortMeta.location,
+                  capacity: currentCohortMeta.capacity,
+                  guests: cohortTrips.map((t) => ({
+                    guest_name: t.client_name,
+                    room_tier: t.room_tier || "Sanctuary Master Villa",
+                    dietary_notes: t.dietary_notes || "Standard Anti-inflammatory",
+                    clinical_flags: t.clinical_flags || [],
+                    flight: t.flight_details || "Arriving Private/Commercial PVR",
+                    arrival: "Scheduled"
+                  })),
+                  kitchen_protocols: dietaryManifest?.kitchen_manifest?.map(k => `${k.guest_name}: ${k.chef_kitchen_protocol.join("; ")}`)
+                });
+              }}
+              className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#FAF7F2] hover:bg-[#F2ECE4] text-[#2D3E35] border border-[#E5DDD0] transition-colors cursor-pointer"
+              title="Print or export rooming, transit and kitchen manifest"
+            >
+              <Printer className="w-3.5 h-3.5 text-[#2D3E35]" />
+              <span>Print Rooming &amp; Guest List</span>
+            </button>
             <button
               onClick={handleLoadDietaryManifest}
               disabled={busyAction !== null}
@@ -403,7 +434,7 @@ export default function CohortCommandTab({
         <div>
           <div className="text-xs font-bold uppercase tracking-wider text-[#2D3E35] mb-3 flex items-center space-x-1.5">
             <Sparkles className="w-3.5 h-3.5 text-[#C07D63]" />
-            <span>1-Click Cohort Crisis, Weather &amp; Logistics Automations</span>
+            <span>Quick Actions: Weather, Flight Delays &amp; Group Care</span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
@@ -412,10 +443,10 @@ export default function CohortCommandTab({
               <div>
                 <div className="flex items-center space-x-1.5 font-semibold text-xs text-[#2D3E35]">
                   <CloudRain className="w-4 h-4 text-blue-700 shrink-0" />
-                  <span>Weather Squall Pivot</span>
+                  <span>Move Activities Indoors (Weather Advisory)</span>
                 </div>
                 <p className="text-[11px] text-[#5C6B5E] mt-1">
-                  Shifts outdoor beach pranayama to indoor Geodesic Sound Domes &amp; Magnesium Flotation across all cohort sub-trips.
+                  Shifts outdoor beach sessions to indoor Geodesic Sound Domes &amp; warm sound baths for all guests.
                 </p>
               </div>
               <button
@@ -423,7 +454,7 @@ export default function CohortCommandTab({
                 disabled={busyAction !== null}
                 className="w-full py-1.5 px-2.5 rounded-md bg-[#2D3E35] hover:bg-[#1f2c25] text-[#FAF7F2] text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
               >
-                {busyAction === "weather" ? "Pivoting Cohort..." : "Execute Indoor Pivot"}
+                {busyAction === "weather" ? "Moving Group Indoors..." : "Move Group Indoors"}
               </button>
             </div>
 
@@ -432,10 +463,10 @@ export default function CohortCommandTab({
               <div>
                 <div className="flex items-center space-x-1.5 font-semibold text-xs text-[#2D3E35]">
                   <Plane className="w-4 h-4 text-indigo-700 shrink-0" />
-                  <span>Chauffeur Fleet Clustering</span>
+                  <span>Organize Airport Chauffeur Waves</span>
                 </div>
                 <p className="text-[11px] text-[#5C6B5E] mt-1">
-                  Clusters cascading airline delays into luxury Escalade/Sprinter waves (≤35m wait window) &amp; isolates cancelled flights.
+                  Groups flight delays into coordinated chauffeur cars (≤35m wait) so guests never wait alone.
                 </p>
               </div>
               <button
@@ -443,7 +474,7 @@ export default function CohortCommandTab({
                 disabled={busyAction !== null}
                 className="w-full py-1.5 px-2.5 rounded-md bg-[#2D3E35] hover:bg-[#1f2c25] text-[#FAF7F2] text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
               >
-                {busyAction === "fleet" ? "Clustering Fleet..." : "Re-Sequence Arrivals"}
+                {busyAction === "fleet" ? "Organizing Chauffeurs..." : "Group Delayed Flights into Chauffeurs"}
               </button>
             </div>
 

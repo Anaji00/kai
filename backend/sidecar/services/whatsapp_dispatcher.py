@@ -212,6 +212,11 @@ def handle_whatsapp_action(
         if not intake:
             return {"success": False, "message": f"Intake {intake_id} not found."}
 
+        from backend.sidecar.services.clinical_governance_engine import active_clinical_hold, clinical_hold_conflict
+        hold = active_clinical_hold(intake.consultation_thesis)
+        if hold:
+            return {"success": False, "message": clinical_hold_conflict(hold)["message"]}
+
         # Commit to Native Sanctuary CRM
         sync_result = crm_client.sync_intake_to_crm(
             intake_id=intake.id,

@@ -268,11 +268,11 @@ export default function PortalDashboard() {
         prev.map((i) =>
           i.id === intake.id
             ? {
-                ...i,
-                status: "CONFIRMED_IN_CRM",
-                crm_trip_id: result.crm_trip_id,
-                crm_contact_id: result.crm_contact_id,
-              }
+              ...i,
+              status: "CONFIRMED_IN_CRM",
+              crm_trip_id: result.crm_trip_id,
+              crm_contact_id: result.crm_contact_id,
+            }
             : i
         )
       );
@@ -328,7 +328,7 @@ export default function PortalDashboard() {
 
   const pendingIntakesCount = intakes.filter((i) => i.status === "PENDING_APPROVAL").length;
   const syncedIntakesCount = intakes.filter((i) => i.status === "CONFIRMED_IN_CRM").length;
-  
+
   return (
     <div className="space-y-8">
       {/* Toast Alert Banner */}
@@ -368,6 +368,7 @@ export default function PortalDashboard() {
             <span>Dictate Voice Memo</span>
           </button>
 
+          {process.env.NODE_ENV !== "production" && (
           <button
             onClick={handleSeedSyntheticData}
             disabled={seedingData || loading}
@@ -377,6 +378,7 @@ export default function PortalDashboard() {
             <Database className={`w-3.5 h-3.5 text-amber-700 ${seedingData ? "animate-spin" : ""}`} />
             <span>{seedingData ? "Seeding Test Data..." : "Seed Test Data"}</span>
           </button>
+          )}
 
           <button
             onClick={loadData}
@@ -491,13 +493,12 @@ export default function PortalDashboard() {
                 <div className="flex items-center justify-between">
                   <span className="font-serif font-bold text-sm text-[#2D3E35]">{c.title}</span>
                   <span
-                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                      isFull
+                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isFull
                         ? "bg-red-100 text-red-800"
                         : isNearCap
-                        ? "bg-amber-100 text-amber-800"
-                        : "bg-emerald-100 text-emerald-800"
-                    }`}
+                          ? "bg-amber-100 text-amber-800"
+                          : "bg-emerald-100 text-emerald-800"
+                      }`}
                   >
                     {isFull ? "FULL" : `${c.remaining_spots} spots left`}
                   </span>
@@ -507,9 +508,8 @@ export default function PortalDashboard() {
                 {/* Progress bar */}
                 <div className="mt-3 w-full bg-[#E5DDD0] rounded-full h-2 overflow-hidden">
                   <div
-                    className={`h-full transition-all duration-500 ${
-                      isFull ? "bg-red-500" : isNearCap ? "bg-amber-500" : "bg-[#2D3E35]"
-                    }`}
+                    className={`h-full transition-all duration-500 ${isFull ? "bg-red-500" : isNearCap ? "bg-amber-500" : "bg-[#2D3E35]"
+                      }`}
                     style={{ width: `${pct}%` }}
                   />
                 </div>
@@ -537,11 +537,10 @@ export default function PortalDashboard() {
                 <button
                   key={st}
                   onClick={() => setFilterStatus(st)}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${
-                    filterStatus === st
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${filterStatus === st
                       ? "bg-[#2D3E35] text-[#FAF7F2]"
                       : "text-[#5C6B5E] hover:bg-[#F2ECE4]"
-                  }`}
+                    }`}
                 >
                   {st === "ALL" ? "All Statuses" : st.replace(/_/g, " ")}
                 </button>
@@ -614,11 +613,10 @@ export default function PortalDashboard() {
               return (
                 <div
                   key={intake.id}
-                  className={`bg-white rounded-xl border transition-all shadow-sm ${
-                    isPending
+                  className={`bg-white rounded-xl border transition-all shadow-sm ${isPending
                       ? "border-[#E5DDD0] hover:border-[#C07D63]/60"
                       : "border-emerald-200 bg-emerald-50/10"
-                  }`}
+                    }`}
                 >
                   {/* Card Header & Summary */}
                   <div className="p-4 sm:p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-[#E5DDD0]/60">
@@ -633,11 +631,10 @@ export default function PortalDashboard() {
                           </span>
                         )}
                         <span
-                          className={`text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center space-x-1 ${
-                            isPending
+                          className={`text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center space-x-1 ${isPending
                               ? "bg-amber-100 text-amber-900 border border-amber-200"
                               : "bg-emerald-100 text-emerald-900 border border-emerald-200"
-                          }`}
+                            }`}
                         >
                           {isPending ? (
                             <>
@@ -882,9 +879,8 @@ export default function PortalDashboard() {
                                 className="inline-flex items-center space-x-1 text-xs text-[#5C6B5E] hover:text-[#2D3E35]"
                               >
                                 <RefreshCw
-                                  className={`w-3 h-3 ${
-                                    generatingThesisId === intake.id ? "animate-spin" : ""
-                                  }`}
+                                  className={`w-3 h-3 ${generatingThesisId === intake.id ? "animate-spin" : ""
+                                    }`}
                                 />
                                 <span>Regenerate</span>
                               </button>
@@ -893,33 +889,33 @@ export default function PortalDashboard() {
 
                           {/* Care Plan View (Plain English, Serene Language) */}
                           <div className="space-y-4">
-                              <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] space-y-2">
-                                <div className="text-xs font-semibold text-[#5C6B5E] uppercase tracking-wider">
-                                  Serene Journey Overview for {intake.client_name}
-                                </div>
-                                <p className="text-xs text-[#2D3E35] leading-relaxed">
-                                  A bespoke 6-day restorative pathway designed for {intake.client_name}. Addressing their personal intention: &ldquo;{intake.clinical_profile?.intentions || "Deep restorative reset and nervous system balance"}&rdquo;. Curated within our intimate 12–14 guest circle with personal guidance from Founder Kareena Islam.
-                                </p>
+                            <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] space-y-2">
+                              <div className="text-xs font-semibold text-[#5C6B5E] uppercase tracking-wider">
+                                Serene Journey Overview for {intake.client_name}
                               </div>
+                              <p className="text-xs text-[#2D3E35] leading-relaxed">
+                                A bespoke 6-day restorative pathway designed for {intake.client_name}. Addressing their personal intention: &ldquo;{intake.clinical_profile?.intentions || "Deep restorative reset and nervous system balance"}&rdquo;. Curated within our intimate 12–14 guest circle with personal guidance from Founder Kareena Islam.
+                              </p>
+                            </div>
 
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
-                                <div className="p-3.5 bg-white rounded-lg border border-[#E5DDD0]">
-                                  <span className="font-semibold text-[#5C6B5E]">Recommended Sanctuary:</span>
-                                  <div className="text-sm font-serif font-bold text-[#2D3E35] mt-0.5">
-                                    {thesis.recommended_sanctuary}
-                                  </div>
-                                  <div className="text-[#5C6B5E] mt-1 text-xs">
-                                    Suite: {thesis.recommended_room_tier}
-                                  </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                              <div className="p-3.5 bg-white rounded-lg border border-[#E5DDD0]">
+                                <span className="font-semibold text-[#5C6B5E]">Recommended Sanctuary:</span>
+                                <div className="text-sm font-serif font-bold text-[#2D3E35] mt-0.5">
+                                  {thesis.recommended_sanctuary}
                                 </div>
-                                <div className="p-3.5 bg-white rounded-lg border border-[#E5DDD0]">
-                                  <span className="font-semibold text-[#5C6B5E]">Daily Restorative Schedule:</span>
-                                  <div className="text-[11px] text-[#2D3E35] mt-1 leading-normal">
-                                    Gentle 4-7-8 calming breathwork &middot; 432Hz twilight sound immersion &middot; Farm-to-table coastal dining &middot; Deep restorative sleep
-                                  </div>
+                                <div className="text-[#5C6B5E] mt-1 text-xs">
+                                  Suite: {thesis.recommended_room_tier}
+                                </div>
+                              </div>
+                              <div className="p-3.5 bg-white rounded-lg border border-[#E5DDD0]">
+                                <span className="font-semibold text-[#5C6B5E]">Daily Restorative Schedule:</span>
+                                <div className="text-[11px] text-[#2D3E35] mt-1 leading-normal">
+                                  Gentle 4-7-8 calming breathwork &middot; 432Hz twilight sound immersion &middot; Farm-to-table coastal dining &middot; Deep restorative sleep
                                 </div>
                               </div>
                             </div>
+                          </div>
 
                           {/* Conversation Focus Points */}
                           <div>
@@ -1038,7 +1034,7 @@ export default function PortalDashboard() {
                             <Sparkles className="w-3.5 h-3.5 text-[#C07D63]" />
                             <span>
                               {generatingThesisId === intake.id
-                                ? "Synthesizing Clinical RAG..."
+                                ? "Preparing Conversation Guide..."
                                 : "Generate Conversation Guide"}
                             </span>
                           </button>
@@ -1049,8 +1045,7 @@ export default function PortalDashboard() {
                       {isPending && (
                         <div className="pt-3 border-t border-[#E5DDD0] flex items-center justify-between">
                           <div className="text-xs text-[#5C6B5E]">
-                            Authorization confirms room allocation and transmits standardized clinical
-                            tags to Native CRM Database.
+                            Approving this confirms the guest&apos;s room and saves their care notes directly to your retreat guest list.
                           </div>
                           <button
                             onClick={() => handleAuthorizeSync(intake)}

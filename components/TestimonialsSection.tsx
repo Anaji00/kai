@@ -42,7 +42,7 @@ export default function TestimonialsSection() {
       <div className="max-w-2xl mx-auto text-center space-y-3">
         <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.25em] text-terracotta font-semibold">
           <Sparkles className="h-3.5 w-3.5 text-terracotta" />
-          Voices of Renewal
+          Guest Stories
         </span>
         <h2 className="font-serif text-3xl sm:text-5xl text-sage font-light">
           What Our Guests Experience

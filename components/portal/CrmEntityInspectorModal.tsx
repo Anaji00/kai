@@ -20,8 +20,10 @@ import {
   Compass,
   FileCheck2,
   SendHorizontal,
+  Printer,
 } from "lucide-react";
 import { StagingIntake, automateCrmTripOutreach } from "@/lib/sidecar-api";
+import { printGuestClinicalDossier } from "@/lib/print-export";
 
 export interface CrmEntityInspectorModalProps {
   isOpen: boolean;
@@ -113,13 +115,38 @@ export function CrmEntityInspectorModal({
                 <span>&middot;</span>
                 <span className="inline-flex items-center gap-1 font-medium text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 text-[10px]">
                   <Database className="w-3 h-3 text-emerald-600" />
-                  Stored Natively in KAI Database (crm_clients &amp; crm_trips)
+                  Stored Directly in Sanctuary System (No Third-Party Subscriptions)
                 </span>
               </p>
             </div>
           </div>
 
           <div className="flex items-center space-x-2">
+            <button
+              onClick={() => {
+                printGuestClinicalDossier({
+                  client_name: intake.client_name,
+                  sanctuary: intake.sanctuary_slug || "Sierra Madre Sanctuary",
+                  room_tier: intake.room_tier || "Sanctuary Master Villa",
+                  overall_severity: intake.consultation_thesis?.clinical_flags?.length ? "CLINICAL_FLAGS_PRESENT" : "ROUTINE_CLEARANCE",
+                  blocked_modalities: intake.consultation_thesis?.clinical_flags?.includes("SSRI_MAOI_INCOMPATIBILITY")
+                    ? ["Holotropic Hyperventilation Breathwork"]
+                    : [],
+                  clinical_findings: (intake.consultation_thesis?.clinical_flags || []).map(flag => ({
+                    category: "Clinical Telemetry",
+                    rule: `Evaluated safety criteria for ${flag}`,
+                    safe_alternative: "Gentle 4-7-8 Somatic Vagal Grounding"
+                  })),
+                  dietary_notes: typeof intake.wellness_profile?.dietary === "string" ? intake.wellness_profile.dietary : undefined,
+                  deterministic_hash: intake.id
+                });
+              }}
+              className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-[#FAF7F2] text-xs font-semibold text-[#2D3E35] border border-[#E5DDD0] hover:bg-[#F2ECE4] transition-colors"
+              title="Print or export guest clinical and culinary dossier"
+            >
+              <Printer className="w-3.5 h-3.5 text-[#2D3E35]" />
+              <span className="hidden sm:inline">Print Guest Care Dossier</span>
+            </button>
             <div className="flex bg-[#F2ECE4] rounded-lg p-0.5 text-xs border border-[#E5DDD0]">
               <button
                 onClick={() => setActiveTab("overview")}
@@ -140,7 +167,7 @@ export function CrmEntityInspectorModal({
                 }`}
               >
                 <Code className="w-3 h-3" />
-                <span>DB Payload</span>
+                <span>Full Record Details</span>
               </button>
             </div>
             <button

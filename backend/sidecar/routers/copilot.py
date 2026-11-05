@@ -32,14 +32,14 @@ import uuid
 from pydantic import BaseModel
 from typing import List, Dict, Any
 
-from backend.sidecar.routers.webhooks import verify_admin
+from backend.dependencies.auth import get_current_admin
 
 logger = logging.getLogger("kai_copilot_router")
 
 router = APIRouter(
     prefix="/copilot",
     tags=["Clinical Copilot"],
-    dependencies=[Depends(verify_admin)]
+    dependencies=[Depends(get_current_admin)]
 )
 
 

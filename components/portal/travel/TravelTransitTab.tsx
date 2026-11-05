@@ -14,7 +14,8 @@ import {
   Sunset,
   Trees,
   CheckCircle2,
-  Send
+  Send,
+  Copy
 } from "lucide-react";
 import {
   SanctuaryRoute,
@@ -122,6 +123,7 @@ export default function TravelTransitTab({ sanctuarySlug }: TravelTransitTabProp
 
   // Transfer simulation state
   const [simulatingTransferId, setSimulatingTransferId] = useState<string | null>(null);
+  const [copiedWhatsApp, setCopiedWhatsApp] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -267,7 +269,7 @@ export default function TravelTransitTab({ sanctuarySlug }: TravelTransitTabProp
             onClick={handleRefresh}
             disabled={loading}
             className="p-1.5 text-[#5C6B5E] hover:text-[#2D3E35] hover:bg-[#F2ECE4] rounded-md transition-colors"
-            title="Refresh routes and chauffeur telemetry"
+            title="Refresh routes and driver updates"
           >
             <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
           </button>
@@ -443,7 +445,21 @@ export default function TravelTransitTab({ sanctuarySlug }: TravelTransitTabProp
             </div>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+            <button
+              onClick={() => {
+                const whatsappText = `*KAI Sanctuary Chauffeur Dispatch*\nSanctuary: ${sanctuarySlug.toUpperCase()}\nGuest: ${transfers[0].guest_name}\nFlight: ${transfers[0].flight_number || "Private Tarmac Meet"}\nChauffeur: ${transfers[0].chauffeur_name} (${transfers[0].vehicle_type})\nPickup: ${transfers[0].pickup_location}\nStatus: ${transfers[0].status}\nAmenities: Chilled towels, organic coconut water prepared.\nDriver Alert: Meet curbside with KAI iPad tablet sign.`;
+                navigator.clipboard.writeText(whatsappText);
+                setCopiedWhatsApp(true);
+                setTimeout(() => setCopiedWhatsApp(false), 2500);
+              }}
+              className="inline-flex items-center space-x-1.5 px-3 py-1 text-xs font-semibold text-[#2D3E35] bg-[#F2ECE4] hover:bg-[#EBE3D8] border border-[#E5DDD0] rounded transition-colors"
+              title="Copy formatted dispatch text for WhatsApp chauffeur group"
+            >
+              <Copy className="w-3 h-3 text-[#5C6B5E]" />
+              <span>{copiedWhatsApp ? "Copied to Clipboard!" : "Copy Chauffeur Manifest (WhatsApp)"}</span>
+            </button>
+
             <button
               onClick={() => handleSimulateTransfer(transfers[0].id)}
               disabled={simulatingTransferId === transfers[0].id}
@@ -451,7 +467,7 @@ export default function TravelTransitTab({ sanctuarySlug }: TravelTransitTabProp
             >
               <Send className="w-3 h-3 text-emerald-700" />
               <span>
-                {simulatingTransferId === transfers[0].id ? "Simulating..." : "Simulate Tarmac Webhook Ping"}
+                {simulatingTransferId === transfers[0].id ? "Simulating..." : "Test Driver Arrival Notice"}
               </span>
             </button>
           </div>

@@ -44,13 +44,25 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: `${retreat.title} — ${retreat.destination} | KAI Wellness Retreats`,
     description: retreat.description,
+    keywords: [
+      retreat.title,
+      retreat.destination,
+      retreat.country,
+      "KAI Wellness Retreats",
+      "Kareena Islam",
+      "Luxury wellness retreat",
+      "Somatic restoration",
+      "432Hz sound bath",
+      `${retreat.destination} retreat`,
+    ],
     alternates: {
-      canonical: `/retreats/${retreat.slug}`,
+      canonical: `https://kaiwellnessretreats.com/retreats/${retreat.slug}`,
     },
     openGraph: {
       title: `${retreat.title} | KAI Wellness Retreats`,
       description: retreat.description,
       url: `https://kaiwellnessretreats.com/retreats/${retreat.slug}`,
+      siteName: "KAI Wellness Retreats",
       images: [
         {
           url: retreat.heroImage,
@@ -59,7 +71,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
           alt: retreat.title,
         },
       ],
-      type: "article",
+      type: "website",
     },
     twitter: {
       card: "summary_large_image",
@@ -79,6 +91,73 @@ export default async function RetreatDetailPage({ params }: PageProps) {
   }
 
   const isComingSoon = retreat.status === "coming-soon";
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      {
+        "@type": "ListItem",
+        position: 1,
+        name: "Home",
+        item: "https://kaiwellnessretreats.com",
+      },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Sanctuaries",
+        item: "https://kaiwellnessretreats.com/retreats",
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: retreat.title,
+        item: `https://kaiwellnessretreats.com/retreats/${retreat.slug}`,
+      },
+    ],
+  };
+
+  const eventJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: retreat.title,
+    description: retreat.description,
+    startDate: retreat.startDate ? `${retreat.startDate}T09:00:00` : "2027-01-28T09:00:00",
+    endDate: retreat.endDate ? `${retreat.endDate}T14:00:00` : "2027-01-31T14:00:00",
+    eventStatus: "https://schema.org/EventScheduled",
+    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+    location: {
+      "@type": "Place",
+      name: retreat.locationDetails,
+      address: {
+        "@type": "PostalAddress",
+        addressLocality: retreat.destination,
+        addressCountry: retreat.country,
+      },
+    },
+    image: [retreat.heroImage, ...(retreat.gallery || [])],
+    performer: {
+      "@type": "Person",
+      name: "Kareena Islam, BSN, RN",
+      jobTitle: "Founder & Clinical Somatic Director",
+    },
+    organizer: {
+      "@type": "Organization",
+      name: "KAI Wellness Retreats",
+      url: "https://kaiwellnessretreats.com",
+    },
+    offers: {
+      "@type": "Offer",
+      price: retreat.investmentStarting.replace(/[^0-9]/g, ""),
+      priceCurrency: "USD",
+      availability:
+        !isComingSoon && retreat.spotsRemaining > 0
+          ? "https://schema.org/InStock"
+          : "https://schema.org/PreOrder",
+      validFrom: "2026-01-01T00:00:00Z",
+      url: `https://kaiwellnessretreats.com/book?retreat=${retreat.id}`,
+    },
+  };
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -109,15 +188,27 @@ export default async function RetreatDetailPage({ params }: PageProps) {
       "@type": "Organization",
       name: "KAI Wellness Retreats",
       url: "https://kaiwellnessretreats.com",
+      founder: {
+        "@type": "Person",
+        name: "Kareena Islam, BSN, RN",
+      },
     },
   };
 
   return (
     <>
-      {/* JSON-LD Schema */}
+      {/* JSON-LD Schemas */}
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd).replace(/</g, "\\u003c") }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(eventJsonLd).replace(/</g, "\\u003c") }}
+      />
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
       />
 
       <div className="py-8 sm:py-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-16">
@@ -345,7 +436,7 @@ export default async function RetreatDetailPage({ params }: PageProps) {
                   Intention & Rhythm
                 </span>
                 <h3 className="font-serif text-2xl sm:text-3xl text-sage font-light">
-                  Curated Daily Schedule
+                  Daily Schedule
                 </h3>
               </div>
 

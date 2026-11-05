@@ -29,6 +29,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 
 from fastapi.testclient import TestClient
 from backend.main import app
+from backend.testing import admin_headers
 from backend.database import SessionLocal, init_db
 from backend.config import settings
 from backend.models import Booking, FlightConciergeRequest, CustomGroupInquiry, ActionDraft
@@ -53,11 +54,7 @@ from backend.sidecar.services.continuity_service import generate_continuity_mile
 from backend.sidecar.services.thesis_rag import generate_pre_call_thesis
 from backend.sidecar.services.lead_gen import discover_and_stage_leads
 
-ADMIN_USER = settings.ADMIN_USERNAME or "kai_founder"
-ADMIN_PASS = settings.ADMIN_PASSWORD or "kai_sanctuary_2026"
-AUTH_HEADER = {
-    "Authorization": f"Basic {base64.b64encode(f'{ADMIN_USER}:{ADMIN_PASS}'.encode()).decode()}"
-}
+AUTH_HEADER = admin_headers()
 
 
 def log_banner(title: str, scenario: str):
@@ -725,7 +722,7 @@ def run_ultra_suite():
     res_appr = client.post(f"/api/v1/drafts/{draft_to_approve}/approve")
     assert res_appr.status_code == 200
     appr_data = res_appr.json()
-    assert appr_data["status"] == "success"
+    assert appr_data["status"] == "approved"
 
     # 4. Discard draft
     res_disc = client.post(f"/api/v1/drafts/{draft_to_discard}/discard")
@@ -751,7 +748,7 @@ def run_ultra_suite():
     log_pass(
         f"Action Drafts Lifecycle & Zero-Autonomous Invariant Audited in {elapsed_ms}ms",
         f"Pending Drafts Pool: {stats['total_pending']} across {len(stats['by_category'])} operational categories\n"
-        f"Approved Draft #{draft_to_approve}: Dispatched with operator provenance (Authorized by {ADMIN_USER})\n"
+        f"Approved Draft #{draft_to_approve}: Dispatched with operator provenance (Authorized by the signed-in operator)\n"
         f"Discarded Draft #{draft_to_discard}: Marked discarded with zero downstream side effects\n"
         f"Batch Approved Routine Drafts: {batch_data['approved_count']}"
     )

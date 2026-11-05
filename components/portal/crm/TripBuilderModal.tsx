@@ -66,7 +66,7 @@ const ACTIVITY_TYPES = [
   { value: "aviation_arrival", label: "✈️ Cirium Aviation & Flights" },
   { value: "ground_chauffeur", label: "🚗 Private Tarmac Chauffeur" },
   { value: "blue_zone_dining", label: "🍽️ Organic Blue Zone Dining" },
-  { value: "clinical_screening", label: "🩺 RN Clinical Bio-Telemetry" },
+  { value: "clinical_screening", label: "🩺 Nurse Health & Safety Check" },
   { value: "custom", label: "✨ Bespoke Guest Modality" },
 ];
 

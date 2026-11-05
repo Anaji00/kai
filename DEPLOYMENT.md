@@ -25,8 +25,10 @@ Doing it on neon.tech directly works too. Copy the **pooled** connection string 
 |---|---|
 | `DATABASE_URL` | Neon pooled string (set for you by the Neon integration) |
 | `ENVIRONMENT` | `production` |
-| `ADMIN_USERNAME` / `ADMIN_PASSWORD` | from `.env` |
-| `JWT_SECRET_KEY`, `EMAIL_WEBHOOK_SECRET`, `CIRIUM_WEBHOOK_SECRET`, `EXPEDIA_WEBHOOK_SECRET`, `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | from `.env` |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | first operator account, created at startup; sign in at `/portal/login` |
+| `AUTH_SECRET_KEY`, `WEBHOOK_HMAC_SECRET` | 32+ random characters each, from `.env` |
+| `WHATSAPP_WEBHOOK_VERIFY_TOKEN` | from `.env` |
+| `WHATSAPP_APP_SECRET` | Meta app secret, when WhatsApp goes live |
 | `GROQ_API_KEY` | from https://console.groq.com/keys |
 | `NEXT_PUBLIC_SITE_URL` | `https://kaiwellnessretreats.com` |
 | `KAREENA_ROUTING_EMAIL` | `kareena@grandtravelcruise.com` |
@@ -81,7 +83,8 @@ disconnect it under **Website → Settings → Domains**, then delete the preset
 - [ ] Vercel shows both domains **Valid Configuration** with certificates.
 - [ ] `https://kaiwellnessretreats.com` loads; `www` redirects to it.
 - [ ] `https://kaiwellnessretreats.com/api/v1/health` → 200 (Python function is live).
-- [ ] `/portal` asks for a login, and after signing in the drafts list loads.
+- [ ] `/portal` redirects to `/portal/login`, and after signing in the drafts list loads.
+- [ ] `https://kaiwellnessretreats.com/api/v1/drafts/stats` with no session returns 401.
 - [ ] A test booking on `/book` succeeds.
 
 The old records had a 4-hour TTL, so some visitors may see Squarespace for up to 4 hours after the switch.
@@ -93,3 +96,14 @@ The old records had a 4-hour TTL, so some visitors may see Squarespace for up to
 ## Later (Phase 3)
 Resend domain verification adds DKIM (`resend._domainkey`), SPF/MX on `send.` and a `_dmarc` record.
 These are additions only and don't affect the site records above.
+
+## Signing webhooks
+Every inbound webhook (`/webhooks/hospitality`, `/webhooks/flight-desk`, `/email-in`, `/webhook/whatsapp`) must send:
+
+- `X-KAI-Timestamp`: Unix seconds, within 300 seconds of now
+- `X-KAI-Signature-256`: `sha256=` + hex HMAC-SHA256 of `<timestamp>.<raw body>`, keyed with `WEBHOOK_HMAC_SECRET`
+
+Meta's WhatsApp deliveries are accepted through `X-Hub-Signature-256` once `WHATSAPP_APP_SECRET` is set.
+
+## Adding operators
+Run with the production `DATABASE_URL`: `python -m backend.create_operator kareena@grandtravelcruise.com "Kareena Islam"`

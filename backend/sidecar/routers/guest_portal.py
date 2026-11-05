@@ -6,19 +6,19 @@ Two-way interactions strictly stage ActionDrafts for Kareena's 1-click authoriza
 """
 
 import logging
-from fastapi import APIRouter, HTTPException, Query, Depends
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, HTTPException, Query, Depends, Request, Response
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
 
 from backend.config import settings
 from backend.database import get_db
 from backend.sidecar.models import StagingIntake, CRMTrip, CRMClient
-from backend.models import ActionDraft
+from backend.models import ActionDraft, Booking
 from sqlalchemy import or_
 import uuid
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from backend.sidecar.services.guest_portal_service import (
     get_guest_portal_data,
     validate_guest_token,
@@ -29,19 +29,43 @@ from backend.sidecar.services.guest_portal_service import (
     submit_guest_flight_update,
     submit_guest_dietary_update,
     revoke_guest_token,
+    create_verified_guest_session,
 )
 from backend.sidecar.services.automation_generators import generate_guest_companion_invitation_draft
-from backend.sidecar.routers.webhooks import verify_admin
+from backend.dependencies.auth import (
+    GuestPrincipal,
+    client_ip,
+    enforce_csrf,
+    get_current_admin,
+    get_current_guest,
+    get_optional_guest,
+    require_guest_owner,
+)
+from backend.services.auth_service import (
+    GUEST_COOKIE,
+    GUEST_CSRF_COOKIE,
+    attempts_exceeded,
+    create_guest_token,
+    decode_token,
+    AuthError,
+    generate_csrf_token,
+    issue_guest_otp,
+    normalize_email,
+    record_attempt,
+    send_guest_otp_email,
+    verify_guest_otp,
+)
 
 logger = logging.getLogger("kai_guest_portal_router")
 
 router = APIRouter(prefix="/guest-portal", tags=["Guest Sanctuary Companion"])
+auth_router = APIRouter(prefix="/api/auth/guest", tags=["Guest Authentication"])
 
 
 # ──── Request Schemas ────
 
 class GuestFlightUpdateRequest(BaseModel):
-    token: str = Field(..., description="Magic-link guest token")
+    token: Optional[str] = Field(None, description="Magic-link guest token, when not using a guest session")
     flight_number: str = Field(..., description="Flight number, e.g. UA 142 or AA 1083")
     delay_minutes: int = Field(0, description="Estimated flight delay in minutes")
     gate: Optional[str] = Field(None, description="Arrival or departure gate")
@@ -49,14 +73,14 @@ class GuestFlightUpdateRequest(BaseModel):
 
 
 class GuestDietaryUpdateRequest(BaseModel):
-    token: str = Field(..., description="Magic-link guest token")
+    token: Optional[str] = Field(None, description="Magic-link guest token, when not using a guest session")
     dietary_tags: List[str] = Field(default_factory=list, description="e.g. Gluten-Free, Plant-Based, Low-FODMAP")
     allergies: Optional[str] = Field(None, description="Severe food allergies (nuts, shellfish, etc.)")
     special_chef_notes: Optional[str] = Field(None, description="Notes for private villa chef")
 
 
 class GuestSomaticPulseRequest(BaseModel):
-    token: str = Field(..., description="Magic-link guest token")
+    token: Optional[str] = Field(None, description="Magic-link guest token, when not using a guest session")
     day_number: int = Field(1, ge=1, le=14, description="Retreat day number")
     phase: str = Field("MORNING_AWAKENING", description="MORNING_AWAKENING or EVENING_STILLNESS")
     restorative_sleep_score: int = Field(8, ge=1, le=10, description="Self-reported sleep quality (1-10)")
@@ -79,9 +103,124 @@ class GuestProposalApproveRequest(BaseModel):
     agreed_to_terms: bool = Field(True, description="Consent to 30% deposit authorization and sanctuary cancellation policy")
 
 
+class GuestAccessRequest(BaseModel):
+    email: EmailStr
+    booking_reference: str = Field(..., min_length=4, max_length=64)
+
+
+class GuestVerifyRequest(BaseModel):
+    email: Optional[EmailStr] = None
+    booking_reference: Optional[str] = Field(None, max_length=64)
+    otp: Optional[str] = Field(None, min_length=6, max_length=6)
+    magic_token: Optional[str] = Field(None, max_length=256)
+
+
+# ──── Guest Authentication ────
+
+def _guest_cookie_secure() -> bool:
+    return settings.ENVIRONMENT == "production"
+
+
+def _set_guest_cookies(response: Response, guest_id: str, email: str, session_id: str, slug: str, expires_at: datetime) -> None:
+    max_age = max(int((expires_at - datetime.now(timezone.utc)).total_seconds()), 0)
+    response.set_cookie(
+        GUEST_COOKIE, create_guest_token(guest_id, email, session_id, [slug], expires_at),
+        max_age=max_age, httponly=True, secure=_guest_cookie_secure(), samesite="lax", path="/",
+    )
+    response.set_cookie(
+        GUEST_CSRF_COOKIE, generate_csrf_token(session_id),
+        max_age=max_age, httponly=False, secure=_guest_cookie_secure(), samesite="lax", path="/",
+    )
+
+
+def _find_guest_booking(db: Session, email: str, reference: str):
+    """Matches email and booking reference together; returns (booking, intake), either possibly None."""
+    booking = db.query(Booking).filter(Booking.reference_code == reference).first()
+    if booking and normalize_email(booking.email) != email:
+        booking = None
+    intake = db.query(StagingIntake).filter(StagingIntake.source_ref == reference).first()
+    if intake and normalize_email(intake.email) != email:
+        intake = None
+    return booking, intake
+
+
+@auth_router.post("/request-access")
+def request_guest_access(payload: GuestAccessRequest, request: Request, db: Session = Depends(get_db)):
+    """Emails a one-time code when email and reference match. The reply never reveals whether they did."""
+    email = normalize_email(payload.email)
+    reference = payload.booking_reference.strip().upper()
+    ip_key = f"guest-request-ip:{client_ip(request)}"
+    email_key = f"guest-request-email:{email}"
+    if attempts_exceeded(db, ip_key, 20) or attempts_exceeded(db, email_key, 5):
+        raise HTTPException(status_code=429, detail="Too many requests. Please wait a few minutes and try again.")
+    record_attempt(db, ip_key)
+    record_attempt(db, email_key)
+
+    booking, intake = _find_guest_booking(db, email, reference)
+    if booking or intake:
+        code = issue_guest_otp(db, email, reference)
+        send_guest_otp_email(email, code)
+    return {"success": True, "message": "If those details match a reservation, an access code is on its way."}
+
+
+@auth_router.post("/verify")
+def verify_guest_access(payload: GuestVerifyRequest, response: Response, db: Session = Depends(get_db)):
+    """Exchanges a one-time code, or an operator-issued magic link, for a guest session cookie."""
+    if payload.magic_token:
+        session = validate_guest_token(payload.magic_token, db=db)
+        if not session or not session.get("id"):
+            raise HTTPException(status_code=401, detail="This link has expired. Please request a new access code.")
+        expires_at = datetime.fromisoformat(session["expires_at"])
+        expires_at = expires_at if expires_at.tzinfo else expires_at.replace(tzinfo=timezone.utc)
+        guest_id = session.get("intake_id") or session["id"]
+        _set_guest_cookies(response, guest_id, session["email"], session["id"], session["sanctuary_slug"], expires_at)
+        return {"success": True, "guest_id": guest_id, "guest_name": session["client_name"]}
+
+    if not (payload.email and payload.booking_reference and payload.otp):
+        raise HTTPException(status_code=422, detail="Email, booking reference and access code are required.")
+
+    email = normalize_email(payload.email)
+    reference = payload.booking_reference.strip().upper()
+    if not verify_guest_otp(db, email, reference, payload.otp):
+        raise HTTPException(status_code=401, detail="That code is incorrect or has expired.")
+    booking, intake = _find_guest_booking(db, email, reference)
+    if not booking and not intake:
+        raise HTTPException(status_code=401, detail="That code is incorrect or has expired.")
+
+    guest_id = str(intake.id) if intake else f"booking-{booking.id}"
+    slug = (intake.sanctuary_slug if intake else booking.retreat_id) or "general"
+    name = intake.client_name if intake else booking.full_name
+    room = intake.room_tier if intake else booking.room_preference
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=settings.GUEST_SESSION_EXPIRE_HOURS)
+    rec = create_verified_guest_session(db, guest_id, name, email, slug, room, expires_at)
+    _set_guest_cookies(response, guest_id, email, rec.id, slug, expires_at)
+    return {"success": True, "guest_id": guest_id, "guest_name": name}
+
+
+@auth_router.post("/logout")
+def guest_logout(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Ends the guest session on the server and clears its cookies."""
+    token = request.cookies.get(GUEST_COOKIE)
+    if token:
+        try:
+            claims = decode_token(token, "guest")
+        except AuthError:
+            claims = None
+        if claims:
+            enforce_csrf(request, claims["sid"], GUEST_CSRF_COOKIE)
+            from backend.sidecar.models import GuestPortalSession
+            rec = db.query(GuestPortalSession).filter(GuestPortalSession.id == claims["sid"]).first()
+            if rec:
+                rec.is_revoked = True
+                db.commit()
+    response.delete_cookie(GUEST_COOKIE, path="/")
+    response.delete_cookie(GUEST_CSRF_COOKIE, path="/")
+    return {"success": True}
+
+
 # ──── Endpoints ────
 
-@router.post("/generate-token", dependencies=[Depends(verify_admin)])
+@router.post("/generate-token", dependencies=[Depends(get_current_admin)])
 def generate_portal_token(
     intake_id: str = Query(..., description="Staging intake ID"),
     auto_stage_invitation: bool = Query(True, description="Whether to automatically stage a companion invitation draft"),
@@ -131,7 +270,8 @@ def generate_portal_token(
 
 @router.get("/me")
 def get_my_retreat(
-    token: str = Query(..., description="Magic-link guest token"),
+    token: Optional[str] = Query(None, description="Magic-link guest token, when not using a guest session"),
+    guest: Optional[GuestPrincipal] = Depends(get_optional_guest),
     db: Session = Depends(get_db)
 ):
     """
@@ -141,7 +281,7 @@ def get_my_retreat(
     
     Privacy: Zero clinical notes, zero internal CRM keys, zero financial figures exposed.
     """
-    data = get_guest_portal_data(token, db=db)
+    data = get_guest_portal_data(token, db=db, guest_session=guest.session if guest else None)
     if not data:
         raise HTTPException(
             status_code=401,
@@ -152,11 +292,12 @@ def get_my_retreat(
 
 @router.get("/validate")
 def validate_token(
-    token: str = Query(..., description="Magic-link guest token"),
+    token: Optional[str] = Query(None, description="Magic-link guest token, when not using a guest session"),
+    guest: Optional[GuestPrincipal] = Depends(get_optional_guest),
     db: Session = Depends(get_db)
 ):
-    """Lightweight token validation — returns guest name and sanctuary if valid."""
-    session = validate_guest_token(token, db=db)
+    """Lightweight validation — returns guest name and sanctuary if the session or token is valid."""
+    session = guest.session if guest else (validate_guest_token(token, db=db) if token else None)
     if not session:
         raise HTTPException(status_code=401, detail="Invalid or expired token.")
     return {
@@ -167,7 +308,21 @@ def validate_token(
     }
 
 
-@router.post("/demo-token", dependencies=[Depends(verify_admin)])
+@router.get("/dossier/{guest_id}")
+def get_guest_dossier(
+    guest_id: str,
+    guest: GuestPrincipal = Depends(get_current_guest),
+    db: Session = Depends(get_db)
+):
+    """A guest's own retreat dossier. Any other guest gets 403."""
+    require_guest_owner(guest, guest_id)
+    data = get_guest_portal_data(None, db=db, guest_session=guest.session)
+    if not data:
+        raise HTTPException(status_code=401, detail="Your session has ended. Please verify your access code again.")
+    return data
+
+
+@router.post("/demo-token", dependencies=[Depends(get_current_admin)])
 def create_demo_token(db: Session = Depends(get_db)):
     """
     Creates a demo guest magic-link token for development and preview.
@@ -185,6 +340,7 @@ def create_demo_token(db: Session = Depends(get_db)):
 @router.post("/flight-update")
 def post_flight_update(
     payload: GuestFlightUpdateRequest,
+    guest: Optional[GuestPrincipal] = Depends(get_optional_guest),
     db: Session = Depends(get_db)
 ):
     """
@@ -195,6 +351,7 @@ def post_flight_update(
     try:
         res = submit_guest_flight_update(
             token=payload.token,
+            guest_session=guest.session if guest else None,
             flight_number=payload.flight_number,
             delay_minutes=payload.delay_minutes,
             gate=payload.gate,
@@ -212,6 +369,7 @@ def post_flight_update(
 @router.post("/dietary-update")
 def post_dietary_update(
     payload: GuestDietaryUpdateRequest,
+    guest: Optional[GuestPrincipal] = Depends(get_optional_guest),
     db: Session = Depends(get_db)
 ):
     """
@@ -221,6 +379,7 @@ def post_dietary_update(
     try:
         res = submit_guest_dietary_update(
             token=payload.token,
+            guest_session=guest.session if guest else None,
             dietary_tags=payload.dietary_tags,
             allergies=payload.allergies,
             special_chef_notes=payload.special_chef_notes,
@@ -237,6 +396,7 @@ def post_dietary_update(
 @router.post("/pulse")
 def post_somatic_pulse(
     payload: GuestSomaticPulseRequest,
+    guest: Optional[GuestPrincipal] = Depends(get_optional_guest),
     db: Session = Depends(get_db)
 ):
     """
@@ -246,6 +406,7 @@ def post_somatic_pulse(
     try:
         res = record_guest_somatic_pulse(
             token=payload.token,
+            guest_session=guest.session if guest else None,
             day_number=payload.day_number,
             phase=payload.phase,
             restorative_sleep_score=payload.restorative_sleep_score,
@@ -266,7 +427,7 @@ def post_somatic_pulse(
         raise HTTPException(status_code=500, detail="Failed to record somatic pulse.")
 
 
-@router.get("/pulses/{intake_id}", dependencies=[Depends(verify_admin)])
+@router.get("/pulses/{intake_id}", dependencies=[Depends(get_current_admin)])
 def get_intake_pulses(
     intake_id: str,
     db: Session = Depends(get_db)
@@ -276,7 +437,7 @@ def get_intake_pulses(
     return {"intake_id": intake_id, "pulses": pulses, "count": len(pulses)}
 
 
-@router.post("/revoke-token", dependencies=[Depends(verify_admin)])
+@router.post("/revoke-token", dependencies=[Depends(get_current_admin)])
 def post_revoke_token(
     payload: RevokeTokenRequest,
     db: Session = Depends(get_db)

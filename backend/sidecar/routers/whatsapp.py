@@ -7,7 +7,7 @@ import logging
 from backend.database import get_db
 from backend.config import settings
 from backend.sidecar.models import StagingIntake
-from backend.sidecar.routers.webhooks import verify_admin
+from backend.dependencies.auth import get_current_admin, verify_whatsapp_signature
 from backend.sidecar.services.whatsapp_dispatcher import (
     build_interactive_intake_card,
     handle_whatsapp_action,
@@ -42,7 +42,7 @@ def verify_meta_webhook(
     raise HTTPException(status_code=403, detail="Invalid verification challenge token")
 
 
-@router.post("")
+@router.post("", dependencies=[Depends(verify_whatsapp_signature)])
 async def receive_whatsapp_event(request: Request, db: Session = Depends(get_db)):
     """
     Receives incoming webhook events from Meta WhatsApp Cloud API.
@@ -75,7 +75,9 @@ async def receive_whatsapp_event(request: Request, db: Session = Depends(get_db)
 
         # 2. Handle Text / Natural Language Reply
         elif msg_type == "text":
-            text_body = message.get("text", {}).get("body", "")
+            from backend.sidecar.services.clinical_governance_engine import UntrustedInputSanitizer
+            raw_text = message.get("text", {}).get("body", "")
+            text_body = UntrustedInputSanitizer.sanitize_text(raw_text)
             parsed = parse_inline_operator_reply(text_body)
             return {"status": "PARSED_REPLY", "parsed": parsed}
 
@@ -85,7 +87,7 @@ async def receive_whatsapp_event(request: Request, db: Session = Depends(get_db)
         return {"status": "ERROR", "detail": str(e)}
 
 
-@router.post("/simulate", dependencies=[Depends(verify_admin)])
+@router.post("/simulate", dependencies=[Depends(get_current_admin)])
 def simulate_whatsapp_interaction(
     payload: SimulateWhatsAppRequest,
     db: Session = Depends(get_db)
@@ -119,7 +121,7 @@ def simulate_whatsapp_interaction(
         )
         db.refresh(intake)
         return {
-            "success": True,
+            "success": result.get("success", True),
             "action_result": result,
             "updated_intake": {
                 "id": intake.id,

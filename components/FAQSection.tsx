@@ -39,7 +39,7 @@ const FAQS: FAQItem[] = [
     category: "Experience",
     question: "How do KAI retreats connect guests with authentic local customs and culture?",
     answer:
-      "Honored as a Future Leaders in Travel advisor, Kareena rejects sterile tourist enclaves. Every sanctuary is curated around intimate, respectful cultural immersion through long-standing relationships with local elders, priests, artisans, and organic farmers. Guests experience sacred local customs—such as private Melukat water purification ceremonies led by Balinese high priests, generational olive harvest tables in Ravello, and native botanical medicine in Costa Rica—with deep reverence and authenticity.",
+      "Honored as a Future Leaders in Travel advisor, Kareena rejects sterile tourist enclaves. Every sanctuary is built around intimate, respectful cultural immersion through long-standing relationships with local elders, priests, artisans, and organic farmers. Guests experience sacred local customs—such as private Melukat water purification ceremonies led by Balinese high priests, generational olive harvest tables in Ravello, and native botanical medicine in Costa Rica—with deep reverence and authenticity.",
   },
   {
     category: "Travel & Logistics",
@@ -57,7 +57,7 @@ const FAQS: FAQItem[] = [
     category: "Experience",
     question: "Can dietary preferences, allergies, or restrictions be accommodated?",
     answer:
-      "Yes, completely. Prior to arrival, you complete a comprehensive clinical wellness and dietary intake form. Our private estate executive chefs curate organic, anti-inflammatory, farm-to-table meals tailored precisely to gluten-free, vegan, vegetarian, dairy-free, or specific allergy profiles.",
+      "Yes, completely. Prior to arrival, you complete a comprehensive clinical wellness and dietary intake form. Our chefs prepare organic, anti-inflammatory, farm-to-table meals tailored precisely to gluten-free, vegan, vegetarian, dairy-free, or specific allergy profiles.",
   },
 ];
 
@@ -79,7 +79,7 @@ export default function FAQSection() {
           Frequently Asked Questions
         </h2>
         <p className="text-xs sm:text-sm text-sage/80 leading-relaxed font-light">
-          Everything you need to know about our nurse-led sanctuaries, intimate group curation, and bespoke travel logistics.
+          Everything you need to know about our nurse-led sanctuaries, small groups, and travel planning.
         </p>
       </div>
 

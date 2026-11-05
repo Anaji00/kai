@@ -6,6 +6,7 @@
 
 import { FormFillProposal } from "./portal-form-bus";
 import { backendOrigin } from "./backend-origin";
+import { authFetch } from "./auth-fetch";
 
 export interface ClinicalProfile {
   movement_experience?: string;
@@ -143,16 +144,10 @@ export interface StagedEmail {
   created_at: string;
 }
 
-// In the browser, admin auth is added by proxy.ts from the HttpOnly portal session cookie,
-// so no credentials are ever bundled client-side. Server-side callers read them from env.
-export const getAuthHeaders = (extraHeaders?: Record<string, string>): Record<string, string> => {
-  const headers: Record<string, string> = { ...(extraHeaders || {}) };
-  if (typeof window === "undefined" && process.env.ADMIN_PASSWORD) {
-    const username = process.env.ADMIN_USERNAME || "admin";
-    headers.Authorization = `Basic ${Buffer.from(`${username}:${process.env.ADMIN_PASSWORD}`).toString("base64")}`;
-  }
-  return headers;
-};
+// Authentication travels in HttpOnly session cookies, and authFetch adds the CSRF header.
+export const getAuthHeaders = (extraHeaders?: Record<string, string>): Record<string, string> => ({
+  ...(extraHeaders || {}),
+});
 
 const getBaseUrl = (): string => {
   if (typeof window !== "undefined") {
@@ -169,7 +164,7 @@ export async function sidecarFetch(
   const url = `${getBaseUrl()}${cleanPath}`;
   const existingHeaders = (options.headers as Record<string, string>) || {};
   const authHeaders = getAuthHeaders(existingHeaders);
-  return fetch(url, {
+  return authFetch(url, {
     ...options,
     headers: authHeaders,
   });
@@ -184,7 +179,7 @@ export async function fetchStagedIntakes(status?: string, sanctuarySlug?: string
     if (status && status !== "ALL") params.append("status", status);
     if (sanctuarySlug && sanctuarySlug !== "ALL") params.append("sanctuary_slug", sanctuarySlug);
     const qs = params.toString() ? `?${params.toString()}` : "";
-    const res = await fetch(`${getBaseUrl()}/intakes${qs}`, { cache: "no-store" });
+    const res = await authFetch(`${getBaseUrl()}/intakes${qs}`, { cache: "no-store" });
     if (!res.ok) return [];
     return await res.json();
   } catch (e) {
@@ -195,7 +190,7 @@ export async function fetchStagedIntakes(status?: string, sanctuarySlug?: string
 
 export async function fetchCohortCapacities(): Promise<SanctuaryCohortStatus[]> {
   try {
-    const res = await fetch(`${getBaseUrl()}/intakes/telemetry/cohorts`, { cache: "no-store" });
+    const res = await authFetch(`${getBaseUrl()}/intakes/telemetry/cohorts`, { cache: "no-store" });
     if (!res.ok) return [];
     return await res.json();
   } catch (e) {
@@ -207,7 +202,7 @@ export async function fetchCohortCapacities(): Promise<SanctuaryCohortStatus[]> 
 export async function createStagedIntake(
   payload: Partial<StagingIntake>
 ): Promise<StagingIntake> {
-  const res = await fetch(`${getBaseUrl()}/intakes`, {
+  const res = await authFetch(`${getBaseUrl()}/intakes`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -220,7 +215,7 @@ export async function createStagedIntake(
 }
 
 export async function seedDemoIntakes(): Promise<StagingIntake[]> {
-  const res = await fetch(`${getBaseUrl()}/intakes/seed-demo`, {
+  const res = await authFetch(`${getBaseUrl()}/intakes/seed-demo`, {
     method: "POST",
     headers: { "Content-Type": "application/json" }
   });
@@ -234,7 +229,7 @@ export async function seedSyntheticData(): Promise<{
   counts: Record<string, number>;
   timestamp: string;
 }> {
-  const res = await fetch(`${getBaseUrl()}/system/seed-synthetic-data`, {
+  const res = await authFetch(`${getBaseUrl()}/system/seed-synthetic-data`, {
     method: "POST",
     headers: { "Content-Type": "application/json" }
   });
@@ -249,7 +244,7 @@ export async function updateStagedIntake(
   intakeId: string,
   payload: Partial<StagingIntake>
 ): Promise<StagingIntake> {
-  const res = await fetch(`${getBaseUrl()}/intakes/${intakeId}`, {
+  const res = await authFetch(`${getBaseUrl()}/intakes/${intakeId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -262,7 +257,7 @@ export async function generateIntakeThesis(
   intakeId: string,
   customNotes?: string
 ): Promise<StagingIntake> {
-  const res = await fetch(`${getBaseUrl()}/intakes/${intakeId}/thesis`, {
+  const res = await authFetch(`${getBaseUrl()}/intakes/${intakeId}/thesis`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ regenerate: true, custom_notes: customNotes })
@@ -284,7 +279,7 @@ export async function commitIntakeToCrm(
   applied_tags: string[];
   status: string;
 }> {
-  const res = await fetch(`${getBaseUrl()}/intakes/${intakeId}/crm-commit`, {
+  const res = await authFetch(`${getBaseUrl()}/intakes/${intakeId}/crm-commit`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -309,7 +304,7 @@ export async function fetchStagedLeads(status?: string, location?: string): Prom
     if (status && status !== "ALL") params.append("status", status);
     if (location) params.append("location", location);
     const qs = params.toString() ? `?${params.toString()}` : "";
-    const res = await fetch(`${getBaseUrl()}/leads${qs}`, { cache: "no-store" });
+    const res = await authFetch(`${getBaseUrl()}/leads${qs}`, { cache: "no-store" });
     if (!res.ok) return [];
     return await res.json();
   } catch (e) {
@@ -323,7 +318,7 @@ export async function triggerLeadDiscovery(
   category: string = "reformer_pilates",
   limit: number = 5
 ): Promise<StagedLead[]> {
-  const res = await fetch(`${getBaseUrl()}/leads/discover`, {
+  const res = await authFetch(`${getBaseUrl()}/leads/discover`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ city, category, limit })
@@ -336,7 +331,7 @@ export async function updateStagedLead(
   leadId: string,
   payload: Partial<StagedLead>
 ): Promise<StagedLead> {
-  const res = await fetch(`${getBaseUrl()}/leads/${leadId}`, {
+  const res = await authFetch(`${getBaseUrl()}/leads/${leadId}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
@@ -350,7 +345,7 @@ export async function approveStagedLead(
   operatorName: string = "Kareena Islam",
   customOutreach?: string
 ): Promise<StagedLead> {
-  const res = await fetch(`${getBaseUrl()}/leads/${leadId}/approve`, {
+  const res = await authFetch(`${getBaseUrl()}/leads/${leadId}/approve`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ operator_name: operatorName, custom_outreach: customOutreach })
@@ -368,7 +363,7 @@ export async function fetchSmsQueue(status?: string, dispatchType?: string): Pro
     if (status && status !== "ALL") params.append("status", status);
     if (dispatchType && dispatchType !== "ALL") params.append("dispatch_type", dispatchType);
     const qs = params.toString() ? `?${params.toString()}` : "";
-    const res = await fetch(`${getBaseUrl()}/messaging/queue${qs}`, { cache: "no-store" });
+    const res = await authFetch(`${getBaseUrl()}/messaging/queue${qs}`, { cache: "no-store" });
     if (!res.ok) return [];
     return await res.json();
   } catch (e) {
@@ -382,7 +377,7 @@ export async function stageOperationalAlert(
   recipientName: string,
   messageBody: string
 ): Promise<SmsDispatch> {
-  const res = await fetch(`${getBaseUrl()}/messaging/stage-alert`, {
+  const res = await authFetch(`${getBaseUrl()}/messaging/stage-alert`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -402,7 +397,7 @@ export async function stageBroadcastCampaign(
   messageBody: string,
   sanctuarySlug?: string
 ): Promise<SmsDispatch[]> {
-  const res = await fetch(`${getBaseUrl()}/messaging/broadcast`, {
+  const res = await authFetch(`${getBaseUrl()}/messaging/broadcast`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -421,7 +416,7 @@ export async function dispatchSms(
   smsId: string,
   operatorName: string = "Kareena Islam"
 ): Promise<{ success: boolean; message: string; sms_id: string; dispatched_at: string }> {
-  const res = await fetch(`${getBaseUrl()}/messaging/${smsId}/dispatch`, {
+  const res = await authFetch(`${getBaseUrl()}/messaging/${smsId}/dispatch`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ operator_name: operatorName })
@@ -450,7 +445,7 @@ export async function parseVoucher(
     raw_text_snippet: string;
   };
 }> {
-  const res = await fetch(`${getBaseUrl()}/reconciliation/parse-voucher`, {
+  const res = await authFetch(`${getBaseUrl()}/reconciliation/parse-voucher`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -468,7 +463,7 @@ export async function runManifestDiff(
   externalGuestRecords: Array<{ name: string; room?: string }>,
   diffDocumentName: string = "ground_manifest.csv"
 ): Promise<StagedVoucherDiff> {
-  const res = await fetch(`${getBaseUrl()}/reconciliation/manifest-diff`, {
+  const res = await authFetch(`${getBaseUrl()}/reconciliation/manifest-diff`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -487,7 +482,7 @@ export async function fetchManifestDiffs(sanctuarySlug?: string, status?: string
     if (sanctuarySlug && sanctuarySlug !== "ALL") params.append("sanctuary_slug", sanctuarySlug);
     if (status && status !== "ALL") params.append("status", status);
     const qs = params.toString() ? `?${params.toString()}` : "";
-    const res = await fetch(`${getBaseUrl()}/reconciliation/diffs${qs}`, { cache: "no-store" });
+    const res = await authFetch(`${getBaseUrl()}/reconciliation/diffs${qs}`, { cache: "no-store" });
     if (!res.ok) return [];
     return await res.json();
   } catch (e) {
@@ -500,7 +495,7 @@ export async function resolveManifestDiff(
   diffId: string,
   operatorName: string = "Kareena Islam"
 ): Promise<{ success: boolean; message: string; diff_id: string; status: string }> {
-  const res = await fetch(`${getBaseUrl()}/reconciliation/diffs/${diffId}/resolve`, {
+  const res = await authFetch(`${getBaseUrl()}/reconciliation/diffs/${diffId}/resolve`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ operator_name: operatorName })
@@ -518,7 +513,7 @@ export async function fetchStagedEmails(status?: string, parsedIntent?: string):
     if (status && status !== "ALL") params.append("status", status);
     if (parsedIntent && parsedIntent !== "ALL") params.append("parsed_intent", parsedIntent);
     const qs = params.toString() ? `?${params.toString()}` : "";
-    const res = await fetch(`${getBaseUrl()}/email-in${qs}`, { cache: "no-store" });
+    const res = await authFetch(`${getBaseUrl()}/email-in${qs}`, { cache: "no-store" });
     if (!res.ok) return [];
     return await res.json();
   } catch (e) {
@@ -533,7 +528,7 @@ export async function ingestEmail(
   rawBody: string,
   recipient: string = "concierge@kaiwellnessretreats.com"
 ): Promise<StagedEmail> {
-  const res = await fetch(`${getBaseUrl()}/email-in`, {
+  const res = await authFetch(`${getBaseUrl()}/email-in`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ sender, recipient, subject, raw_body: rawBody })
@@ -547,7 +542,7 @@ export async function approveEmailAction(
   actionType: string = "CREATE_INTAKE",
   operatorName: string = "Kareena Islam"
 ): Promise<StagedEmail> {
-  const res = await fetch(`${getBaseUrl()}/email-in/${emailId}/action`, {
+  const res = await authFetch(`${getBaseUrl()}/email-in/${emailId}/action`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action_type: actionType, operator_name: operatorName })
@@ -604,7 +599,7 @@ export interface WhatsAppSimulationResponse {
 
 export async function fetchWhatsAppCard(intakeId: string): Promise<WhatsAppSimulationResponse> {
   try {
-    const res = await fetch(`${getBaseUrl()}/webhook/whatsapp/simulate`, {
+    const res = await authFetch(`${getBaseUrl()}/webhook/whatsapp/simulate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ intake_id: intakeId, action: "GET_CARD" })
@@ -649,7 +644,7 @@ export async function executeWhatsAppButtonAction(
   operatorName: string = "Kareena Islam"
 ): Promise<WhatsAppSimulationResponse> {
   try {
-    const res = await fetch(`${getBaseUrl()}/webhook/whatsapp/simulate`, {
+    const res = await authFetch(`${getBaseUrl()}/webhook/whatsapp/simulate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -689,7 +684,7 @@ export async function sendWhatsAppReplyText(
   replyText: string
 ): Promise<WhatsAppSimulationResponse> {
   try {
-    const res = await fetch(`${getBaseUrl()}/webhook/whatsapp/simulate`, {
+    const res = await authFetch(`${getBaseUrl()}/webhook/whatsapp/simulate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -749,7 +744,7 @@ export async function fetchCalendarEvents(
     if (sanctuarySlug && sanctuarySlug !== "ALL") params.append("sanctuary_slug", sanctuarySlug);
     if (category && category !== "ALL") params.append("category", category);
 
-    const res = await fetch(`${getBaseUrl()}/calendar/events?${params.toString()}`);
+    const res = await authFetch(`${getBaseUrl()}/calendar/events?${params.toString()}`);
     if (!res.ok) throw new Error("Failed to fetch calendar events");
     return await res.json();
   } catch (err) {
@@ -793,7 +788,7 @@ export async function fetchCalendarEvents(
 
 export async function createCalendarEvent(eventData: Partial<CalendarEvent>): Promise<CalendarEvent> {
   try {
-    const res = await fetch(`${getBaseUrl()}/calendar/events`, {
+    const res = await authFetch(`${getBaseUrl()}/calendar/events`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(eventData)
@@ -859,7 +854,7 @@ export async function chatWithCopilot(
   conversationHistory?: Array<{ role: string; content: string }>
 ): Promise<CopilotChatResponse> {
   try {
-    const res = await fetch(`${getBaseUrl()}/copilot/chat`, {
+    const res = await authFetch(`${getBaseUrl()}/copilot/chat`, {
       method: "POST",
       headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
@@ -904,7 +899,7 @@ export async function chatWithCopilotStream(
   callbacks?: CopilotStreamCallbacks
 ): Promise<void> {
   try {
-    const res = await fetch(`${getBaseUrl()}/copilot/chat/stream`, {
+    const res = await authFetch(`${getBaseUrl()}/copilot/chat/stream`, {
       method: "POST",
       headers: getAuthHeaders({ "Content-Type": "application/json" }),
       body: JSON.stringify({
@@ -972,7 +967,7 @@ export async function fetchLaymanToolGuide(): Promise<{
   founder_principles: string[];
 }> {
   try {
-    const res = await fetch(`${getBaseUrl()}/copilot/tool-guide`);
+    const res = await authFetch(`${getBaseUrl()}/copilot/tool-guide`);
     if (!res.ok) throw new Error("Failed to fetch layman tool guide");
     return await res.json();
   } catch (err) {
@@ -1069,7 +1064,7 @@ export async function fetchIntegrationProviders(): Promise<{
   total_active: number;
 }> {
   try {
-    const res = await fetch(`${getBaseUrl()}/webhooks/providers`);
+    const res = await authFetch(`${getBaseUrl()}/webhooks/providers`);
     if (!res.ok) throw new Error("Failed to fetch provider telemetry");
     return await res.json();
   } catch (err) {
@@ -1342,7 +1337,7 @@ export interface SomaticPointOfInterest {
 export async function fetchSanctuaryRoutes(sanctuarySlug?: string): Promise<SanctuaryRoute[]> {
   try {
     const qs = sanctuarySlug && sanctuarySlug !== "ALL" ? `?sanctuary_slug=${sanctuarySlug}` : "";
-    const res = await fetch(`${getBaseUrl()}/travel/routes${qs}`, { cache: "no-store" });
+    const res = await authFetch(`${getBaseUrl()}/travel/routes${qs}`, { cache: "no-store" });
     if (!res.ok) return [];
     return await res.json();
   } catch (e) {
@@ -1353,7 +1348,7 @@ export async function fetchSanctuaryRoutes(sanctuarySlug?: string): Promise<Sanc
 
 export async function calculateDynamicRoute(req: RouteCalculateRequest): Promise<SanctuaryRoute | null> {
   try {
-    const res = await fetch(`${getBaseUrl()}/travel/routes/calculate`, {
+    const res = await authFetch(`${getBaseUrl()}/travel/routes/calculate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req),
@@ -1369,7 +1364,7 @@ export async function calculateDynamicRoute(req: RouteCalculateRequest): Promise
 export async function fetchPointsOfInterest(sanctuarySlug?: string): Promise<SomaticPointOfInterest[]> {
   try {
     const qs = sanctuarySlug && sanctuarySlug !== "ALL" ? `?sanctuary_slug=${sanctuarySlug}` : "";
-    const res = await fetch(`${getBaseUrl()}/travel/points-of-interest${qs}`, { cache: "no-store" });
+    const res = await authFetch(`${getBaseUrl()}/travel/points-of-interest${qs}`, { cache: "no-store" });
     if (!res.ok) return [];
     return await res.json();
   } catch (e) {
@@ -1592,7 +1587,7 @@ export async function fetchSanctuaryWeather(
     const params = new URLSearchParams({ sanctuary_slug: sanctuarySlug });
     if (lat !== undefined) params.append("lat", lat.toString());
     if (lon !== undefined) params.append("lon", lon.toString());
-    const res = await fetch(`${getBaseUrl()}/travel/weather?${params.toString()}`, { cache: "no-store" });
+    const res = await authFetch(`${getBaseUrl()}/travel/weather?${params.toString()}`, { cache: "no-store" });
     if (res.ok) {
       const data = await res.json();
       return { ...data, api_source: "KAI Sidecar + Open-Meteo Live Telemetry" };
@@ -1604,7 +1599,7 @@ export async function fetchSanctuaryWeather(
   // 2. Try Direct Open-Meteo Forecast API from Browser
   try {
     const openMeteoUrl = `https://api.open-meteo.com/v1/forecast?latitude=${targetLat}&longitude=${targetLon}&current=temperature_2m,relative_humidity_2m,apparent_temperature,weather_code,wind_speed_10m&daily=uv_index_max&timezone=auto`;
-    const omRes = await fetch(openMeteoUrl);
+    const omRes = await authFetch(openMeteoUrl);
     if (omRes.ok) {
       const omData = await omRes.json();
       const current = omData.current || {};
@@ -1676,7 +1671,7 @@ export async function fetchHistoricalWeatherPatterns(
   // 1. Try KAI Sidecar Backend Historical Endpoint
   try {
     const params = new URLSearchParams({ sanctuary_slug: sanctuarySlug, start_md: sMd, end_md: eMd });
-    const res = await fetch(`${getBaseUrl()}/travel/weather/historical?${params.toString()}`, {
+    const res = await authFetch(`${getBaseUrl()}/travel/weather/historical?${params.toString()}`, {
       cache: "no-store",
     });
     if (res.ok) {
@@ -1713,7 +1708,7 @@ export async function fetchHistoricalWeatherPatterns(
       const startDate = `${yr}-${sMd}`;
       const endDate = `${yr}-${eMd}`;
       const archiveUrl = `https://archive-api.open-meteo.com/v1/archive?latitude=${info.lat}&longitude=${info.lon}&start_date=${startDate}&end_date=${endDate}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code&timezone=auto`;
-      const resp = await fetch(archiveUrl);
+      const resp = await authFetch(archiveUrl);
       if (resp.ok) {
         const data = await resp.json();
         const daily = data.daily || {};
@@ -1887,7 +1882,7 @@ export async function fetchCuratedDining(
     if (cuisineType) params.append("cuisine_type", cuisineType);
     if (maxDistanceKm) params.append("max_distance_km", maxDistanceKm.toString());
     const qs = params.toString() ? `?${params.toString()}` : "";
-    const res = await fetch(`${getBaseUrl()}/travel/dining${qs}`, { cache: "no-store" });
+    const res = await authFetch(`${getBaseUrl()}/travel/dining${qs}`, { cache: "no-store" });
     if (!res.ok) return [];
     return await res.json();
   } catch (e) {
@@ -1898,7 +1893,7 @@ export async function fetchCuratedDining(
 
 export async function createCuratedDiningSpot(req: CuratedDiningCreateRequest): Promise<CuratedDiningSpot | null> {
   try {
-    const res = await fetch(`${getBaseUrl()}/travel/dining`, {
+    const res = await authFetch(`${getBaseUrl()}/travel/dining`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req),
@@ -1952,7 +1947,7 @@ export interface InboundReviewWebhookPayload {
 export async function fetchDestinationReviews(sanctuarySlug?: string): Promise<DestinationReview[]> {
   try {
     const qs = sanctuarySlug && sanctuarySlug !== "ALL" ? `?sanctuary_slug=${sanctuarySlug}` : "";
-    const res = await fetch(`${getBaseUrl()}/travel/reviews${qs}`, { cache: "no-store" });
+    const res = await authFetch(`${getBaseUrl()}/travel/reviews${qs}`, { cache: "no-store" });
     if (!res.ok) return [];
     return await res.json();
   } catch (e) {
@@ -1963,7 +1958,7 @@ export async function fetchDestinationReviews(sanctuarySlug?: string): Promise<D
 
 export async function submitDestinationReview(req: DestinationReviewCreateRequest): Promise<DestinationReview | null> {
   try {
-    const res = await fetch(`${getBaseUrl()}/travel/reviews`, {
+    const res = await authFetch(`${getBaseUrl()}/travel/reviews`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req),
@@ -1978,7 +1973,7 @@ export async function submitDestinationReview(req: DestinationReviewCreateReques
 
 export async function simulateReviewWebhook(payload: InboundReviewWebhookPayload): Promise<DestinationReview | null> {
   try {
-    const res = await fetch(`${getBaseUrl()}/travel/reviews/webhook`, {
+    const res = await authFetch(`${getBaseUrl()}/travel/reviews/webhook`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -2011,7 +2006,7 @@ export interface DestinationGuide {
 
 export async function fetchDestinationGuide(sanctuarySlug = "nosara"): Promise<DestinationGuide | null> {
   try {
-    const res = await fetch(`${getBaseUrl()}/travel/destination-guide/${sanctuarySlug}`, { cache: "no-store" });
+    const res = await authFetch(`${getBaseUrl()}/travel/destination-guide/${sanctuarySlug}`, { cache: "no-store" });
     if (!res.ok) return null;
     return await res.json();
   } catch (e) {
@@ -2043,7 +2038,7 @@ export interface GroundTransfer {
 export async function fetchGroundTransfers(sanctuarySlug?: string): Promise<GroundTransfer[]> {
   try {
     const qs = sanctuarySlug && sanctuarySlug !== "ALL" ? `?sanctuary_slug=${sanctuarySlug}` : "";
-    const res = await fetch(`${getBaseUrl()}/travel/transfers${qs}`, { cache: "no-store" });
+    const res = await authFetch(`${getBaseUrl()}/travel/transfers${qs}`, { cache: "no-store" });
     if (!res.ok) return [];
     return await res.json();
   } catch (e) {
@@ -2058,7 +2053,7 @@ export async function simulateGroundTransferWebhook(
   notes?: string
 ): Promise<{ status: string; transfer_id: string; new_status: string } | null> {
   try {
-    const res = await fetch(`${getBaseUrl()}/travel/transfers/webhook`, {
+    const res = await authFetch(`${getBaseUrl()}/travel/transfers/webhook`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ transfer_id: transferId, status, chauffeur_notes: notes }),
@@ -2099,7 +2094,7 @@ export async function uploadGuestDocument(
     if (guestName) formData.append("guest_name", guestName);
     if (intakeId) formData.append("intake_id", intakeId);
 
-    const res = await fetch(`${getBaseUrl()}/copilot/upload-document`, {
+    const res = await authFetch(`${getBaseUrl()}/copilot/upload-document`, {
       method: "POST",
       body: formData,
     });
@@ -2116,7 +2111,7 @@ export async function uploadGuestDocument(
 
 export async function fetchUploadedDocuments(): Promise<UploadedDocument[]> {
   try {
-    const res = await fetch(`${getBaseUrl()}/travel/documents`, { cache: "no-store" });
+    const res = await authFetch(`${getBaseUrl()}/travel/documents`, { cache: "no-store" });
     if (!res.ok) return [];
     return await res.json();
   } catch (e) {
@@ -2203,7 +2198,7 @@ export async function fetchVendors(sanctuarySlug?: string, category?: string): P
     if (sanctuarySlug && sanctuarySlug !== "all") params.append("sanctuary_slug", sanctuarySlug);
     if (category && category !== "ALL") params.append("category", category);
     const qs = params.toString() ? `?${params.toString()}` : "";
-    const res = await fetch(`${getBaseUrl()}/vendors${qs}`, { cache: "no-store" });
+    const res = await authFetch(`${getBaseUrl()}/vendors${qs}`, { cache: "no-store" });
     if (!res.ok) return [];
     return await res.json();
   } catch (e) {
@@ -2214,7 +2209,7 @@ export async function fetchVendors(sanctuarySlug?: string, category?: string): P
 
 export async function fetchSingleVendor(id: string): Promise<VendorSupplier | null> {
   try {
-    const res = await fetch(`${getBaseUrl()}/vendors/${id}`, { cache: "no-store" });
+    const res = await authFetch(`${getBaseUrl()}/vendors/${id}`, { cache: "no-store" });
     if (!res.ok) return null;
     return await res.json();
   } catch (e) {
@@ -2225,7 +2220,7 @@ export async function fetchSingleVendor(id: string): Promise<VendorSupplier | nu
 
 export async function createVendor(req: VendorSupplierCreateRequest): Promise<VendorSupplier | null> {
   try {
-    const res = await fetch(`${getBaseUrl()}/vendors`, {
+    const res = await authFetch(`${getBaseUrl()}/vendors`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req),
@@ -2240,7 +2235,7 @@ export async function createVendor(req: VendorSupplierCreateRequest): Promise<Ve
 
 export async function updateVendor(id: string, req: VendorSupplierUpdateRequest): Promise<VendorSupplier | null> {
   try {
-    const res = await fetch(`${getBaseUrl()}/vendors/${id}`, {
+    const res = await authFetch(`${getBaseUrl()}/vendors/${id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req),
@@ -2255,7 +2250,7 @@ export async function updateVendor(id: string, req: VendorSupplierUpdateRequest)
 
 export async function deleteVendor(id: string): Promise<boolean> {
   try {
-    const res = await fetch(`${getBaseUrl()}/vendors/${id}`, {
+    const res = await authFetch(`${getBaseUrl()}/vendors/${id}`, {
       method: "DELETE",
     });
     return res.ok;
@@ -2267,7 +2262,7 @@ export async function deleteVendor(id: string): Promise<boolean> {
 
 export async function syncVendorToCrm(id: string): Promise<VendorSupplier | null> {
   try {
-    const res = await fetch(`${getBaseUrl()}/vendors/${id}/sync-crm`, {
+    const res = await authFetch(`${getBaseUrl()}/vendors/${id}/sync-crm`, {
       method: "POST",
     });
     if (!res.ok) return null;
@@ -2282,7 +2277,7 @@ export async function syncVendorToCrm(id: string): Promise<VendorSupplier | null
 
 export async function sendLeadEmail(leadId: string, subject: string, body: string): Promise<{ status: string; message: string }> {
   try {
-    const res = await fetch(`${getBaseUrl()}/leads/${leadId}/send-email`, {
+    const res = await authFetch(`${getBaseUrl()}/leads/${leadId}/send-email`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ subject, body })
@@ -2307,6 +2302,10 @@ export interface ApiActionDraft {
   channel_target?: string;
   channel_badge?: string;
   icon?: string;
+  target_entity_type?: string;
+  target_entity_id?: string;
+  target_entity_version_hash?: string;
+  staged_patch_json?: string;
 }
 
 export interface DraftStats {
@@ -2330,7 +2329,7 @@ export async function fetchPendingDrafts(status: string = "pending_review", cate
     if (status) params.append("status", status);
     if (category && category !== "all") params.append("category", category);
     const qs = params.toString() ? `?${params.toString()}` : "";
-    const res = await fetch(`${getApiBaseUrl()}/drafts${qs}`, {
+    const res = await authFetch(`${getApiBaseUrl()}/drafts${qs}`, {
       cache: 'no-store',
       headers: getAuthHeaders()
     });
@@ -2344,7 +2343,7 @@ export async function fetchPendingDrafts(status: string = "pending_review", cate
 
 export async function fetchDraftStats(): Promise<DraftStats> {
   try {
-    const res = await fetch(`${getApiBaseUrl()}/drafts/stats`, {
+    const res = await authFetch(`${getApiBaseUrl()}/drafts/stats`, {
       cache: 'no-store',
       headers: getAuthHeaders()
     });
@@ -2365,14 +2364,35 @@ export async function fetchDraftStats(): Promise<DraftStats> {
 export async function approveDraftAction(
   draftId: number,
   updatedContent?: string,
-  operatorName: string = "Kareena Islam"
+  operatorName: string = "Kareena Islam",
+  forceOverride: boolean = false
 ): Promise<{ status: string; message: string; draft_id: number; dispatch_result?: Record<string, unknown> }> {
-  const res = await fetch(`${getApiBaseUrl()}/drafts/${draftId}/approve`, {
+  const res = await authFetch(`${getApiBaseUrl()}/drafts/${draftId}/approve`, {
     method: 'POST',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ updated_content: updatedContent, operator_name: operatorName }),
+    body: JSON.stringify({ 
+      updated_content: updatedContent, 
+      operator_name: operatorName,
+      force_override: forceOverride
+    }),
   });
-  if (!res.ok) throw new Error('Failed to approve draft');
+  if (!res.ok) {
+    if (res.status === 409) {
+      const errData = await res.json().catch(() => ({}));
+      const detail = errData?.detail;
+      const msg = typeof detail === 'object' && detail?.message 
+        ? detail.message 
+        : typeof detail === 'string'
+          ? detail
+          : 'State drift conflict detected';
+      const err = new Error(msg) as any;
+      err.status = 409;
+      err.data = typeof detail === 'object' ? detail : errData;
+      throw err;
+    }
+    const errText = await res.text().catch(() => 'Failed to approve draft');
+    throw new Error(errText || 'Failed to approve draft');
+  }
   return await res.json();
 }
 
@@ -2381,7 +2401,7 @@ export async function discardDraftAction(
   reason?: string,
   operatorName: string = "Kareena Islam"
 ): Promise<{ status: string; message: string; draft_id: number }> {
-  const res = await fetch(`${getApiBaseUrl()}/drafts/${draftId}/discard`, {
+  const res = await authFetch(`${getApiBaseUrl()}/drafts/${draftId}/discard`, {
     method: 'POST',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ reason, operator_name: operatorName }),
@@ -2392,7 +2412,7 @@ export async function discardDraftAction(
 
 export async function updateDraftStatus(draftId: number, status: string, content: string): Promise<boolean> {
   try {
-    const res = await fetch(`${getApiBaseUrl()}/drafts/${draftId}`, {
+    const res = await authFetch(`${getApiBaseUrl()}/drafts/${draftId}`, {
       method: 'PATCH',
       headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ status, content }),
@@ -2415,7 +2435,7 @@ export async function batchApproveDraftsAction(
   results: Array<{ draft_id: number; type: string; guest_name: string; dispatch_result?: Record<string, unknown> }>;
   safety_notice?: string;
 }> {
-  const res = await fetch(`${getApiBaseUrl()}/drafts/batch-approve`, {
+  const res = await authFetch(`${getApiBaseUrl()}/drafts/batch-approve`, {
     method: 'POST',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
@@ -2438,7 +2458,7 @@ export async function dispatchDraftsDigestWhatsApp(): Promise<{
   recipient: string;
   digest_payload: Record<string, unknown>;
 }> {
-  const res = await fetch(`${getApiBaseUrl()}/drafts/digest/whatsapp`, {
+  const res = await authFetch(`${getApiBaseUrl()}/drafts/digest/whatsapp`, {
     method: 'POST',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
   });
@@ -2505,7 +2525,7 @@ export async function transcribeVoiceMemo(audio: Blob): Promise<string> {
   const ext = audio.type.includes('mp4') ? 'm4a' : audio.type.includes('ogg') ? 'ogg' : 'webm';
   const form = new FormData();
   form.append('file', audio, `voice-memo.${ext}`);
-  const res = await fetch(`${getApiBaseUrl()}/sidecar/intakes/voice-memo/transcribe`, {
+  const res = await authFetch(`${getApiBaseUrl()}/sidecar/intakes/voice-memo/transcribe`, {
     method: 'POST',
     headers: getAuthHeaders(),
     body: form,
@@ -2522,7 +2542,7 @@ export async function submitVoiceConsultationMemo(
   rawTranscript: string,
   operatorName: string = "Kareena Islam"
 ): Promise<VoiceMemoResponse> {
-  const res = await fetch(`${getApiBaseUrl()}/sidecar/intakes/voice-memo`, {
+  const res = await authFetch(`${getApiBaseUrl()}/sidecar/intakes/voice-memo`, {
     method: 'POST',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
@@ -2542,7 +2562,7 @@ export async function generateContinuityArc(
   departureDate?: string,
   operatorName: string = "Kareena Islam"
 ): Promise<ContinuityArcResponse> {
-  const res = await fetch(`${getApiBaseUrl()}/sidecar/continuity/generate-arc`, {
+  const res = await authFetch(`${getApiBaseUrl()}/sidecar/continuity/generate-arc`, {
     method: 'POST',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({
@@ -2566,7 +2586,7 @@ export async function fetchContinuityArcs(
   if (guestName) params.append('guest_name', guestName);
   if (status) params.append('status', status);
   const url = `${getApiBaseUrl()}/sidecar/continuity/active-arcs${params.toString() ? `?${params.toString()}` : ''}`;
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: 'GET',
     headers: getAuthHeaders(),
   });
@@ -2588,7 +2608,7 @@ export interface GuestPortalTokenResponse {
 
 export async function generateGuestPortalToken(intakeId: string): Promise<GuestPortalTokenResponse> {
   const url = `${getApiBaseUrl()}/sidecar/guest-portal/generate-token?intake_id=${encodeURIComponent(intakeId)}`;
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: 'POST',
     headers: getAuthHeaders(),
   });
@@ -2601,7 +2621,7 @@ export async function generateGuestPortalToken(intakeId: string): Promise<GuestP
 
 export async function fetchGuestPortalDemoToken(): Promise<GuestPortalTokenResponse> {
   const url = `${getApiBaseUrl()}/sidecar/guest-portal/demo-token`;
-  const res = await fetch(url, {
+  const res = await authFetch(url, {
     method: 'POST',
   });
   if (!res.ok) {
@@ -2623,7 +2643,7 @@ export interface StaffGeneratedRetreatPlanResponse {
 }
 
 export async function generateStaffRetreatPlan(intakeId: string): Promise<StaffGeneratedRetreatPlanResponse> {
-  const res = await fetch('/api/portal/generate-plan', {
+  const res = await authFetch('/api/portal/generate-plan', {
     method: 'POST',
     headers: getAuthHeaders(),
     body: JSON.stringify({ intakeId }),
@@ -2663,17 +2683,23 @@ export interface CRMTripItem {
   crm_trip_id: string;
   client_name: string;
   client_email: string;
+  client_phone?: string;
   title: string;
   sanctuary_slug: string;
   dates: string;
   room_tier: string;
+  assigned_room_number?: string;
   status: string;
   total_investment: number;
   deposit_amount: number;
   deposit_status: string;
   final_balance: number;
+  paid_amount?: number;
   activities_count: number;
   smart_flight?: Record<string, any>;
+  flight_details?: string;
+  dietary_notes?: string;
+  clinical_flags?: string[];
   deep_link?: string;
   created_at: string;
 }
@@ -3771,3 +3797,15 @@ export async function executeAiAutomationPlaybook(
   return await res.json();
 }
 
+
+export async function recordClinicalClearance(intakeId: string, reason: string): Promise<void> {
+  const res = await authFetch(`${getApiBaseUrl()}/sidecar/intakes/${encodeURIComponent(intakeId)}/clinical-hold/override`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(typeof err.detail === 'string' ? err.detail : 'Failed to record the clearance');
+  }
+}

@@ -110,40 +110,6 @@ TOOL_DESCRIPTIONS_LAYMAN = {
     }
 }
 
-CLINICAL_CONTRAINDICATION_RULES = [
-    {
-        "keywords": ["epilepsy", "seizure", "aneurysm", "detached retina", "bipolar i", "arrhythmia", "tachycardia", "svt", "cardiovascular"],
-        "modality": "Intense Rapid Breathwork / Tummo / Holotropic",
-        "risk_level": "CONTRAINDICATION_ALERT",
-        "nurse_guidance": "High-velocity hyperventilation alters cerebral blood flow and arterial CO2 (hypocapnia), potentially triggering seizure activity or cardiovascular tachyarrhythmias. Strictly substitute with gentle 4-7-8 vagal breathing or coherent 5.5-bpm cardiac resonance breathing."
-    },
-    {
-        "keywords": ["raynaud", "raynaud's", "peripheral neuropathy", "severe arrhythmia", "arrhythmia", "tachycardia", "svt", "cardiac", "cold urticaria"],
-        "modality": "Cold Plunge / Cryo Therapy",
-        "risk_level": "CONTRAINDICATION_ALERT",
-        "nurse_guidance": "Cold shock response and peripheral vasospasm trigger sudden sympathetic surges and peripheral vasoconstriction that exacerbate arrhythmias and ischemia. Substitute full immersion with contrast warm hydrotherapy or foot-only immersion up to 68°F with warm wool grounding."
-    },
-    {
-        "keywords": ["pregnancy", "pregnant", "trimester"],
-        "modality": "Hyperthermic Finnish Sauna / Hot Temazcal / Deep Cold Plunge",
-        "risk_level": "CONTRAINDICATION_ALERT",
-        "nurse_guidance": "Maternal core temperature elevations above 102°F (38.9°C) pose fetal risks, particularly during early gestation. Substitute with tepid mineral soaking (98°F–100°F) and gentle acoustic sound immersion."
-    },
-    {
-        "keywords": ["pacemaker", "icd", "cochlear implant", "recent concussion", "tinnitus"],
-        "modality": "Direct Heavy Acoustic Gong / High-Vibration Sound Bed",
-        "risk_level": "MODERATE_REVIEW",
-        "nurse_guidance": "High mechanical acoustic resonance in immediate proximity to skull or implanted electronic leads may trigger discomfort or device interference. Position guest 10+ feet away from physical gongs and emphasize gentle 432Hz crystal alchemy singing bowls."
-    },
-    {
-        "keywords": ["ssri", "snri", "anxiety", "insomnia", "elevated cortisol", "adrenal fatigue", "burnout"],
-        "modality": "432Hz Acoustic Somatic Alignment & 4-7-8 Breathing",
-        "risk_level": "CLEAR",
-        "nurse_guidance": "Highly recommended and safe. Non-invasive parasympathetic stimulation supports autonomous serotonin and GABA production without pharmacological interference."
-    }
-]
-
-
 class ClinicalCopilotAgent:
     """
     All-encompassing AI Chief of Staff & Clinical Copilot for Founder Kareena Islam, BSN, RN.
@@ -156,34 +122,56 @@ class ClinicalCopilotAgent:
 
     def screen_contraindications(self, health_notes: str, requested_modalities: Optional[List[str]] = None) -> Dict[str, Any]:
         """
-        Screens guest health notes against clinical nursing contraindications.
+        Screens guest health notes against deterministic clinical nursing protocols.
+        MANDATORY INVARIANT: Deterministic Python rules evaluate first as read-only ground truth.
         """
-        notes_lower = health_notes.lower()
-        matched_alerts = []
-        highest_severity = "CLEAR"
+        from backend.sidecar.services.clinical_governance_engine import (
+            DeterministicClinicalEngine,
+            ClinicalSeverity,
+        )
 
-        for rule in CLINICAL_CONTRAINDICATION_RULES:
-            matches = [kw for kw in rule["keywords"] if kw in notes_lower]
-            if matches:
-                matched_alerts.append({
-                    "trigger_words": matches,
-                    "modality": rule["modality"],
-                    "risk_level": rule["risk_level"],
-                    "nurse_guidance": rule["nurse_guidance"]
-                })
-                if rule["risk_level"] == "CONTRAINDICATION_ALERT":
-                    highest_severity = "CONTRAINDICATION_ALERT"
-                elif rule["risk_level"] == "MODERATE_REVIEW" and highest_severity != "CONTRAINDICATION_ALERT":
-                    highest_severity = "MODERATE_REVIEW"
+        report = DeterministicClinicalEngine.evaluate(
+            client_name="Consultation Subject",
+            sanctuary_slug="general",
+            clinical_profile={"health_notes": health_notes}
+        )
+
+        # Map to copilot's existing safety level strings
+        if report.hard_hold or report.overall_severity == ClinicalSeverity.HARD_CONTRAINDICATION_HOLD:
+            highest_severity = "CONTRAINDICATION_ALERT"
+        elif report.overall_severity == ClinicalSeverity.MODERATE_CAUTION:
+            highest_severity = "MODERATE_REVIEW"
+        elif report.overall_severity == ClinicalSeverity.ADVISORY:
+            highest_severity = "ADVISORY"
+        else:
+            highest_severity = "CLEAR"
+
+        matched_alerts = []
+        for f in report.findings:
+            matched_alerts.append({
+                "trigger_words": [f.trigger],
+                "condition": f.trigger,
+                "rationale": f.rationale,
+                "adaptation": f.safe_alternative,
+                "modality": ", ".join(f.blocked_modalities) if f.blocked_modalities else f.category,
+                "risk_level": "CONTRAINDICATION_ALERT" if f.severity == ClinicalSeverity.HARD_CONTRAINDICATION_HOLD else "MODERATE_REVIEW",
+                "nurse_guidance": f"{f.rule} Safe Alternative: {f.safe_alternative}",
+                "finding_id": f.finding_id,
+                "safe_alternative": f.safe_alternative,
+                "blocked_modalities": f.blocked_modalities
+            })
 
         return {
             "safety_level": highest_severity,
             "alerts_count": len(matched_alerts),
             "findings": matched_alerts,
+            "blocked_modalities": report.blocked_modalities,
+            "deterministic_hash": report.deterministic_hash,
+            "hard_hold": report.hard_hold,
             "nurse_summary": (
                 "Clinical clearance verified. No acute contraindications identified for standard somatic itinerary."
                 if highest_severity == "CLEAR" else
-                f"Clinical review flagged {len(matched_alerts)} consideration(s). Nurse protocol adaptations recommended."
+                f"Clinical evaluation identified {len(matched_alerts)} consideration(s) [Blocked: {', '.join(report.blocked_modalities) if report.blocked_modalities else 'None'}]. Nurse protocol adaptations required."
             )
         }
 
@@ -545,7 +533,7 @@ class ClinicalCopilotAgent:
             }
 
         # 1. Vendor & Preferred Supplier
-        if any(kw in msg_lower for kw in ["add vendor", "new vendor", "add supplier", "new supplier", "register vendor", "register supplier", "create supplier", "create vendor"]):
+        if any(kw in msg_lower for kw in ["/vendor", "add vendor", "new vendor", "add supplier", "new supplier", "register vendor", "register supplier", "create supplier", "create vendor"]):
             name_match = re.search(r'(?:vendor|supplier)(?:\s+(?:called|named)?\s*[:"\']?)([^,\'"\.\n]+)', message, re.IGNORECASE)
             name = name_match.group(1).strip() if name_match else "New Luxury Partner"
             
@@ -607,7 +595,7 @@ class ClinicalCopilotAgent:
             }
 
         # 2. Dynamic Route Calculator
-        if any(kw in msg_lower for kw in ["calculate route", "plan route", "scenic route", "route calculator", "plan drive", "chauffeur transit"]):
+        if any(kw in msg_lower for kw in ["/route", "calculate route", "plan route", "scenic route", "route calculator", "plan drive", "chauffeur transit"]):
             origin_match = re.search(r'(?:from)\s+([A-Za-z0-9\s\(\)\-]+?)(?:\s+to|\.|$)', message, re.IGNORECASE)
             origin = origin_match.group(1).strip() if origin_match else "Regional Airport (LIR)"
             vehicle = "Executive 4WD Suburban" if target_sanctuary == "nosara" else "Mercedes-Benz Luxury Van"
@@ -634,7 +622,7 @@ class ClinicalCopilotAgent:
             }
 
         # 3. Curated Dining Spot
-        if any(kw in msg_lower for kw in ["add dining", "new dining", "add restaurant", "new restaurant", "curate dining"]):
+        if any(kw in msg_lower for kw in ["/dining", "add dining", "new dining", "add restaurant", "new restaurant", "curate dining"]):
             name_match = re.search(r'(?:dining|restaurant)(?:\s+(?:called|named)?\s*[:"\']?)([^,\'"\.\n]+)', message, re.IGNORECASE)
             name = name_match.group(1).strip() if name_match else "Restorative Kitchen"
             dietary = ["Gluten-Free", "Plant-Forward"]
@@ -712,7 +700,7 @@ class ClinicalCopilotAgent:
             }
 
         # 6. Broadcast SMS
-        if any(kw in msg_lower for kw in ["broadcast sms", "send cohort sms", "send group sms", "broadcast message", "sms cohort", "sms group", "message waitlist"]):
+        if any(kw in msg_lower for kw in ["/broadcast", "/sms", "broadcast sms", "send cohort sms", "send group sms", "broadcast message", "sms cohort", "sms group", "message waitlist"]):
             segment = "waitlist_nosara" if "waitlist" in msg_lower else "pre_departure_cohort"
             payload = {
                 "campaign_name": f"{target_sanctuary.title()} Somatic Group Briefing",
@@ -763,7 +751,151 @@ class ClinicalCopilotAgent:
                 "approval_required": True
             }
 
+        # 8. Attendee Spreadsheet Row
+        if any(kw in msg_lower for kw in ["add attendee row", "new attendee row", "create attendee row", "/attendee", "add row"]):
+            name_match = re.search(r'(?:attendee|row|guest)(?:\s+(?:for|called|named)?\s*[:"\']?)([^,\'"\.\n]+)', message, re.IGNORECASE)
+            att_name = name_match.group(1).strip() if name_match else "New Retreat Attendee"
+            payload = {
+                "name": att_name,
+                "email": f"{att_name.lower().replace(' ', '.')}@example.com",
+                "sanctuary_slug": target_sanctuary,
+                "status": "Confirmed",
+                "group": "confirmed"
+            }
+            title = f"Add Attendee Row: {att_name}"
+            summary = f"Stage new attendee row for {att_name} in the Monday.com-style retreat guest spreadsheet."
+            return {
+                "form_type": "attendee_row",
+                "form_title": title,
+                "action_title": title,
+                "target_tab": "attendees",
+                "target_url": "/portal/crm?tab=spreadsheet&action=new-row",
+                "fields": payload,
+                "payload": payload,
+                "summary": summary,
+                "requires_approval": True,
+                "approval_required": True
+            }
+
+        # 9. Partner Studio Syndicate Lead
+        if any(kw in msg_lower for kw in ["add partner lead", "new partner lead", "register partner studio", "create partner lead", "/lead", "/syndicate"]):
+            name_match = re.search(r'(?:lead|studio|partner)(?:\s+(?:called|named)?\s*[:"\']?)([^,\'"\.\n]+)', message, re.IGNORECASE)
+            studio_name = name_match.group(1).strip() if name_match else "Elite Reformer Studio"
+            payload = {
+                "business_name": studio_name,
+                "location": "New York, NY",
+                "category": "Reformer Pilates & Somatics",
+                "contact_name": "Studio Director",
+                "email": "director@studio.com",
+                "commission_rate": 15.0
+            }
+            title = f"Register Partner Studio: {studio_name}"
+            summary = f"Stage referral syndicate partnership with {studio_name} at 15% contractual commission."
+            return {
+                "form_type": "partner_lead",
+                "form_title": title,
+                "action_title": title,
+                "target_tab": "leads",
+                "target_url": "/portal/leads",
+                "fields": payload,
+                "payload": payload,
+                "summary": summary,
+                "requires_approval": True,
+                "approval_required": True
+            }
+
+        # 10. Billing Folio / Executive Buyout Breakdown
+        if any(kw in msg_lower for kw in ["open billing folio", "view billing folio", "open folio", "folio breakdown", "/folio"]):
+            payload = {
+                "sanctuary_slug": target_sanctuary,
+                "type": "villa_buyout",
+                "deposit_terms": "30% Deposit / 70% Balance"
+            }
+            title = f"View Executive Billing Folio ({target_sanctuary.title()})"
+            summary = f"Open itemized billing folio and installment ledger for {target_sanctuary.title()} Sanctuary."
+            return {
+                "form_type": "billing_folio",
+                "form_title": title,
+                "action_title": title,
+                "target_tab": "billing",
+                "target_url": "/portal/crm?tab=billing",
+                "fields": payload,
+                "payload": payload,
+                "summary": summary,
+                "requires_approval": False,
+                "approval_required": False
+            }
+
         return None
+
+    @staticmethod
+    def _query_with_session(db, query_fn):
+        if db is not None:
+            return query_fn(db)
+        from backend.database import SessionLocal
+        with SessionLocal() as session:
+            return query_fn(session)
+
+    def _build_chauffeur_manifest(self, sanctuary_slug: str, s_cfg: Dict[str, Any], db: Optional[Any]) -> str:
+        """Run sheet from real ground transfer records only. Never fabricates guests, flights or drivers."""
+        from backend.sidecar.models import GroundTransferRecord
+
+        def _lines(session):
+            records = (
+                session.query(GroundTransferRecord)
+                .filter(GroundTransferRecord.sanctuary_slug == sanctuary_slug)
+                .order_by(GroundTransferRecord.pickup_time.asc())
+                .limit(30)
+                .all()
+            )
+            return [
+                f"* {r.pickup_time:%b %d %H:%M} | {r.guest_name} ({r.flight_number or 'no flight on file'}) | "
+                f"{r.vehicle_type} with {r.chauffeur_name} | {r.status}"
+                + (f" | Note: {r.chauffeur_notes}" if r.chauffeur_notes else "")
+                for r in records
+            ]
+
+        lines = self._query_with_session(db, _lines)
+        header = f"CHAUFFEUR DISPATCH MANIFEST ({s_cfg['airport']} -> {s_cfg['name']}):"
+        if not lines:
+            return f"{header}\n* No ground transfers are on file for this sanctuary yet. Do not invent guests, flights or drivers."
+        return "\n".join([header, *lines])
+
+    def _build_dietary_matrix(self, sanctuary_slug: str, s_cfg: Dict[str, Any], db: Optional[Any]) -> str:
+        """Dietary and allergen matrix from real intake disclosures only; safety data must never be invented."""
+        from backend.sidecar.models import StagingIntake
+
+        def _lines(session):
+            intakes = (
+                session.query(StagingIntake)
+                .filter(StagingIntake.sanctuary_slug == sanctuary_slug)
+                .order_by(StagingIntake.created_at.desc())
+                .limit(14)
+                .all()
+            )
+            rows = []
+            for intake in intakes:
+                wellness = intake.wellness_profile or {}
+                clinical = intake.clinical_profile or {}
+                diet = (
+                    wellness.get("nutrition_preferences") or wellness.get("dietary_preferences")
+                    or clinical.get("health_notes") or "No dietary notes on file"
+                )
+                screening = self.screen_contraindications(
+                    f"{clinical.get('health_notes') or ''} {clinical.get('allergies') or ''} {wellness.get('dietary_preferences') or ''}"
+                )
+                allergens = [f["condition"] for f in screening["findings"] if str(f.get("finding_id", "")).startswith("ALLERGY")]
+                rows.append(
+                    f"* {intake.client_name} ({intake.room_tier or 'room not set'}): {diet}"
+                    + (f" | ALLERGEN ALERT: {'; '.join(allergens)}" if allergens else "")
+                )
+            return rows
+
+        lines = self._query_with_session(db, _lines)
+        header = f"PRIVATE CHEF DIETARY MATRIX ({s_cfg['name']}), from guest disclosures on file:"
+        if not lines:
+            return f"{header}\n* No guest dietary records are on file for this sanctuary yet. Do not invent guests or allergies."
+        return "\n".join([header, *lines])
 
     def _synthesize_deterministic_response(
         self,
@@ -784,11 +916,11 @@ class ClinicalCopilotAgent:
         if safety_level == "CONTRAINDICATION_ALERT":
             findings = screening.get("findings", [])
             finding_text = ", ".join([f"{f.get('condition')} ({f.get('modality')})" for f in findings]) if findings else "Acute Clinical Condition"
-            parts.append("**[CONTRAINDICATION_ALERT] Clinical Alert Flagged for Kareena Islam, BSN, RN**")
-            parts.append(f"Clinical evaluation identified acute contraindications: **{finding_text}**.")
+            parts.append("**⚠️ Health Consideration Notice for Nurse Kareena Islam**")
+            parts.append(f"Health review identified special care considerations: **{finding_text}**.")
             for f in findings:
-                parts.append(f"• **Condition**: {f.get('condition')}\n• **Restricted Modality**: {f.get('modality')}\n• **Clinical Rationale**: {f.get('rationale')}\n• **Safe Somatic Adaptation**: {f.get('adaptation')}")
-            parts.append("All high-intensity modalities must be substituted with gentle parasympathetic pacing, titrated 4-7-8 vagal breathing, and 432Hz acoustic grounding under nurse supervision.")
+                parts.append(f"• **Condition**: {f.get('condition')}\n• **Restricted Activity**: {f.get('modality')}\n• **Nurse Reason**: {f.get('rationale')}\n• **Gentle Alternative**: {f.get('adaptation')}")
+            parts.append("For guest comfort and safety, we recommend replacing high-intensity activities with gentle 4-7-8 breathing, relaxing sound bowls, and personalized care under nurse guidance.")
 
         dining_tc = next((tc for tc in tool_calls if tc.get("tool") == "search_curated_dining"), None)
         if dining_tc and dining_tc.get("dining_spots"):
@@ -810,6 +942,30 @@ class ClinicalCopilotAgent:
         email_tc = next((tc for tc in tool_calls if tc.get("tool") == "draft_personalized_email"), None)
         if email_tc and email_tc.get("email_draft"):
             parts.append(email_tc["email_draft"])
+
+        finance_tc = next((tc for tc in tool_calls if tc.get("tool") == "compute_executive_finance_folio"), None)
+        if finance_tc and finance_tc.get("summary"):
+            parts.append(finance_tc["summary"])
+
+        radar_tc = next((tc for tc in tool_calls if tc.get("tool") == "generate_chauffeur_radar_manifest"), None)
+        if radar_tc and radar_tc.get("summary"):
+            parts.append(radar_tc["summary"])
+
+        b2b_tc = next((tc for tc in tool_calls if tc.get("tool") == "generate_b2b_syndicate_proposal"), None)
+        if b2b_tc and b2b_tc.get("summary"):
+            parts.append(b2b_tc["summary"])
+
+        chef_tc = next((tc for tc in tool_calls if tc.get("tool") == "generate_chef_dietary_matrix"), None)
+        if chef_tc and chef_tc.get("summary"):
+            parts.append(chef_tc["summary"])
+
+        booking_tc = next((tc for tc in tool_calls if tc.get("tool") in ["calculate_booking_quote", "parse_booking_request"]), None)
+        if booking_tc and booking_tc.get("summary"):
+            parts.append(f"### Retreat Booking & Payment Calculation\n{booking_tc['summary']}")
+
+        route_tc = next((tc for tc in tool_calls if tc.get("tool") == "calculate_dynamic_route"), None)
+        if route_tc:
+            parts.append(f"### Chauffeur Scenic Path\n• Route: {route_tc.get('origin')} &rarr; {route_tc.get('destination')} ({route_tc.get('distance_km')} km)")
 
         if matched_intake:
             w = getattr(matched_intake, "wellness_profile", {}) or {}
@@ -835,7 +991,7 @@ class ClinicalCopilotAgent:
     def process_chat(
         self,
         message: str,
-        mode: str = "clinical_safety",
+        mode: str = "omniscient",
         guest_context: Optional[Dict[str, Any]] = None,
         sanctuary_slug: Optional[str] = None,
         current_page: Optional[str] = None,
@@ -844,7 +1000,8 @@ class ClinicalCopilotAgent:
         stream: bool = False
     ) -> Dict[str, Any]:
         """
-        Dispatches incoming messages through the Groq-hosted LLM.
+        Dispatches incoming messages through the Groq-hosted LLM or Tier 3 Deterministic Engine.
+        Fluid, omniscient, and reactive to all commands across the 5 pillars.
         STRICT REQUIREMENT: ZERO SILENT FALLBACK TO CANNED RESPONSES.
         Guarantees clinical nursing safety guardrails, intimate group limits (12-14 guests),
         and founder approval invariants.
@@ -875,7 +1032,7 @@ class ClinicalCopilotAgent:
                 "model_used": "direct-tool-passthrough"
             }
 
-        # 1. Mandatory Clinical Screening (Deterministic Pre-Check)
+        # 1. Mandatory Clinical Screening (Deterministic Pre-Check - Fluid across all modes)
         screening = self.screen_contraindications(message)
         safety_level = None
         safety_screened = False
@@ -887,9 +1044,10 @@ class ClinicalCopilotAgent:
                 "tool": "screen_guest_contraindications",
                 "result": screening
             })
-        elif mode == "clinical_safety" and any(kw in msg_lower for kw in [
+        elif any(kw in msg_lower for kw in [
             "contraindication", "seizure", "epilepsy", "raynaud", "pregnant", "pregnancy",
-            "pacemaker", "ssri", "screen", "intake notes", "health review", "medical", "clearance"
+            "pacemaker", "ssri", "screen", "intake notes", "health review", "medical", "clearance",
+            "/clinical", "/screen", "/safety", "/triage"
         ]):
             safety_level = "CLEAR"
             safety_screened = True
@@ -1068,16 +1226,16 @@ class ClinicalCopilotAgent:
             g_intentions = c_prof.get("intentions") or guest_intentions
             guest_intentions = g_intentions
 
-            # Run clinical screening on the guest's profile
+            # Run clinical screening on the guest's profile (preserve any alert flagged from the prompt)
             if h_notes:
                 guest_screening = self.screen_contraindications(h_notes)
                 safety_screened = True
                 if guest_screening["safety_level"] != "CLEAR":
                     safety_level = guest_screening["safety_level"]
                     screening = guest_screening
-                else:
+                elif not safety_level:
                     safety_level = "CLEAR"
-            else:
+            elif not safety_level:
                 safety_screened = True
                 safety_level = "CLEAR"
 
@@ -1380,6 +1538,78 @@ class ClinicalCopilotAgent:
                     f"* Local Concierge Contact: {guide.local_concierge_phone}"
                 )
 
+        # Check for executive finance / buyout folio inquiries
+        if mode == "executive_finance" or any(kw in msg_lower for kw in ["folio", "buyout", "split folio", "installments", "wire reconciliation", "margins", "profitability", "gross margin", "finance"]):
+            s_cfg = ClinicalCopilotAgent.SANCTUARY_CONFIG.get(target_sanctuary, ClinicalCopilotAgent.SANCTUARY_CONFIG["nosara"])
+            guests_cnt = s_cfg["capacity_limit"]
+            total_gross = s_cfg["standard_6night_suite"] * guests_cnt
+            deposit_gross = round(total_gross * 0.30, 2)
+            balance_gross = round(total_gross * 0.70, 2)
+
+            folio_summary = (
+                f"EXECUTIVE FINANCE & VILLA BUYOUT FOLIO ({s_cfg['name']}):\n"
+                f"* Cohort Capacity: {guests_cnt} guests maximum (Strict Intimate Cap)\n"
+                f"* Total Buyout Gross: ${total_gross:,.2f} USD\n"
+                f"* Payment Installments (KAI CRM Native Vault):\n"
+                f"  - 30% Deposit Hold: ${deposit_gross:,.2f} USD (Authorized upon Founder Review)\n"
+                f"  - 70% Balance Due: ${balance_gross:,.2f} USD (Due 45 days pre-arrival)\n"
+                f"  - Average Per-Guest Apportionment: ${s_cfg['standard_6night_suite']:,.2f} USD (6-night restorative immersion)\n"
+                f"* Net Contribution Margin: not calculated; no actual cost data is on file for this cohort. Do not state a margin figure.\n"
+                f"* International Wire Settlement: Zero merchant surcharge via direct SWIFT/Fedwire settlement; optional PCI card vault authorization."
+            )
+            tool_calls.append({
+                "tool": "compute_executive_finance_folio",
+                "sanctuary": target_sanctuary,
+                "total_gross": total_gross,
+                "deposit_30": deposit_gross,
+                "balance_70": balance_gross,
+                "summary": folio_summary
+            })
+            domain_context_snippets.append(folio_summary)
+
+        # Check for flight radar / chauffeur run-sheet inquiries
+        if mode == "travel_logistics" or any(kw in msg_lower for kw in ["/radar", "/transit", "/chauffeur", "/flights", "waves", "chauffeur manifest", "whatsapp run-sheet", "cirium", "flight radar", "g650er", "part 135", "reroute", "lost luggage"]):
+            s_cfg = ClinicalCopilotAgent.SANCTUARY_CONFIG.get(target_sanctuary, ClinicalCopilotAgent.SANCTUARY_CONFIG["nosara"])
+            radar_summary = self._build_chauffeur_manifest(target_sanctuary, s_cfg, db)
+            tool_calls.append({
+                "tool": "generate_chauffeur_radar_manifest",
+                "sanctuary": target_sanctuary,
+                "airport": s_cfg["airport"],
+                "summary": radar_summary
+            })
+            domain_context_snippets.append(radar_summary)
+
+        # Check for B2B sales & syndicate inquiries
+        if mode == "b2b_sales" or any(kw in msg_lower for kw in ["/b2b", "/syndicate", "/sales", "/partners", "syndicate", "b2b", "reformer", "pilates", "commission agreement", "corporate burnout", "affiliate proposal"]):
+            b2b_summary = (
+                f"B2B STUDIO SYNDICATE & CORPORATE RETREAT PROPOSAL:\n"
+                f"* Partner Tier: Preferred Wellness Practice / Reformer Studio Syndicate\n"
+                f"* Revenue Share: 15% contractual referral commission ($1,470 – $2,175 per confirmed client reservation)\n"
+                f"* Partner Privileges: 48-hour priority pre-booking window for studio VIP clients before public cohort announcement\n"
+                f"* Corporate C-Suite Burnout Package (12 Executives):\n"
+                f"  - 6-Day Autonomic Circadian Recalibration Immersion\n"
+                f"  - Dedicated private Starlink executive workstations & quiet meeting decks\n"
+                f"  - 1-on-1 Nurse consultation & daily vagus nerve 4-7-8 somatic breathwork\n"
+                f"  - All-inclusive private chef organic nutrition, Grand Travel VIP flight coordination & luxury ground transit."
+            )
+            tool_calls.append({
+                "tool": "generate_b2b_syndicate_proposal",
+                "commission_rate": 15,
+                "summary": b2b_summary
+            })
+            domain_context_snippets.append(b2b_summary)
+
+        # Check for chef hospitality & dietary banquet matrix inquiries
+        if mode == "chef_hospitality" or any(kw in msg_lower for kw in ["/chef", "/dining", "/menu", "/dietary", "banquet matrix", "dietary matrix", "chef", "seed oil", "seed-oil", "celiac", "allium", "allergen matrix"]):
+            s_cfg = ClinicalCopilotAgent.SANCTUARY_CONFIG.get(target_sanctuary, ClinicalCopilotAgent.SANCTUARY_CONFIG["nosara"])
+            chef_summary = self._build_dietary_matrix(target_sanctuary, s_cfg, db)
+            tool_calls.append({
+                "tool": "generate_chef_dietary_matrix",
+                "sanctuary": target_sanctuary,
+                "summary": chef_summary
+            })
+            domain_context_snippets.append(chef_summary)
+
         # 4. Construct System Prompt for Qwen
         rag_context_str = "\n".join([f"* {m['title']}: {m['content']}" for m in rag_matches]) if rag_matches else "No specific knowledge seeds requested."
         domain_context_str = "\n".join(domain_context_snippets) if domain_context_snippets else "None specifically requested."
@@ -1398,17 +1628,25 @@ class ClinicalCopilotAgent:
             "* Clinical Screening: Not requested for this operational inquiry."
         )
 
-        system_prompt = f"""You are the AI Chief of Staff speaking DIRECTLY TO Kareena Islam (Founder & Director of KAI Wellness Retreats & Curated Travel).
-You are Kareena's executive right hand specializing in luxury restorative wellness, quiet travel curation, booking quotes (30% deposit / 70% balance at 45 days), supplier contracts, scenic travel routes, and sanctuary inquiries. Speak TO Kareena warmly, creatively, and hospitably. Never impersonate her.
+        system_prompt = f"""You are the Omniscient AI Chief of Staff & Operations Copilot speaking DIRECTLY TO Kareena Islam (Founder & Director of KAI Wellness Retreats & Curated Travel).
+You command deep expertise across the 5 Pillars of Sanctuary Operations:
+1. Executive Finance & Folios (buyout splits, 30% deposit / 70% balance schedules, wire settlement reconciliation, gross margins)
+2. Flight Radar & Travel Logistics (Cirium tracking, airport chauffeur waves, tarmac escorts, FAA Part 135 crew duty, 4WD mountain rerouting)
+3. B2B Sales & Studio Syndicates (reformer studios, functional medicine clinics, 15% referral commissions, executive burnout proposals)
+4. Private Chef & Kitchen Hospitality (dietary banquet matrices, seed-oil-free protocols, farm-to-table sourcing, allergen clearance)
+5. Clinical Somatic Safety (nurse protocols, 4-7-8 vagal pacing, 432Hz sound immersion, contraindication triage, medical handovers).
+
+Speak TO Kareena warmly, creatively, and hospitably. Never impersonate her.
+Use only guest names, flights, drivers, allergies, and figures present in the CONTEXT below. If something is not there, say it is not on file; never invent it.
 
 CORE RULES:
-1. PLATFORM IDENTITY: Wellness, rest, and luxury travel are KAI's primary focus. Clinical contraindication screening is an elevated specialized feature for guests with specific medical considerations—our base mission is restorative quietude, unbroken sleep, somatic vitality, and seamless Grand Travel logistics.
-2. INTIMATE GROUP LIMIT: 12-14 guests max per retreat to preserve intimate quietude.
-3. ZERO AUTONOMOUS WRITES: All actions require Kareena's 1-click approval via the Action Review Queue.
-4. KAI SANCTUARY CRM & GRAND TRAVEL: Payments, supplier contracts, PCI card auth handled natively in KAI CRM. ALWAYS bundle/mention Grand Travel & Cruise VIP flights, group air blocks, and tarmac transfers when discussing itineraries or sales.
+1. PLATFORM IDENTITY: Wellness, rest, luxury travel, and profitable sanctuary operations are KAI's focus. Clinical contraindication screening is an elevated specialized feature for guests with specific medical considerations.
+2. INTIMATE GROUP LIMIT: Strictly 12-14 guests max per retreat to preserve intimate quietude.
+3. ZERO AUTONOMOUS WRITES: All operational actions require Kareena's 1-click approval via the Action Review Queue.
+4. KAI SANCTUARY CRM & GRAND TRAVEL: Payments, supplier contracts, PCI card auth handled natively in KAI CRM. ALWAYS bundle/mention Grand Travel & Cruise VIP flights, group air blocks, and tarmac transfers.
 5. SOMATIC WELLNESS: Evidence-based vagal nerve guidance (4-7-8), acoustic resonance (432Hz/528Hz), anti-inflammatory Blue Zone nutrition. Never diagnose.
 
-ELEVATED SAFETY SCREENING (FEATURE):
+ELEVATED SAFETY SCREENING:
 {screening_summary_str}
 {f"ALERT: Safety Level {safety_level}. Highlight required modality adaptations." if safety_level and safety_level != 'CLEAR' else ""}
 
@@ -1422,7 +1660,10 @@ CONTEXT:
 FORMATTING:
 * NEVER start with a greeting card or self-introduction. Dive into the answer.
 * For dining: use '### Nourishing Dining'. For weather: use 'Sanctuary Microclimate & Breathwork Window'.
-* Be warm, serene, and hospitably insightful. Answer fully across all KAI wellness and travel operations."""
+* For finance: present exact numbers, deposit (30%), balance (70%), and margins.
+* For travel/radar: provide chauffeur wave breakdown and WhatsApp dispatch text.
+* For chef: format clear guest dietary matrix with replacements and seed-oil-free certification.
+* Be warm, serene, and hospitably insightful across all KAI business operations."""
 
         # 5. Multi-Tier AI Invocation (Tier 1: Groq LLM -> Tier 2: Deterministic Clinical Synthesis)
         model_used = settings.GROQ_MODEL

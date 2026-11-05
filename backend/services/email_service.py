@@ -1,3 +1,4 @@
+import html
 import logging
 import requests
 from typing import Dict, Any, List
@@ -22,6 +23,7 @@ MOVEMENT_LABELS = {
 
 def _send_smtp_email(to_emails: List[str], subject: str, html_content: str, display_name: str = "KAI Sanctuary Reservations") -> bool:
     import smtplib
+    import ssl
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
     from email.utils import formataddr
@@ -38,9 +40,14 @@ def _send_smtp_email(to_emails: List[str], subject: str, html_content: str, disp
         msg["To"] = ", ".join(to_emails)
         msg.attach(MIMEText(html_content, "html"))
 
-        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=12) as server:
-            if settings.SMTP_USE_TLS:
-                server.starttls()
+        tls_context = ssl.create_default_context()
+        if settings.SMTP_PORT == 465:
+            smtp_client = smtplib.SMTP_SSL(settings.SMTP_HOST, settings.SMTP_PORT, timeout=12, context=tls_context)
+        else:
+            smtp_client = smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=12)
+        with smtp_client as server:
+            if settings.SMTP_USE_TLS and settings.SMTP_PORT != 465:
+                server.starttls(context=tls_context)
             server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
             server.sendmail(settings.SMTP_USER, to_emails, msg.as_string())
         logger.info(f"[SMTP Live] Dispatched email to {to_emails} via {settings.SMTP_HOST} (From: {from_header})")
@@ -60,6 +67,8 @@ def _get_founder_recipients() -> List[str]:
 
 
 def send_booking_confirmation(booking_data: dict, retreat_info: dict) -> bool:
+    # Guest-supplied text goes into HTML email bodies below, so neutralize markup first.
+    booking_data = {k: html.escape(v, quote=False) if isinstance(v, str) else v for k, v in booking_data.items()}
     """
     Dispatches dual confirmation emails:
     1. Internal Founder Alert: Routed simultaneously to kareena@grandtravelcruise.com & armaan@grandtravelcruise.com
@@ -251,7 +260,7 @@ def send_booking_confirmation(booking_data: dict, retreat_info: dict) -> bool:
                     else:
                         logger.error(f"[Resend Error] Guest Confirmation failed ({res_guest.status_code}): {res_guest.text[:300]}")
                         # Customer confirmation delivery fallback:
-                        if founder_recipients:
+                        if founder_recipients and settings.ENVIRONMENT != "production":
                             mirror_payload = {
                                 "from": "KAI Concierge Desk <onboarding@resend.dev>",
                                 "to": founder_recipients,

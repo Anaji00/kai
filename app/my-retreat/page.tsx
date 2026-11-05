@@ -44,6 +44,7 @@ import {
   ExternalLink,
   X,
 } from "lucide-react";
+import { authFetch } from "@/lib/auth-fetch";
 
 // ──── Types ────
 
@@ -104,7 +105,7 @@ interface GuestPortalData {
   guest_name: string;
   sanctuary: SanctuaryData;
   room_tier: string;
-  weather: WeatherData;
+  weather: WeatherData | null;
   chauffeur: ChauffeurData;
   flight: FlightData | null;
   packing_list: string[];
@@ -305,13 +306,13 @@ function MyRetreatContent() {
     setError(null);
     try {
       const backendUrl = process.env.NEXT_PUBLIC_FASTAPI_BACKEND_URL || "";
-      const res = await fetch(`${backendUrl}/api/v1/sidecar/guest-portal/demo-token`, {
+      const res = await authFetch(`${backendUrl}/api/v1/sidecar/guest-portal/demo-token`, {
         method: "POST",
       });
       if (!res.ok) throw new Error("Backend unavailable");
       const json = await res.json();
       if (json.token) {
-        window.location.href = `/my-retreat?token=${encodeURIComponent(json.token)}`;
+        window.location.assign(`/my-retreat?token=${encodeURIComponent(json.token)}`);
       }
     } catch {
       setError("Unable to launch the demo companion right now. Please contact concierge@kaiwellnessretreats.com.");
@@ -322,28 +323,27 @@ function MyRetreatContent() {
   useEffect(() => {
     const backendUrl = process.env.NEXT_PUBLIC_FASTAPI_BACKEND_URL || "";
 
-    // Flow 1: Guest Token provided -> Fetch guest companion
+    // Flow 1: A magic link is exchanged once for a session cookie, then removed from the address bar.
     if (token) {
-      const fetchTokenData = async () => {
+      const exchangeToken = async () => {
         try {
-          const res = await fetch(`${backendUrl}/api/v1/sidecar/guest-portal/me?token=${encodeURIComponent(token)}`);
+          const res = await authFetch("/api/auth/guest/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ magic_token: token }),
+          });
           if (!res.ok) {
-            if (res.status === 401) {
-              setError("This magic link has expired. Please contact your KAI concierge for a new link.");
-            } else {
-              setError("Unable to load your retreat companion. Please try again later.");
-            }
+            setError("This link has expired. Please sign in with your email and booking reference.");
+            setLoading(false);
             return;
           }
-          const json = await res.json();
-          setData(json);
+          window.location.replace("/my-retreat");
         } catch {
           setError("Connection error. Please check your internet and try again.");
-        } finally {
           setLoading(false);
         }
       };
-      fetchTokenData();
+      exchangeToken();
       return;
     }
 
@@ -351,7 +351,7 @@ function MyRetreatContent() {
     if (ref) {
       const fetchProposalData = async () => {
         try {
-          const res = await fetch(`${backendUrl}/api/v1/sidecar/guest-portal/proposal?ref=${encodeURIComponent(ref)}`);
+          const res = await authFetch(`${backendUrl}/api/v1/sidecar/guest-portal/proposal?ref=${encodeURIComponent(ref)}`);
           if (!res.ok) {
             setError("We could not locate this sanctuary proposal. Please check your reservation link or contact concierge@kaiwellnessretreats.com.");
             return;
@@ -374,9 +374,22 @@ function MyRetreatContent() {
       return;
     }
 
-    // Flow 3: No token and no ref -> notify user
-    setError("No access token or proposal reference provided. Please use your personal sanctuary link.");
-    setLoading(false);
+    // Flow 3: Signed-in guest (proxy.ts already redirected anyone without a session).
+    const fetchSessionData = async () => {
+      try {
+        const res = await authFetch(`${backendUrl}/api/v1/sidecar/guest-portal/me`);
+        if (!res.ok) {
+          setError("Unable to load your retreat companion. Please try again later.");
+          return;
+        }
+        setData(await res.json());
+      } catch {
+        setError("Connection error. Please check your internet and try again.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchSessionData();
   }, [token, ref]);
 
   const togglePacking = (idx: number) => {
@@ -403,7 +416,7 @@ function MyRetreatContent() {
 
     try {
       const backendUrl = process.env.NEXT_PUBLIC_FASTAPI_BACKEND_URL || "";
-      const res = await fetch(`${backendUrl}/api/v1/sidecar/guest-portal/proposal/approve`, {
+      const res = await authFetch(`${backendUrl}/api/v1/sidecar/guest-portal/proposal/approve`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -470,7 +483,7 @@ function MyRetreatContent() {
                 Private Sanctuary Reservation Proposal
               </h1>
               <p className="text-xs text-sage/70 mt-1">
-                Curated for <span className="font-semibold text-sage">{proposal.guest_name}</span> &middot; Reference: <span className="font-mono text-terracotta">{proposal.ref}</span>
+                Prepared for <span className="font-semibold text-sage">{proposal.guest_name}</span> &middot; Reference: <span className="font-mono text-terracotta">{proposal.ref}</span>
               </p>
             </div>
 
@@ -537,7 +550,7 @@ function MyRetreatContent() {
           <div className="glass-card rounded-2xl p-6 sm:p-8 space-y-6">
             <div className="flex items-center justify-between border-b border-sand-border/60 pb-4">
               <div>
-                <h3 className="font-serif text-xl text-sage">Curated Daily Itinerary</h3>
+                <h3 className="font-serif text-xl text-sage">Daily Itinerary</h3>
                 <p className="text-xs text-sage/60">Circadian circadian rhythm optimization &amp; somatic restorativeness</p>
               </div>
               <span className="text-xs text-olive bg-olive-soft px-3 py-1 rounded-full font-medium">
@@ -883,6 +896,19 @@ function MyRetreatContent() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
           >
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await authFetch("/api/auth/guest/logout", { method: "POST" });
+                } finally {
+                  window.location.assign("/my-retreat/login");
+                }
+              }}
+              className="float-right rounded-full border border-linen/40 bg-sage-dark/40 px-3 py-1.5 text-[11px] text-linen hover:bg-sage-dark/70 transition-colors"
+            >
+              Sign out
+            </button>
             <span className="inline-block text-[10px] uppercase tracking-[0.3em] text-terracotta-light font-semibold mb-2">
               Your Sanctuary Companion
             </span>
@@ -931,6 +957,7 @@ function MyRetreatContent() {
               className="space-y-6"
             >
               {/* Weather Card */}
+              {weather && (
               <div className="glass-card rounded-2xl p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xs uppercase tracking-[0.2em] text-sage font-semibold">Live Sanctuary Weather</h2>
@@ -941,8 +968,8 @@ function MyRetreatContent() {
                 <div className="grid grid-cols-3 gap-4">
                   <div className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-sand/50">
                     <Thermometer className="h-5 w-5 text-terracotta" />
-                    <span className="font-serif text-2xl text-sage">{weather.temperature_celsius}&deg;</span>
-                    <span className="text-[10px] text-sage/60 uppercase tracking-wider">Celsius</span>
+                    <span className="font-serif text-2xl text-sage">{Math.round((weather.temperature_celsius * 9) / 5 + 32)}&deg;F</span>
+                    <span className="text-[10px] text-sage/60 uppercase tracking-wider">Now</span>
                   </div>
                   <div className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-sand/50">
                     <Droplets className="h-5 w-5 text-olive" />
@@ -965,6 +992,7 @@ function MyRetreatContent() {
                   </div>
                 )}
               </div>
+              )}
 
               {/* Wellness Focus */}
               <div className="glass-card rounded-2xl p-5 space-y-3">
@@ -1086,7 +1114,7 @@ function MyRetreatContent() {
               </div>
 
               {/* Breathwork Window */}
-              {weather.prana_breathwork_window && (
+              {weather?.prana_breathwork_window && (
                 <div className="glass-card rounded-2xl p-4 border-l-4 border-terracotta/40">
                   <span className="text-[10px] uppercase tracking-[0.2em] text-terracotta font-semibold block mb-1">
                     Today&apos;s Optimal Breathwork Window
@@ -1443,8 +1471,8 @@ function MyRetreatContent() {
                   </p>
                   <p className="text-xs text-sage/60 leading-relaxed">
                     {sound.frequency === 432
-                      ? "432Hz is associated with deep parasympathetic activation, promoting melatonin production and circadian rhythm re-alignment. Ideal for pre-sleep wind-down and long-haul travel."
-                      : "528Hz is known as the 'Love Frequency' and is associated with cellular repair, DNA healing, and stress reduction. Recommended for morning grounding and post-travel recovery."}
+                      ? "A low, steady tone. Many guests like it for winding down before bed or after a long trip."
+                      : "A slightly brighter tone. Many guests like it for a quiet moment in the morning."}
                   </p>
                 </div>
               </div>

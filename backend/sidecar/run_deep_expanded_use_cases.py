@@ -26,6 +26,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 from fastapi.testclient import TestClient
 
 from backend.main import app
+from backend.testing import admin_headers
 from backend.database import SessionLocal, init_db
 from backend.config import settings
 from backend.sidecar.models import (
@@ -38,11 +39,7 @@ from backend.sidecar.models import (
 )
 from backend.models import ActionDraft, CustomGroupInquiry
 
-ADMIN_USER = settings.ADMIN_USERNAME
-ADMIN_PASS = settings.ADMIN_PASSWORD
-AUTH_HEADER = {
-    "Authorization": f"Basic {base64.b64encode(f'{ADMIN_USER}:{ADMIN_PASS}'.encode()).decode()}"
-}
+AUTH_HEADER = admin_headers()
 
 
 def log_step(title: str, scenario: str):
@@ -441,7 +438,7 @@ def run_suite():
     res9_cohorts = client.get("/api/v1/sidecar/intakes/telemetry/cohorts")
     assert res9_cohorts.status_code == 200
     cohorts = res9_cohorts.json()
-    assert len(cohorts) == 4
+    assert len(cohorts) == 5
 
     nosara_c = next((c for c in cohorts if c["slug"] == "nosara"), None)
     amalfi_c = next((c for c in cohorts if c["slug"] == "amalfi"), None)

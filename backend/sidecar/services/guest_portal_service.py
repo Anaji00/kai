@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 from backend.config import settings
 from backend.database import SessionLocal
 from backend.sidecar.models import GuestPortalSession, GuestSomaticPulse, StagingIntake
+from backend.sidecar.services.dining_service import normalize_sanctuary_slug
 from backend.sidecar.services.weather_service import fetch_sanctuary_weather_sync
 from backend.sidecar.services.automation_generators import (
     generate_guest_flight_update_draft,
@@ -109,6 +110,65 @@ def generate_guest_magic_token(
     }
 
 
+def _guest_session_dict(rec: GuestPortalSession) -> Optional[Dict[str, Any]]:
+    """Session payload for a stored row, or None when it has expired."""
+    expires_at = rec.expires_at
+    if expires_at is not None:
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > expires_at:
+            return None
+    return {
+        "id": rec.id,
+        "intake_id": rec.intake_id,
+        "client_name": rec.client_name,
+        "email": rec.email,
+        "sanctuary_slug": rec.sanctuary_slug,
+        "room_tier": rec.room_tier,
+        "flight_request": rec.flight_request or {},
+        "wellness_profile": rec.wellness_profile or {},
+        "expires_at": rec.expires_at.isoformat() if rec.expires_at else None,
+    }
+
+
+def load_guest_session_by_id(session_id: Optional[str], db: Session) -> Optional[Dict[str, Any]]:
+    """Live, unrevoked guest session by id, used by the cookie-based guest guard."""
+    if not session_id:
+        return None
+    rec = db.query(GuestPortalSession).filter(
+        GuestPortalSession.id == session_id,
+        GuestPortalSession.is_revoked == False,
+    ).first()
+    return _guest_session_dict(rec) if rec else None
+
+
+def create_verified_guest_session(
+    db: Session,
+    guest_id: str,
+    client_name: str,
+    email: str,
+    sanctuary_slug: str,
+    room_tier: Optional[str],
+    expires_at: datetime,
+) -> GuestPortalSession:
+    """Session row for a guest who proved ownership with a one-time code. Its token hash is never issued."""
+    rec = GuestPortalSession(
+        token_hash=_hash_token(secrets.token_urlsafe(48)),
+        intake_id=guest_id,
+        client_name=client_name,
+        email=email,
+        sanctuary_slug=sanctuary_slug,
+        room_tier=room_tier or "Private Villa Sanctuary",
+        flight_request={},
+        wellness_profile={},
+        expires_at=expires_at,
+    )
+    db.add(rec)
+    db.commit()
+    db.refresh(rec)
+    return rec
+
+
 def validate_guest_token(token: str, db: Optional[Session] = None) -> Optional[Dict[str, Any]]:
     """
     Validates a magic-link token and returns guest session data, or None if invalid/expired/revoked.
@@ -122,30 +182,11 @@ def validate_guest_token(token: str, db: Optional[Session] = None) -> Optional[D
             GuestPortalSession.is_revoked == False
         ).first()
 
-    def _session_from_record(rec: GuestPortalSession) -> Optional[Dict[str, Any]]:
-        expires_at = rec.expires_at
-        if expires_at is not None:
-            if expires_at.tzinfo is None:
-                expires_at = expires_at.replace(tzinfo=timezone.utc)
-            if datetime.now(timezone.utc) > expires_at:
-                return None
-        return {
-            "id": rec.id,
-            "intake_id": rec.intake_id,
-            "client_name": rec.client_name,
-            "email": rec.email,
-            "sanctuary_slug": rec.sanctuary_slug,
-            "room_tier": rec.room_tier,
-            "flight_request": rec.flight_request or {},
-            "wellness_profile": rec.wellness_profile or {},
-            "expires_at": rec.expires_at.isoformat() if rec.expires_at else None,
-        }
-
     def _lookup(s: Session) -> Optional[Dict[str, Any]]:
         rec = _query_db(s)
         if not rec:
             return None
-        session_data = _session_from_record(rec)
+        session_data = _guest_session_dict(rec)
         if session_data:
             rec.last_accessed_at = datetime.now(timezone.utc)
             s.commit()
@@ -205,11 +246,42 @@ def revoke_guest_token(token_or_hash: str, db: Optional[Session] = None) -> bool
 # ──── Sanctuary Metadata (guest-safe, no internal operator data) ────
 
 SANCTUARY_GUEST_DATA = {
+    "puerto-vallarta": {
+        "sanctuary_name": "Marival Harmony: Banderas Bay Somatic & Cultural Awakening",
+        "destination": "Punta de Mita, Puerto Vallarta",
+        "country": "Mexico",
+        "dates": "January 28 – 31, 2027",
+        "duration": "4 Days / 3 Nights",
+        "gateway_airport": "PVR",
+        "gateway_airport_name": "Puerto Vallarta International Airport",
+        "transfer_vehicle": "Private coastal transfer",
+        "transfer_duration": "About 45 minutes from PVR",
+        "villa_name": "Marival Armony Luxury Resort & Suites, Punta de Mita",
+        "check_in_time": "Confirmed in your welcome note",
+        "check_out_time": "Confirmed in your welcome note",
+        "emergency_clinic": "Your KAI nurse and the resort front desk will share local clinic details on arrival",
+        "local_currency": "Mexican Peso (MXN) / USD widely accepted",
+        "hero_image": "https://images.unsplash.com/photo-1512813195386-6cf811ad3542?auto=format&fit=crop&w=1600&q=85",
+        "daily_schedule": [
+            {"time": "Jan 28", "activity": "Arrival, private transfer from PVR, sunset restorative Yin & cacao intention ceremony", "icon": "sunrise"},
+            {"time": "Jan 29", "activity": "Sunrise vinyasa over Banderas Bay, founders seminar, Wixárika cultural integration & starlight sound bath", "icon": "yoga"},
+            {"time": "Jan 30", "activity": "Coastal mobility & ocean immersion, culinary masterclass, 1-on-1 check-ins & farewell banquet", "icon": "waves"},
+            {"time": "Jan 31", "activity": "Sunrise gratitude meditation, farewell brunch & private transfer to PVR", "icon": "leaf"},
+        ],
+        "packing_essentials": [
+            "2–3 sets of breathable yoga & somatic movement attire",
+            "A light cardigan, kimono, or wrap for evening sound baths & coastal breezes",
+            "2 swimsuits for the pools, spa hydrotherapy & Banderas Bay immersion",
+            "Reef-safe mineral sunscreen (SPF 30+), polarized sunglasses & wide-brim sun hat",
+            "Supportive walking sandals and slip-on beach footwear",
+            "Valid passport (6+ months validity) and a reusable insulated water bottle",
+        ],
+    },
     "nosara": {
         "sanctuary_name": "Canopy & Ocean Somatic Alignment",
         "destination": "Nosara, Guanacaste",
         "country": "Costa Rica",
-        "dates": "February 18 – 24, 2027",
+        "dates": "Coming Soon • Dates to be confirmed",
         "duration": "7 Days / 6 Nights",
         "gateway_airport": "SJO / LIR",
         "gateway_airport_name": "Juan Santamaría International / Daniel Oduber Quirós",
@@ -249,7 +321,7 @@ SANCTUARY_GUEST_DATA = {
         "sanctuary_name": "Mediterranean Longevity & Coastal Stillness",
         "destination": "Amalfi Coast, Campania",
         "country": "Italy",
-        "dates": "May 10 – 16, 2027",
+        "dates": "Coming Soon • Dates to be confirmed",
         "duration": "7 Days / 6 Nights",
         "gateway_airport": "NAP",
         "gateway_airport_name": "Naples International Airport",
@@ -289,7 +361,7 @@ SANCTUARY_GUEST_DATA = {
         "sanctuary_name": "Deep Somatic Healing & Water Cleansing",
         "destination": "Ubud & Sidemen Valley",
         "country": "Indonesia",
-        "dates": "September 14 – 22, 2027",
+        "dates": "Coming Soon • Dates to be confirmed",
         "duration": "9 Days / 8 Nights",
         "gateway_airport": "DPS",
         "gateway_airport_name": "Ngurah Rai International Airport, Denpasar",
@@ -329,7 +401,7 @@ SANCTUARY_GUEST_DATA = {
         "sanctuary_name": "Oceanfront Autonomic Reset",
         "destination": "Riviera Maya, Quintana Roo",
         "country": "Mexico",
-        "dates": "October 1 – 4, 2026",
+        "dates": "Coming Soon • Dates to be confirmed",
         "duration": "4 Days / 3 Nights",
         "gateway_airport": "CUN",
         "gateway_airport_name": "Cancún International Airport",
@@ -367,27 +439,57 @@ SANCTUARY_GUEST_DATA = {
     },
 }
 
+BESPOKE_GUEST_DATA = {
+    "sanctuary_name": "Your Bespoke KAI Retreat",
+    "destination": "Details being finalized",
+    "country": "",
+    "dates": "Dates to be confirmed by your concierge",
+    "duration": "",
+    "gateway_airport": "your arrival airport",
+    "gateway_airport_name": "To be confirmed",
+    "transfer_vehicle": "Private transfer",
+    "transfer_duration": "To be confirmed",
+    "villa_name": "To be confirmed",
+    "check_in_time": "To be confirmed",
+    "check_out_time": "To be confirmed",
+    "emergency_clinic": "Your KAI nurse will share local clinic details before arrival",
+    "local_currency": "To be confirmed",
+    "hero_image": SANCTUARY_GUEST_DATA["puerto-vallarta"]["hero_image"],
+    "daily_schedule": [],
+    "packing_essentials": [],
+}
 
-def get_guest_portal_data(token: str, db: Optional[Session] = None) -> Optional[Dict[str, Any]]:
+
+def get_guest_portal_data(token: Optional[str], db: Optional[Session] = None, guest_session: Optional[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
     """
     Returns the full guest companion portal payload.
     Combines sanctuary metadata, live weather, flight info, and somatic schedule.
     Strips all internal/clinical/financial data.
     """
-    session = validate_guest_token(token, db=db)
+    session = guest_session or (validate_guest_token(token, db=db) if token else None)
     if not session:
         return None
 
-    slug = session.get("sanctuary_slug", "nosara")
-    sanctuary = SANCTUARY_GUEST_DATA.get(slug, SANCTUARY_GUEST_DATA["nosara"])
+    slug = normalize_sanctuary_slug(session.get("sanctuary_slug")) or ""
+    # Never show one retreat's dates and logistics to a guest of another; bespoke trips get a neutral view.
+    sanctuary = SANCTUARY_GUEST_DATA.get(slug) or BESPOKE_GUEST_DATA
     wellness = session.get("wellness_profile", {})
     flight = session.get("flight_request", {})
 
-    # Fetch live weather
-    try:
-        weather = fetch_sanctuary_weather_sync(slug)
-    except Exception:
-        weather = {"temperature_celsius": 27.0, "humidity_percent": 70, "uv_index": 8.0, "condition": "Peaceful Coastal Breezes"}
+    # Fetch live weather. A bespoke trip has no confirmed location yet, so it shows none rather than another retreat's.
+    weather = None
+    if slug in SANCTUARY_GUEST_DATA:
+        try:
+            weather = fetch_sanctuary_weather_sync(slug)
+            # The companion page reads these names; the weather service reports current_temp_c, humidity, conditions.
+            weather = {
+                **weather,
+                "temperature_celsius": weather.get("current_temp_c"),
+                "humidity_percent": weather.get("humidity"),
+                "condition": weather.get("conditions"),
+            }
+        except Exception as e:
+            logger.warning(f"Guest companion weather unavailable: {e}")
 
     # Build chauffeur info
     chauffeur = {
@@ -427,7 +529,9 @@ def get_guest_portal_data(token: str, db: Optional[Session] = None) -> Optional[
 
 
 def record_guest_somatic_pulse(
-    token: str,
+    token: Optional[str],
+    guest_session: Optional[Dict[str, Any]] = None,
+    *,
     day_number: int,
     phase: str,
     restorative_sleep_score: int,
@@ -440,7 +544,7 @@ def record_guest_somatic_pulse(
     Records an in-stay subjective somatic pulse reported by a guest.
     Feeds directly into the Clinical Copilot briefing and 30-day continuity arcs.
     """
-    session = validate_guest_token(token, db=db)
+    session = guest_session or (validate_guest_token(token, db=db) if token else None)
     if not session:
         raise ValueError("Invalid or expired guest session token.")
 
@@ -502,7 +606,9 @@ def get_guest_somatic_pulses(intake_id: str, db: Optional[Session] = None) -> Li
 
 
 def submit_guest_flight_update(
-    token: str,
+    token: Optional[str],
+    guest_session: Optional[Dict[str, Any]] = None,
+    *,
     flight_number: str,
     delay_minutes: int,
     gate: Optional[str] = None,
@@ -513,7 +619,7 @@ def submit_guest_flight_update(
     Stages an ActionDraft for Grand Travel chauffeur recalibration when a guest reports a flight delay.
     Zero Autonomous Writes: routes strictly to review queue for Kareena's 1-click authorization.
     """
-    session = validate_guest_token(token, db=db)
+    session = guest_session or (validate_guest_token(token, db=db) if token else None)
     if not session:
         raise ValueError("Invalid or expired guest session token.")
 
@@ -540,7 +646,9 @@ def submit_guest_flight_update(
 
 
 def submit_guest_dietary_update(
-    token: str,
+    token: Optional[str],
+    guest_session: Optional[Dict[str, Any]] = None,
+    *,
     dietary_tags: List[str],
     allergies: Optional[str] = None,
     special_chef_notes: Optional[str] = None,
@@ -550,7 +658,7 @@ def submit_guest_dietary_update(
     Stages an ActionDraft for executive chef culinary briefing.
     Zero Autonomous Writes: Nurse Kareena verifies before culinary profile is updated.
     """
-    session = validate_guest_token(token, db=db)
+    session = guest_session or (validate_guest_token(token, db=db) if token else None)
     if not session:
         raise ValueError("Invalid or expired guest session token.")
 

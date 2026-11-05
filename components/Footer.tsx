@@ -5,12 +5,17 @@ import Link from "next/link";
 import { Compass, ArrowRight, CheckCircle2, Loader2 } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { subscribeNewsletter } from "@/app/actions/booking";
+import { usePathname } from "next/navigation";
 
 export default function Footer() {
+  const pathname = usePathname();
   const [state, formAction, isPending] = useActionState(subscribeNewsletter, {
     success: false,
     message: "",
   });
+
+  // The portal has its own footer.
+  if (pathname === "/portal" || pathname.startsWith("/portal/")) return null;
 
   return (
     <footer className="border-t border-sand-border bg-sand/60 text-sage pt-16 pb-12">
@@ -38,7 +43,7 @@ export default function Footer() {
             </p>
 
             <p className="text-xs leading-relaxed text-sage/75">
-              Immersive somatic sanctuaries thoughtfully curated by Kareena Islam. Rooted in restorative wellness science, anatomical yoga, crystal sound resonance, and high-touch luxury travel.
+              Small wellness retreats led by Kareena Islam, BSN, RN, and Armaan Islam, with yoga, sound baths, cultural experiences, and travel support from Grand Travel & Cruise.
             </p>
 
             {/* Social & Partner Badges */}
@@ -77,23 +82,28 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/retreats/puerto-vallarta-mexico-2027" className="hover:text-terracotta transition-colors">
+                  Puerto Vallarta, Mexico (Jan 28–31, 2027)
+                </Link>
+              </li>
+              <li>
                 <Link href="/book?retreat=nosara-2027" className="hover:text-terracotta transition-colors">
-                  Nosara, Costa Rica (Feb 2027)
+                  Nosara, Costa Rica (Coming Soon)
                 </Link>
               </li>
               <li>
                 <Link href="/book?retreat=amalfi-2027" className="hover:text-terracotta transition-colors">
-                  Amalfi Coast, Italy (May 2027)
+                  Amalfi Coast, Italy (Coming Soon)
                 </Link>
               </li>
               <li>
                 <Link href="/book?retreat=bali-2027" className="hover:text-terracotta transition-colors">
-                  Ubud & Sidemen, Bali (Sep 2027)
+                  Ubud & Sidemen, Bali (Coming Soon)
                 </Link>
               </li>
               <li>
                 <Link href="/book?retreat=riviera-2026" className="hover:text-terracotta transition-colors">
-                  Riviera Maya, Mexico (Fall 2026)
+                  Riviera Maya, Mexico (Coming Soon)
                 </Link>
               </li>
               <li>
@@ -184,7 +194,7 @@ export default function Footer() {
                   </button>
                 </div>
                 <span className="block text-[10px] text-sage/60">
-                  Zero spam. Sacred privacy. Unsubscribe at any time.
+                  Occasional updates only. Unsubscribe at any time.
                 </span>
               </form>
             )}
@@ -194,7 +204,7 @@ export default function Footer() {
               <Compass className="h-5 w-5 text-terracotta shrink-0 mt-0.5" />
               <div>
                 <span className="font-medium text-sage block">
-                  Curated with Grand Travel & Cruise
+                  Planned with Grand Travel & Cruise
                 </span>
                 <span className="text-[11px] text-sage/70">
                   25+ years of luxury travel mastery. <em>Future Leaders in Travel</em> Honoree.

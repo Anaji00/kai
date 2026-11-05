@@ -1,7 +1,9 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, File, UploadFile
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timezone
+import json
 import re
 
 from backend.database import get_db
@@ -26,7 +28,8 @@ from backend.sidecar.services.thesis_rag import (
 from backend.sidecar.services.crm_client import crm_client
 from backend.sidecar.services.voice_transcriber import extract_entities_from_transcript
 from backend.sidecar.services.llm_service import transcribe_audio, LLMServiceError
-from backend.sidecar.routers.webhooks import verify_admin
+from backend.dependencies.auth import get_current_admin
+from backend.services.auth_service import AdminPrincipal, record_audit
 
 router = APIRouter(prefix="/intakes", tags=["KAI Sanctuary CRM: Guest Inquiries & Guides"])
 
@@ -51,17 +54,24 @@ def create_staged_intake(
 
     seed_sanctuary_knowledge(db)
 
+    wellness_prof = payload.wellness_profile or {}
+    clin_prof = payload.clinical_profile or {}
+    screening_enabled = payload.clinical_screening_enabled or bool(clin_prof)
+
+    # MANDATORY INVARIANT: Deterministic clinical evaluation runs synchronously FIRST
+    from backend.sidecar.services.clinical_governance_engine import (
+        attach_clinical_evaluation,
+        HITLDraftConcurrencyGuard,
+    )
+
     thesis = generate_pre_call_thesis(
         client_name=payload.client_name,
         sanctuary_slug=payload.sanctuary_slug or "nosara",
         room_tier=payload.room_tier or "Private Ocean Canopy Villa",
-        clinical_profile=payload.clinical_profile or {},
+        clinical_profile=clin_prof,
         flight_request=payload.flight_request
     )
-
-    wellness_prof = payload.wellness_profile or {}
-    clin_prof = payload.clinical_profile or {}
-    screening_enabled = payload.clinical_screening_enabled or bool(clin_prof)
+    thesis, clinical_report = attach_clinical_evaluation(thesis, payload.client_name, target_slug, clin_prof, wellness_prof)
 
     intake = StagingIntake(
         client_name=payload.client_name,
@@ -80,12 +90,29 @@ def create_staged_intake(
     db.commit()
     db.refresh(intake)
 
-    # Push auto task to Action Drafts review queue
+    # Compute entity version hash for Cryptographic OCC
+    intake_snapshot = {
+        "id": str(intake.id),
+        "client_name": intake.client_name,
+        "email": intake.email,
+        "phone": intake.phone,
+        "sanctuary_slug": intake.sanctuary_slug,
+        "room_tier": intake.room_tier,
+        "status": intake.status,
+    }
+    intake_occ_hash = HITLDraftConcurrencyGuard.compute_entity_hash(intake_snapshot)
+
+    # Push auto task to Action Drafts review queue with OCC hash
     from backend.models import ActionDraft
+    draft_prefix = "[CLINICAL HOLD] " if clinical_report.hard_hold else ""
     draft = ActionDraft(
         type="guest_intake",
         guest_name=payload.client_name,
-        content=f"Restorative guest intake staged for {payload.client_name} ({payload.sanctuary_slug or 'nosara'}). Status: PENDING_APPROVAL. Awaiting founder review and Sanctuary CRM commitment."
+        content=f"{draft_prefix}Restorative guest intake staged for {payload.client_name} ({payload.sanctuary_slug or 'nosara'}). Status: PENDING_APPROVAL. Awaiting founder review and Sanctuary CRM commitment.",
+        target_entity_type="staging_intakes",
+        target_entity_id=str(intake.id),
+        target_entity_version_hash=intake_occ_hash,
+        staged_patch_json=json.dumps({"base": intake_snapshot}, default=str),
     )
     db.add(draft)
     db.commit()
@@ -113,13 +140,9 @@ async def transcribe_voice_memo(file: UploadFile = File(...)):
             filename=file.filename or "voice-memo.webm",
             prompt="KAI Wellness Retreats founder voice note about a guest: names, retreat dates, rooms, flights, dietary needs.",
         )
-    except LLMServiceError:
-        transcript = (
-            "Consultation note recorded by Kareena Islam: Spoke with guest Elena Vance regarding our First Retreat of 2027 "
-            "at Marival Harmony in Puerto Vallarta (January 28–31, 2027). She is flying out of IAH Houston, wants the "
-            "Marival Harmony Oceanfront Suite, eats gluten-free and anti-inflammatory coastal cuisine, and wants deep "
-            "vagal nerve restoration, 432Hz crystal bowl sound baths, and Armaan's endurance mobility session."
-        )
+    except LLMServiceError as e:
+        # Never substitute sample text: it would be staged as a real guest's record.
+        raise HTTPException(status_code=502, detail=f"{e.message} {e.diagnostic_hint}")
     if not transcript:
         raise HTTPException(status_code=422, detail="No speech was detected in the recording.")
     return {"transcript": transcript}
@@ -157,6 +180,13 @@ def stage_intake_from_voice_memo(
         clinical_profile=extracted["clinical_profile"],
         flight_request=extracted["flight_request"]
     )
+    from backend.sidecar.services.clinical_governance_engine import attach_clinical_evaluation
+    thesis, clinical_report = attach_clinical_evaluation(
+        thesis, extracted["client_name"], extracted["sanctuary_slug"],
+        extracted["clinical_profile"], extracted["wellness_profile"],
+    )
+    if clinical_report.hard_hold:
+        extracted["clinical_screening_enabled"] = True
 
     intake = StagingIntake(
         client_name=extracted["client_name"],
@@ -523,6 +553,11 @@ def commit_intake_to_crm(
     if not intake:
         raise HTTPException(status_code=404, detail="Staged intake not found")
 
+    from backend.sidecar.services.clinical_governance_engine import active_clinical_hold, clinical_hold_conflict
+    hold = active_clinical_hold(intake.consultation_thesis)
+    if hold:
+        raise HTTPException(status_code=409, detail=clinical_hold_conflict(hold))
+
     # If thesis wasn't generated yet, generate now
     if not intake.consultation_thesis:
         intake.consultation_thesis = generate_pre_call_thesis(
@@ -574,11 +609,49 @@ def commit_intake_to_crm(
 
 
 
+class ClinicalHoldOverrideRequest(BaseModel):
+    reason: str = Field(..., min_length=10, max_length=2000, description="Nurse clearance notes")
+
+
+@router.post("/{intake_id}/clinical-hold/override")
+def override_clinical_hold(
+    intake_id: str,
+    payload: ClinicalHoldOverrideRequest,
+    db: Session = Depends(get_db),
+    operator: AdminPrincipal = Depends(get_current_admin)
+):
+    """Records a nurse clearance against a clinical hold, attributed to the signed-in operator."""
+    intake = db.query(StagingIntake).filter(StagingIntake.id == intake_id).first()
+    if not intake:
+        raise HTTPException(status_code=404, detail="Intake not found")
+    from backend.sidecar.services.clinical_governance_engine import active_clinical_hold
+    evaluation = active_clinical_hold(intake.consultation_thesis)
+    if not evaluation:
+        raise HTTPException(status_code=409, detail="This intake has no active clinical hold.")
+
+    cleared_at = datetime.now(timezone.utc).isoformat()
+    thesis = dict(intake.consultation_thesis)
+    thesis["clinical_hold_override"] = {
+        "operator_id": operator.id,
+        "operator_email": operator.email,
+        "reason": payload.reason,
+        "cleared_at": cleared_at,
+        "deterministic_hash": evaluation.get("deterministic_hash"),
+    }
+    intake.consultation_thesis = thesis
+    record_audit(db, operator, "clinical_hold.override", "staging_intake", intake.id, {
+        "reason": payload.reason,
+        "blocked_modalities": evaluation.get("blocked_modalities", []),
+    }, commit=False)
+    db.commit()
+    return {"success": True, "intake_id": intake.id, "cleared_by": operator.email, "cleared_at": cleared_at}
+
+
 @router.post("/{intake_id}/generate-plan")
 def generate_staff_retreat_plan(
     intake_id: str,
     db: Session = Depends(get_db),
-    _admin: str = Depends(verify_admin)
+    _admin: AdminPrincipal = Depends(get_current_admin)
 ):
     """
     Dedicated Staff Portal API Route: Executes LLM plan & clinical thesis generation
@@ -609,6 +682,13 @@ def generate_staff_retreat_plan(
         flight_request=intake.flight_request
     )
     thesis["llm_suggested_plan"] = suggested_plan
+    from backend.sidecar.services.clinical_governance_engine import attach_clinical_evaluation
+    thesis, _ = attach_clinical_evaluation(
+        thesis, intake.client_name, intake.sanctuary_slug or "", clin, intake.wellness_profile,
+    )
+    prior_override = (intake.consultation_thesis or {}).get("clinical_hold_override")
+    if prior_override:
+        thesis["clinical_hold_override"] = prior_override
     intake.consultation_thesis = thesis
     db.commit()
     db.refresh(intake)

@@ -131,7 +131,7 @@ export default function TripOperationsDrawer({
         pilot_duty_hours: pilotDutyHours,
       });
       notifyDraft(
-        `Private Charter Manifest (${res.tail_number}): Gross Payload ${res.gross_payload_lbs}/${res.max_payload_lbs} lbs, Crew Duty ${res.crew_duty_hours}h — Dispatch ${res.dispatch_approved ? "APPROVED" : "HOLD: RELIEF CREW REQUIRED"} (Draft #${res.draft_id}).`
+        `Private Flight Manifest (${res.tail_number}): Total Weight ${res.gross_payload_lbs}/${res.max_payload_lbs} lbs, Pilot Hours ${res.crew_duty_hours}h — Status: ${res.dispatch_approved ? "APPROVED" : "HOLD: RELIEF PILOT REQUIRED"} (Draft #${res.draft_id}).`
       );
       onRefresh();
     } catch (err: unknown) {

@@ -10,7 +10,9 @@ import {
   AlertTriangle,
   Activity,
   Stethoscope,
+  Sparkles,
 } from "lucide-react";
+import { triggerExplainThis } from "@/lib/portal-form-bus";
 import {
   CRMClientItem,
   CRMTripItem,
@@ -254,7 +256,7 @@ export default function ClinicalSafetyTelemetryTab({
         </div>
         <div>
           <label className="block text-[10px] font-mono uppercase font-bold text-[#2D3E35] mb-1">
-            Target Sanctuary Sub-Trip (Emergency &amp; Telemetry Link)
+            Retreat Stay (Emergency &amp; Medical Contact Link)
           </label>
           <select
             value={activeTrip?.id || ""}
@@ -270,25 +272,25 @@ export default function ClinicalSafetyTelemetryTab({
         </div>
       </div>
 
-      {/* Row 1: Pre-Arrival Clinical Contraindication + In-Stay Somatic Pulse */}
+      {/* Row 1: Pre-Arrival Health & Medical Check + Daily Wellness Pulse */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Card 1: Pre-Arrival Clinical Contraindication Scanner */}
+        {/* Card 1: Pre-Arrival Health Scanner */}
         <div className="bg-white p-5 rounded-xl border border-[#E5DDD0] shadow-xs space-y-4 flex flex-col justify-between">
           <div className="space-y-3">
             <div className="flex items-center justify-between border-b border-[#E5DDD0] pb-3">
               <div className="flex items-center space-x-2">
                 <Stethoscope className="w-4 h-4 text-[#2D3E35]" />
                 <h3 className="font-serif text-base font-bold text-[#2D3E35]">
-                  Pre-Arrival Clinical Contraindication Triage
+                  Pre-Arrival Health &amp; Medical Safety Check
                 </h3>
               </div>
               <span className="text-[10px] font-mono bg-emerald-50 text-emerald-900 border border-emerald-200 px-2 py-0.5 rounded">
-                RN Protocol Gate
+                Nurse Health Review
               </span>
             </div>
 
             <p className="text-xs text-[#5C6B5E]">
-              Scans guest health notes and medical intake history for cardiovascular arrhythmias, pregnancy, severe anaphylaxis, and cervical/lumbar spine contraindications.
+              Scans guest health notes and medical intake history for allergies, medications, cardiovascular conditions, pregnancy, or joint limitations to recommend safe retreat activities.
             </p>
 
             {clinicalTriageRes && (
@@ -303,15 +305,33 @@ export default function ClinicalSafetyTelemetryTab({
                   {clinicalTriageRes.clinical_flags.map((f, i) => (
                     <span
                       key={i}
-                      className="px-2 py-0.5 rounded bg-rose-50 border border-rose-200 text-rose-900 font-mono text-[10px]"
+                      className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-rose-50 border border-rose-200 text-rose-900 font-mono text-[10px]"
                     >
-                      {f}
+                      <span>{f}</span>
+                      <button
+                        type="button"
+                        onClick={() => triggerExplainThis(`Explain clinical contraindication flag: ${f} for guest ${clinicalTriageRes.client_name}. Detail underlying physiological mechanisms, contraindicated somatic modalities, and safe clinical alternatives.`, "clinical_safety")}
+                        className="text-amber-800 hover:text-amber-950 font-sans font-bold underline pl-1 cursor-pointer"
+                        title="Explain this clinical flag"
+                      >
+                        Explain
+                      </button>
                     </span>
                   ))}
                 </div>
                 <ul className="list-disc list-inside text-[11px] text-[#5C6B5E] space-y-0.5">
                   {clinicalTriageRes.contraindications.map((c, i) => (
-                    <li key={i}>{c}</li>
+                    <li key={i} className="flex items-center justify-between">
+                      <span>{c}</span>
+                      <button
+                        type="button"
+                        onClick={() => triggerExplainThis(`Explain contraindicated somatic modality: ${c} for guest ${clinicalTriageRes.client_name}. What is the evidence-based protocol?`, "clinical_safety")}
+                        className="inline-flex items-center space-x-1 px-1.5 py-0.2 rounded bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 text-[10px] font-medium"
+                      >
+                        <Sparkles className="w-2.5 h-2.5 text-amber-700" />
+                        <span>Explain</span>
+                      </button>
+                    </li>
                   ))}
                 </ul>
               </div>
@@ -323,7 +343,7 @@ export default function ClinicalSafetyTelemetryTab({
             disabled={busy !== null || !activeClient}
             className="w-full py-2 rounded-lg bg-[#2D3E35] hover:bg-[#1f2c25] text-[#FAF7F2] text-xs font-semibold transition-colors cursor-pointer"
           >
-            {busy === "prearrival" ? "Scanning Medical Dossier..." : "Run RN Clinical Contraindication Audit"}
+            {busy === "prearrival" ? "Checking Health Notes..." : "Run Nurse Health & Safety Check"}
           </button>
         </div>
 
@@ -333,7 +353,7 @@ export default function ClinicalSafetyTelemetryTab({
             <div className="flex items-center space-x-2">
               <Activity className="w-4 h-4 text-[#C07D63]" />
               <h3 className="font-serif text-base font-bold text-[#2D3E35]">
-                In-Stay Somatic Pulse Dysautonomia Triage
+                In-Stay Guest Daily Vitality &amp; Nervous System Check
               </h3>
             </div>
             <span className="text-[10px] font-mono bg-amber-50 text-amber-900 border border-amber-200 px-2 py-0.5 rounded">
@@ -394,8 +414,18 @@ export default function ClinicalSafetyTelemetryTab({
 
           {pulseRes && (
             <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs space-y-1">
-              <div className="font-bold text-amber-950">
-                Alert: {pulseRes.alert_level} &middot; Status: {pulseRes.triage_status}
+              <div className="flex items-center justify-between">
+                <div className="font-bold text-amber-950">
+                  Alert: {pulseRes.alert_level} &middot; Status: {pulseRes.triage_status}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => triggerExplainThis(`Explain somatic pulse alert: ${pulseRes.alert_level} (${pulseRes.triage_status}). Protocol: ${pulseRes.contraindication_protocol}. What autonomic nervous system indicators are driving this?`, "clinical_safety")}
+                  className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded bg-amber-200 hover:bg-amber-300 text-amber-900 text-[10px] font-semibold cursor-pointer"
+                >
+                  <Sparkles className="w-2.5 h-2.5 text-amber-800" />
+                  <span>Explain Telemetry</span>
+                </button>
               </div>
               <div className="text-[11px] text-amber-900">{pulseRes.contraindication_protocol}</div>
             </div>
@@ -472,8 +502,18 @@ export default function ClinicalSafetyTelemetryTab({
           </form>
 
           {thermalRes && (
-            <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-950">
-              <strong>{thermalRes.alert_level}:</strong> {thermalRes.protocol_lockout} (Draft #{thermalRes.draft_id})
+            <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-950 flex items-center justify-between">
+              <div>
+                <strong>{thermalRes.alert_level}:</strong> {thermalRes.protocol_lockout} (Draft #{thermalRes.draft_id})
+              </div>
+              <button
+                type="button"
+                onClick={() => triggerExplainThis(`Explain thermal shock and hypoxia escalation: ${thermalRes.alert_level}. Protocol: ${thermalRes.protocol_lockout}. What physiological hypothermia/hypoxia criteria triggered this lockout?`, "clinical_safety")}
+                className="inline-flex items-center space-x-1 px-1.5 py-0.5 rounded bg-blue-200 hover:bg-blue-300 text-blue-950 text-[10px] font-semibold cursor-pointer shrink-0 ml-2"
+              >
+                <Sparkles className="w-2.5 h-2.5 text-blue-800" />
+                <span>Explain</span>
+              </button>
             </div>
           )}
         </div>

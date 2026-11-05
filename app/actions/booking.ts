@@ -5,6 +5,16 @@ import crypto from "crypto";
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
 
+// Guest input is untrusted: escape it before it reaches any HTML email.
+function escapeHtml(value: string | undefined | null): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 async function sendEmailViaSmtp(options: {
   to: string[];
   subject: string;
@@ -30,9 +40,6 @@ async function sendEmailViaSmtp(options: {
         user,
         pass,
       },
-      tls: {
-        rejectUnauthorized: false,
-      },
     });
 
     const fromHeader = `"${options.senderName}" <${user}>`;
@@ -49,7 +56,6 @@ async function sendEmailViaSmtp(options: {
     return false;
   }
 }
-
 import { BookingFormState } from "@/lib/types";
 import { getRetreatById } from "@/lib/retreats";
 import { backendOrigin } from "@/lib/backend-origin";
@@ -62,23 +68,24 @@ const FOUNDER_EMAILS = Array.from(
 );
 
 const bookingSchema = z.object({
-  fullName: z.string().min(2, "Please provide your full legal name"),
+  fullName: z.string().min(2, "Please provide your full legal name").max(200, "Please shorten your name"),
   email: z.string().email("Please enter a valid email address"),
-  phone: z.string().min(7, "Please enter a valid contact phone number"),
+  phone: z.string().min(7, "Please enter a valid contact phone number").max(40, "Please enter a valid contact phone number"),
   retreatId: z.string().min(1, "Please select a retreat sanctuary"),
   roomPreference: z.enum(["private-suite", "shared-luxury", "flexible"] as const, {
     message: "Please select a room preference",
   }),
   movementExperience: z.string().min(1, "Please indicate your movement experience"),
-  healthNotes: z.string().optional(),
-  intentions: z.string().optional(),
+  healthNotes: z.string().max(5000, "Please keep notes under 5,000 characters").optional(),
+  intentions: z.string().max(5000, "Please keep this under 5,000 characters").optional(),
   passportValid: z.string().optional(),
   waiverAccepted: z.literal("on", {
     message: "You must accept the Release of Liability & Assumption of Risk waiver to proceed",
   }),
   electronicSignature: z
     .string()
-    .min(2, "Please type your full legal name as your binding electronic signature"),
+    .min(2, "Please type your full legal name as your binding electronic signature")
+    .max(200, "Please shorten your signature"),
 });
 
 export async function submitBookingInquiry(
@@ -112,6 +119,7 @@ export async function submitBookingInquiry(
 
   const data = validation.data;
   const backendUrl = backendOrigin();
+  const bookingReference = `KAI-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
   const waiverSignedAt = new Date().toISOString().replace("T", " ").slice(0, 16) + " UTC";
 
   // 1. Primary: Wire directly to FastAPI Backend & Database (dual founder routing)
@@ -122,8 +130,11 @@ export async function submitBookingInquiry(
       body: JSON.stringify({
         ...data,
         waiverAccepted: true,
+        clientReference: bookingReference,
       }),
-      signal: AbortSignal.timeout(4500),
+      // Long enough for a serverless cold start. A timeout here can still mean the backend saved the
+      // booking, so the fallback below reuses the same reference rather than minting a second one.
+      signal: AbortSignal.timeout(20000),
     });
     if (apiRes.ok) {
       const resData = await apiRes.json();
@@ -144,8 +155,6 @@ export async function submitBookingInquiry(
   const retreat = getRetreatById(data.retreatId);
   const retreatTitle = retreat ? `${retreat.title} (${retreat.destination})` : data.retreatId;
   const retreatDates = retreat ? retreat.dates : "January 28 – 31, 2027";
-  const bookingReference = `KAI-${crypto.randomBytes(3).toString("hex").toUpperCase()}`;
-
   const resendApiKey = process.env.RESEND_API_KEY;
   const fromEmailAdmin =
     process.env.RESEND_FROM_EMAIL || "KAI Sanctuary Reservations <inquiries@kaiwellnessretreats.com>";
@@ -154,167 +163,122 @@ export async function submitBookingInquiry(
     process.env.RESEND_FROM_EMAIL ||
     "KAI Concierge Desk <concierge@kaiwellnessretreats.com>";
 
-  try {
-    if (resendApiKey) {
-      const resend = new Resend(resendApiKey);
+  const resend = resendApiKey ? new Resend(resendApiKey) : null;
+  const founderSubject = `[New KAI Inquiry] ${retreatTitle} - ${data.fullName} (${bookingReference})`;
+  const guestSubject = `Your KAI Sanctuary Reservation Inquiry for ${retreatTitle} [Ref: ${bookingReference}]`;
 
-      const adminHtml = `
-          <div style="font-family: 'Georgia', serif; color: #2D3E35; max-width: 640px; margin: 0 auto; padding: 30px; background-color: #FAF7F2; border: 1px solid #E5DDD0; border-radius: 12px;">
-            <h2 style="color: #2D3E35; border-bottom: 1px solid #E5DDD0; padding-bottom: 12px; margin-top: 0;">New Sanctuary Reservation Inquiry</h2>
-            <p><strong>Routed To:</strong> kareena@grandtravelcruise.com &amp; armaan@grandtravelcruise.com</p>
-            <p><strong>Reference:</strong> ${bookingReference}</p>
-            <p><strong>Sanctuary:</strong> ${retreatTitle}</p>
-            <p><strong>Dates:</strong> ${retreatDates}</p>
-            <hr style="border: none; border-top: 1px solid #E5DDD0; margin: 20px 0;" />
-            <h3 style="color: #5C6B5E;">Guest Details &amp; Electronic Liability Waiver:</h3>
-            <p><strong>Name:</strong> ${data.fullName}</p>
-            <p><strong>Email:</strong> <a href="mailto:${data.email}">${data.email}</a></p>
-            <p><strong>Phone:</strong> ${data.phone}</p>
-            <p><strong>Room Preference:</strong> ${data.roomPreference}</p>
-            <p><strong>Movement Experience:</strong> ${data.movementExperience}</p>
-            <p><strong>Passport Status:</strong> ${data.passportValid}</p>
-            <p><strong>Health &amp; Dietary Notes:</strong> ${data.healthNotes || "None specified"}</p>
-            <p><strong>Intentions for Renewal:</strong> ${data.intentions || "None specified"}</p>
-            <p><strong>Liability Waiver Electronic Signature:</strong> ${data.electronicSignature} (Signed ${waiverSignedAt})</p>
-            <hr style="border: none; border-top: 1px solid #E5DDD0; margin: 20px 0;" />
-            <p style="font-size: 12px; color: #738475;">Sent from KAI Wellness Retreats Reservation Desk • Founded by Kareena Islam &amp; Armaan Islam</p>
-          </div>
-        `;
+  const adminHtml = `
+      <div style="font-family: 'Georgia', serif; color: #2D3E35; max-width: 640px; margin: 0 auto; padding: 30px; background-color: #FAF7F2; border: 1px solid #E5DDD0; border-radius: 12px;">
+        <h2 style="color: #2D3E35; border-bottom: 1px solid #E5DDD0; padding-bottom: 12px; margin-top: 0;">New Sanctuary Reservation Inquiry</h2>
+        <p><strong>Routed To:</strong> kareena@grandtravelcruise.com &amp; armaan@grandtravelcruise.com</p>
+        <p><strong>Reference:</strong> ${bookingReference}</p>
+        <p><strong>Sanctuary:</strong> ${escapeHtml(retreatTitle)}</p>
+        <p><strong>Dates:</strong> ${retreatDates}</p>
+        <hr style="border: none; border-top: 1px solid #E5DDD0; margin: 20px 0;" />
+        <h3 style="color: #5C6B5E;">Guest Details &amp; Electronic Liability Waiver:</h3>
+        <p><strong>Name:</strong> ${escapeHtml(data.fullName)}</p>
+        <p><strong>Email:</strong> <a href="mailto:${escapeHtml(data.email)}">${escapeHtml(data.email)}</a></p>
+        <p><strong>Phone:</strong> ${escapeHtml(data.phone)}</p>
+        <p><strong>Room Preference:</strong> ${escapeHtml(data.roomPreference)}</p>
+        <p><strong>Movement Experience:</strong> ${escapeHtml(data.movementExperience)}</p>
+        <p><strong>Passport Status:</strong> ${escapeHtml(data.passportValid)}</p>
+        <p><strong>Health &amp; Dietary Notes:</strong> ${escapeHtml(data.healthNotes) || "None specified"}</p>
+        <p><strong>Intentions for Renewal:</strong> ${escapeHtml(data.intentions) || "None specified"}</p>
+        <p><strong>Liability Waiver Electronic Signature:</strong> ${escapeHtml(data.electronicSignature)} (Signed ${waiverSignedAt})</p>
+        <hr style="border: none; border-top: 1px solid #E5DDD0; margin: 20px 0;" />
+        <p style="font-size: 12px; color: #738475;">Sent from KAI Wellness Retreats Reservation Desk • Founded by Kareena Islam &amp; Armaan Islam</p>
+      </div>
+    `;
 
-      const guestHtml = `
-          <div style="font-family: 'Georgia', serif; color: #2D3E35; max-width: 640px; margin: 0 auto; padding: 40px; background-color: #FAF7F2; border: 1px solid #E5DDD0; border-radius: 16px; line-height: 1.6;">
-            <div style="text-align: center; margin-bottom: 30px;">
-              <span style="font-size: 24px; letter-spacing: 4px; text-transform: uppercase; color: #2D3E35; display: block;">K A I</span>
-              <span style="font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #5C6B5E;">Wellness Retreats • Where Your Peace Within Can Blend With The Pieces Around</span>
-            </div>
-            
-            <p style="font-size: 16px;">Dear ${data.fullName},</p>
-            
-            <p>Thank you for placing your trust in KAI Wellness Retreats. Your reservation inquiry for <strong>${retreatTitle}</strong> (${retreatDates}) has been delivered directly to <strong>Kareena Islam (kareena@grandtravelcruise.com)</strong> and <strong>Armaan Islam (armaan@grandtravelcruise.com)</strong>.</p>
-            
-            <div style="background-color: #F2ECE4; padding: 20px; border-radius: 12px; margin: 24px 0; border: 1px solid #E5DDD0;">
-              <p style="margin: 0 0 8px 0; font-size: 14px; color: #5C6B5E; text-transform: uppercase; letter-spacing: 1px;"><strong>Reservation Inquiry Summary</strong></p>
-              <p style="margin: 0; font-size: 15px;"><strong>Sanctuary:</strong> ${retreatTitle}</p>
-              <p style="margin: 4px 0 0 0; font-size: 14px;"><strong>Reference Code:</strong> ${bookingReference}</p>
-              <p style="margin: 4px 0 0 0; font-size: 14px;"><strong>Waiver E-Signed By:</strong> ${data.electronicSignature}</p>
-            </div>
-            
-            <p>Over the next 24 to 48 hours, Kareena and Armaan (in partnership with Grand Travel &amp; Cruise) will reach out to coordinate your flight logistics, discuss your wellness preferences, and finalize your suite placement.</p>
-            
-            <p style="margin-top: 24px;">
-              With gratitude and warm calm,<br />
-              <strong>Kareena Islam, BSN, RN, RYT &amp; Armaan Islam</strong><br />
-              <span style="font-size: 13px; color: #738475;">Co-Founders, KAI Wellness Retreats • Grand Travel &amp; Cruise</span>
-            </p>
-          </div>
-        `;
+  const guestHtml = `
+      <div style="font-family: 'Georgia', serif; color: #2D3E35; max-width: 640px; margin: 0 auto; padding: 40px; background-color: #FAF7F2; border: 1px solid #E5DDD0; border-radius: 16px; line-height: 1.6;">
+        <div style="text-align: center; margin-bottom: 30px;">
+          <span style="font-size: 24px; letter-spacing: 4px; text-transform: uppercase; color: #2D3E35; display: block;">K A I</span>
+          <span style="font-size: 10px; letter-spacing: 2px; text-transform: uppercase; color: #5C6B5E;">Wellness Retreats • Where Your Peace Within Can Blend With The Pieces Around</span>
+        </div>
+        
+        <p style="font-size: 16px;">Dear ${escapeHtml(data.fullName)},</p>
+        
+        <p>Thank you for placing your trust in KAI Wellness Retreats. Your reservation inquiry for <strong>${escapeHtml(retreatTitle)}</strong> (${retreatDates}) has been delivered directly to <strong>Kareena Islam (kareena@grandtravelcruise.com)</strong> and <strong>Armaan Islam (armaan@grandtravelcruise.com)</strong>.</p>
+        
+        <div style="background-color: #F2ECE4; padding: 20px; border-radius: 12px; margin: 24px 0; border: 1px solid #E5DDD0;">
+          <p style="margin: 0 0 8px 0; font-size: 14px; color: #5C6B5E; text-transform: uppercase; letter-spacing: 1px;"><strong>Reservation Inquiry Summary</strong></p>
+          <p style="margin: 0; font-size: 15px;"><strong>Sanctuary:</strong> ${escapeHtml(retreatTitle)}</p>
+          <p style="margin: 4px 0 0 0; font-size: 14px;"><strong>Reference Code:</strong> ${bookingReference}</p>
+          <p style="margin: 4px 0 0 0; font-size: 14px;"><strong>Waiver E-Signed By:</strong> ${escapeHtml(data.electronicSignature)}</p>
+        </div>
+        
+        <p>Over the next 24 to 48 hours, Kareena and Armaan (in partnership with Grand Travel &amp; Cruise) will reach out to coordinate your flight logistics, discuss your wellness preferences, and finalize your suite placement.</p>
+        
+        <p style="margin-top: 24px;">
+          With gratitude and warm calm,<br />
+          <strong>Kareena Islam, BSN, RN, RYT &amp; Armaan Islam</strong><br />
+          <span style="font-size: 13px; color: #738475;">Co-Founders, KAI Wellness Retreats • Grand Travel &amp; Cruise</span>
+        </p>
+      </div>
+    `;
 
-      // 1. Internal Founder Alert (Dual Engine: SMTP -> Resend Fallback)
-      let founderSent = false;
-      if (process.env.SMTP_HOST) {
-        founderSent = await sendEmailViaSmtp({
-          to: FOUNDER_EMAILS,
-          subject: `[New KAI Inquiry] ${retreatTitle} - ${data.fullName} (${bookingReference})`,
-          html: adminHtml,
-          senderName: "KAI Sanctuary Reservations",
-        });
+
+  // Delivers through SMTP when configured, then Resend. The SDK returns API failures rather than throwing.
+  const deliver = async (to: string[], subject: string, html: string, senderName: string, from: string): Promise<boolean> => {
+    if (await sendEmailViaSmtp({ to, subject, html, senderName })) return true;
+    if (!resend) return false;
+    try {
+      const res = await resend.emails.send({ from, to, subject, html });
+      if (res.error) {
+        console.error(`[Resend Error] Delivery to ${to.join(", ")} failed:`, res.error.message);
+        return false;
       }
-
-      if (!founderSent) {
-        try {
-          await resend.emails.send({
-            from: fromEmailAdmin,
-            to: FOUNDER_EMAILS,
-            subject: `[New KAI Inquiry] ${retreatTitle} - ${data.fullName} (${bookingReference})`,
-            html: adminHtml,
-          });
-          console.log(`[Resend Live] Founder Alert sent to ${FOUNDER_EMAILS.join(", ")} for ${bookingReference}`);
-        } catch (err: unknown) {
-          console.error("[Resend Error] Founder Alert failed:", err instanceof Error ? err.message : err);
-        }
-      }
-
-      // 2. Customer Confirmation Email (Dual Engine: SMTP -> Resend -> Sandbox Mirror)
-      let guestSent = false;
-      if (process.env.SMTP_HOST) {
-        guestSent = await sendEmailViaSmtp({
-          to: [data.email],
-          subject: `Your KAI Sanctuary Reservation Inquiry for ${retreatTitle} [Ref: ${bookingReference}]`,
-          html: guestHtml,
-          senderName: "KAI Concierge Desk",
-        });
-      }
-
-      if (!guestSent) {
-        try {
-          const guestRes = await resend.emails.send({
-            from: fromEmailConcierge,
-            to: [data.email],
-            subject: `Your KAI Sanctuary Reservation Inquiry for ${retreatTitle} [Ref: ${bookingReference}]`,
-            html: guestHtml,
-          });
-          if (guestRes.error) {
-            throw new Error(guestRes.error.message);
-          }
-          console.log(`[Resend Live] Guest Confirmation dispatched to ${data.email} for ${bookingReference}`);
-        } catch (err: unknown) {
-          const errMsg = err instanceof Error ? err.message : String(err);
-          console.error(`[Resend Error] Guest Confirmation to ${data.email} failed:`, errMsg);
-
-          // If delivery to customer fails (e.g. sandbox restriction or domain pending verification):
-          // Deliver the exact Customer Confirmation copy to the test founder inbox so it can be verified.
-          if (FOUNDER_EMAILS.length > 0) {
-            try {
-              await resend.emails.send({
-                from: "KAI Concierge Desk <onboarding@resend.dev>",
-                to: FOUNDER_EMAILS,
-                subject: `[CUSTOMER CONFIRMATION: ${data.email}] Your KAI Reservation for ${retreatTitle} [Ref: ${bookingReference}]`,
-                html: `
-                  <div style="background-color: #FFF3CD; border: 1px solid #FFEEBA; color: #856404; padding: 14px 18px; border-radius: 8px; margin-bottom: 24px; font-family: sans-serif; font-size: 13px; line-height: 1.5;">
-                    <strong>Customer Delivery Notice:</strong> In production with your verified domain (<code>kaiwellnessretreats.com</code>) or SMTP, this confirmation is delivered directly to the customer (<code>${data.email}</code>). In testing sandbox mode, Resend delivers this customer copy here to <code>${FOUNDER_EMAILS[0]}</code> so you can review the exact layout and reference code.
-                  </div>
-                ` + guestHtml,
-              });
-              console.log(`[Resend Fallback] Delivered customer confirmation preview to ${FOUNDER_EMAILS[0]}`);
-            } catch (mirrorErr) {
-              console.error("[Resend Fallback Error]:", mirrorErr);
-            }
-          }
-        }
-      }
-    } else {
-      console.log("[Resend Simulated Dual Founder Alert to kareena@grandtravelcruise.com & armaan@grandtravelcruise.com]:", {
-        to: FOUNDER_EMAILS,
-        bookingReference,
-        retreatTitle,
-        waiverSignedBy: data.electronicSignature,
-      });
-      console.log("[Resend Simulated Guest Confirmation Email]:", {
-        to: data.email,
-        bookingReference,
-        retreatTitle,
-      });
+      console.log(`[Resend Live] Delivered to ${to.join(", ")} for ${bookingReference}`);
+      return true;
+    } catch (err: unknown) {
+      console.error("[Resend Error]:", err instanceof Error ? err.message : err);
+      return false;
     }
+  };
 
-    return {
-      success: true,
-      message: `Your reservation inquiry for ${retreatTitle} has been received and routed directly to kareena@grandtravelcruise.com & armaan@grandtravelcruise.com. Kareena and Armaan will personally reach out within 24–48 hours.`,
+  const hasTransport = Boolean(process.env.SMTP_HOST || resend);
+  const isProduction = process.env.NODE_ENV === "production";
+
+  if (!hasTransport && !isProduction) {
+    console.log("[Simulated founder alert and guest confirmation]:", {
+      to: FOUNDER_EMAILS,
+      guest: data.email,
       bookingReference,
-      waiverSignedBy: data.electronicSignature,
-      waiverSignedAt,
-      routedEmails: FOUNDER_EMAILS,
-    };
-  } catch (error) {
-    console.error("Booking submission error:", error);
+      retreatTitle,
+    });
+  }
+
+  const founderDelivered = hasTransport
+    ? await deliver(FOUNDER_EMAILS, founderSubject, adminHtml, "KAI Sanctuary Reservations", fromEmailAdmin)
+    : !isProduction;
+
+  // Reaching this point means the backend did not confirm the booking. If the founders were not told
+  // either, nothing has recorded this inquiry, so the guest must hear that rather than a false success.
+  if (!founderDelivered) {
+    console.error("[CRITICAL] Booking inquiry could not be stored or delivered:", { bookingReference, retreatTitle });
     return {
-      success: true,
-      message: `Your reservation inquiry for ${retreatTitle} has been logged [Ref: ${bookingReference}] and queued for kareena@grandtravelcruise.com & armaan@grandtravelcruise.com.`,
-      bookingReference,
-      waiverSignedBy: data.electronicSignature,
-      waiverSignedAt,
-      routedEmails: FOUNDER_EMAILS,
+      success: false,
+      message:
+        "We could not submit your inquiry just now. Please try again in a few minutes, or email kareena@grandtravelcruise.com directly.",
     };
   }
+
+  if (hasTransport) {
+    const guestDelivered = await deliver([data.email], guestSubject, guestHtml, "KAI Concierge Desk", fromEmailConcierge);
+    if (!guestDelivered) {
+      console.error(`[Email Error] Guest confirmation not delivered to ${data.email} for ${bookingReference}`);
+    }
+  }
+
+  return {
+    success: true,
+    message: `Your reservation inquiry for ${retreatTitle} has been received and routed directly to kareena@grandtravelcruise.com & armaan@grandtravelcruise.com. Kareena and Armaan will personally reach out within 24–48 hours.`,
+    bookingReference,
+    waiverSignedBy: data.electronicSignature,
+    waiverSignedAt,
+    routedEmails: FOUNDER_EMAILS,
+  };
 }
 
 const newsletterSchema = z.object({

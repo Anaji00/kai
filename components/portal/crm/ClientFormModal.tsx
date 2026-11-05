@@ -199,10 +199,10 @@ export default function ClientFormModal({
             </span>
             <div>
               <h2 className="font-serif text-lg font-bold text-[#2D3E35]">
-                {isEditing ? `Edit Dossier: ${clientToEdit?.full_name}` : "Create 360° Client Dossier"}
+                {isEditing ? `Edit Guest Profile: ${clientToEdit?.full_name}` : "Create Guest Profile & Notes"}
               </h2>
               <p className="text-xs text-[#5C6B5E]">
-                KAI Sanctuary CRM contact schema with RN clinical intake fields &amp; SQLite WAL persistence
+                Guest contact profile with retreat preferences, dietary needs &amp; nurse intake notes
               </p>
             </div>
           </div>

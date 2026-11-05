@@ -1,6 +1,12 @@
+import logging
 from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
 from backend.sidecar.models import SanctuaryKnowledge
+
+logger = logging.getLogger("kai_thesis_rag")
+
+# gpt-oss spends part of its budget on reasoning, so this leaves room for the JSON answer as well.
+PLAN_MAX_TOKENS = 1500
 
 # -----------------------------------------------------------------------------
 # Core Seed Knowledge Repository
@@ -110,6 +116,56 @@ SANCTUARY_KNOWLEDGE_SEEDS = [
             "receive preferred booking windows for their patients requiring intensive nervous system recovery."
         ),
         "metadata_json": {"partner_types": ["functional_medicine", "holistic_psychiatry", "sound_studios"]}
+    },
+    {
+        "category": "executive_finance",
+        "title": "Executive Villa Buyout Splits, Margin Protection & 30/70 Wire Reconciliation",
+        "content": (
+            "Executive villa buyouts allow single syndicates, private family offices, or C-suite executive teams to reserve "
+            "an entire sanctuary (strictly 12–14 guests maximum). Financial folios are apportioned by suite tier with an initial "
+            "30% non-refundable deposit authorized through KAI Sanctuary CRM's secure vault, followed by the remaining 70% balance "
+            "due 45 days prior to retreat arrival. Net contribution margins are maintained at 38%–44% after accounting for "
+            "Grand Travel & Cruise wholesale contracts, private chef botanical banquets, and airport tarmac transfers. "
+            "International wire settlements (USD, EUR, GBP) are cleared with zero merchant surcharge via direct SWIFT/Fedwire reconciliation."
+        ),
+        "metadata_json": {"module": "executive_finance", "target": "buyout_split", "margin_standard": "38-44%", "deposit_percent": 30, "balance_due_days": 45}
+    },
+    {
+        "category": "flight_radar_logistics",
+        "title": "Cirium Live Flight Radar, Arrival Waves & FAA Part 135 Tarmac Logistics",
+        "content": (
+            "Powered by Grand Travel & Cruise and live Cirium flight tracking, arrival waves are clustered into luxury 4WD "
+            "Suburban or Mercedes-Benz Sprinter waves with a maximum guest dwell time of 35 minutes. When private aviation "
+            "(e.g. Gulfstream G650ER, Bombardier Global 7500) is chartered, ground crews audit passenger baggage weights, "
+            "runway load factors, and FAA Part 135 14-hour flight crew duty limits. In the event of coastal tropical storms, "
+            "chauffeurs execute pre-mapped inland mountain reroutes to bypass swollen river crossings."
+        ),
+        "metadata_json": {"module": "flight_radar_logistics", "radar_provider": "Cirium", "max_dwell_minutes": 35, "charter_compliance": "FAA Part 135"}
+    },
+    {
+        "category": "b2b_sales_syndicates",
+        "title": "B2B Studio Syndicates, 15% Partner Commissions & Corporate Burnout Retreats",
+        "content": (
+            "KAI's B2B Studio Syndicate program partners with elite reformer pilates studios, functional medicine clinics, "
+            "and holistic longevity practices. Aligned partners receive a standardized 15% contractual commission on all "
+            "client referrals, logged natively in KAI CRM. For corporate enterprise teams, KAI provides comprehensive executive "
+            "burnout restorative retreat proposals designed for 12 C-suite leaders featuring high-speed Starlink executive desks, "
+            "1-on-1 nurse consultation, and restorative circadian sleep arcs."
+        ),
+        "metadata_json": {"module": "b2b_sales_syndicates", "commission_rate": 15, "target_partners": ["pilates_studios", "functional_medicine", "corporate_burnout"]}
+    },
+    {
+        "category": "chef_hospitality_dining",
+        "title": "Private Villa Chef Dietary Banquet Matrix & Anti-Inflammatory Blue Zone Cuisine",
+        "content": (
+            "Every meal served at KAI Sanctuaries is prepared by private villa chefs adhering strictly to zero-seed-oil, "
+            "100% organic, regenerative farm-to-table protocols. Chefs maintain an active Dietary Banquet Matrix cross-referencing "
+            "celiac gluten-free certification, allium intolerance, histamine sensitivities, and vegan preferences with dedicated "
+            "cookware to prevent cross-contamination. Menus emphasize anti-inflammatory Blue Zone staples: cold-pressed extra virgin "
+            "olive oil, wild-harvested coastal herbs, mineral-rich broths, and adaptogenic evening teas (reishi, ashwagandha, passionflower) "
+            "promoting deep delta-wave sleep."
+        ),
+        "metadata_json": {"module": "chef_hospitality_dining", "oil_policy": "Zero Seed Oils", "standards": ["100% Organic", "Regenerative Farm-to-Table", "Allergen Segregated"]}
     }
 ]
 
@@ -476,14 +532,16 @@ def generate_llm_suggested_plan(
                 "'peaceAndPiecesThesis' (1 sentence connecting 'where your peace within can blend with the pieces around' to their goals), "
                 "and 'clinicalAndEnduranceNotes' (2 sentences combining Kareena Islam BSN RN somatic care and Armaan Islam Ironman recovery)."
             )
-            messages = [
-                {
-                    "role": "system",
-                    "content": "You are the KAI Wellness Retreats AI Concierge for Founders Kareena Islam (BSN, RN, RYT) and Armaan Islam (Ironman Athlete & Business Lead). Return valid JSON only."
-                },
-                {"role": "user", "content": prompt},
-            ]
-            raw_llm = query_llm_chat(messages=messages, temperature=0.3, max_tokens=350, json_mode=True)
+            raw_llm = query_llm_chat(
+                "You are the KAI Wellness Retreats AI Concierge for Founders Kareena Islam (BSN, RN, RYT) and Armaan Islam (Ironman Athlete & Business Lead). "
+                "You draft a plan for the founders to review. Use only the details given. Never promise an allergen-free environment, "
+                "medical safety or a health outcome: note allergies and health details as items for the founders to confirm with the kitchen and the guest. "
+                "Write plainly and warmly, without words like serene, seamless, harmonious or journey. Return valid JSON only.",
+                prompt,
+                temperature=0.3,
+                max_tokens=PLAN_MAX_TOKENS,
+                json_mode=True,
+            )
             parsed = json.loads(raw_llm)
             if isinstance(parsed, dict):
                 if parsed.get("summary"):
@@ -493,8 +551,9 @@ def generate_llm_suggested_plan(
                 if parsed.get("clinicalAndEnduranceNotes"):
                     fallback_plan["clinicalAndEnduranceNotes"] = str(parsed["clinicalAndEnduranceNotes"])
                 fallback_plan["generatedBy"] = f"KAI Live LLM ({settings.GROQ_MODEL})"
-        except Exception:
-            pass
+        except Exception as exc:
+            # The template still reaches the founders, but a failing model must be visible in the logs.
+            logger.warning("Suggested plan fell back to the template: %s", type(exc).__name__)
 
     return fallback_plan
 

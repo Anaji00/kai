@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.models import NewsletterSubscriber, ActionDraft
 from backend.schemas import NewsletterSubscribe, NewsletterResponse
-from backend.sidecar.routers.webhooks import verify_admin
+from backend.dependencies.auth import get_current_admin
 
 router = APIRouter(prefix="/newsletter", tags=["Private Priority Circle"])
 
@@ -50,7 +50,7 @@ def subscribe_to_circle(data: NewsletterSubscribe, db: Session = Depends(get_db)
     )
 
 
-@router.get("/subscribers", dependencies=[Depends(verify_admin)])
+@router.get("/subscribers", dependencies=[Depends(get_current_admin)])
 def list_subscribers(db: Session = Depends(get_db)):
     """Admin endpoint to view all active private circle subscribers."""
     return db.query(NewsletterSubscriber).filter(NewsletterSubscriber.is_active.is_(True)).all()

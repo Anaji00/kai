@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import datetime, timezone
@@ -15,7 +16,7 @@ from backend.schemas import (
 )
 from backend.services.retreats_service import get_retreat_by_slug_or_id
 from backend.services.email_service import send_booking_confirmation
-from backend.sidecar.routers.webhooks import verify_admin
+from backend.dependencies.auth import get_current_admin
 from backend.config import settings
 
 logger = logging.getLogger("kai_bookings_router")
@@ -59,6 +60,11 @@ def process_booking_sidecar_background(
             "waiver_signed_at": waiver_signed_at,
         }
 
+        from backend.sidecar.services.clinical_governance_engine import attach_clinical_evaluation
+        clinical_thesis, clinical_report = attach_clinical_evaluation(
+            None, data_dict["fullName"], retreat_id, clinical_dict
+        )
+
         staging_rec = StagingIntake(
             source_ref=ref_code,
             client_name=data_dict["fullName"],
@@ -67,11 +73,12 @@ def process_booking_sidecar_background(
             sanctuary_slug=retreat_id,
             room_tier=data_dict.get("roomPreference"),
             clinical_profile=clinical_dict,
-            consultation_thesis=None,
+            consultation_thesis=clinical_thesis,
             status="PENDING_APPROVAL"
         )
         db.add(staging_rec)
         db.commit()
+        db.refresh(staging_rec)
 
         # Stage operational SMS alert for Kareena & Armaan Islam
         stage_operational_alert(
@@ -91,8 +98,10 @@ def process_booking_sidecar_background(
             type="booking_hold",
             guest_name=data_dict["fullName"],
             recipient_email="kareena@grandtravelcruise.com, armaan@grandtravelcruise.com",
+            target_entity_type="staging_intakes",
+            target_entity_id=str(staging_rec.id),
             content=(
-                f"Booking Hold Request: {data_dict['fullName']} [{ref_code}]\n"
+                f"{'[CLINICAL HOLD] ' if clinical_report.hard_hold else ''}Booking Hold Request: {data_dict['fullName']} [{ref_code}]\n"
                 f"Routed To: kareena@grandtravelcruise.com & armaan@grandtravelcruise.com\n"
                 f"Sanctuary: {retreat_title} ({retreat_id})\n"
                 f"Room Tier: {data_dict.get('roomPreference')}\n"
@@ -131,6 +140,23 @@ def process_booking_sidecar_background(
         logger.error(f"Error sending booking confirmation email: {e}")
 
 
+def _duplicate_booking_response(existing: Booking, data: BookingCreate) -> BookingResponse:
+    """The reply for a retried submission. A reference reused with another email is refused."""
+    if existing.email.lower() != str(data.email).lower():
+        raise HTTPException(status_code=409, detail="This booking reference is already in use.")
+    return BookingResponse(
+        success=True,
+        message=f"Your reservation inquiry for {existing.retreat_title} has already been received.",
+        bookingReference=existing.reference_code,
+        retreatTitle=existing.retreat_title,
+        status=existing.status,
+        createdAt=existing.created_at,
+        suggestedPlan=None,
+        waiverSignedBy=(data.electronicSignature or data.fullName).strip(),
+        routedEmails=list(settings.FOUNDER_INQUIRY_EMAILS),
+    )
+
+
 @router.post("", response_model=BookingResponse, status_code=201)
 def create_booking(
     data: BookingCreate,
@@ -144,8 +170,13 @@ def create_booking(
     retreat = get_retreat_by_slug_or_id(data.retreatId, db=db)
     retreat_title = retreat["title"] if retreat else data.retreatId
 
-    ref_code = generate_reference()
-    while db.query(Booking).filter(Booking.reference_code == ref_code).first():
+    if data.clientReference:
+        existing = db.query(Booking).filter(Booking.reference_code == data.clientReference).first()
+        if existing:
+            return _duplicate_booking_response(existing, data)
+
+    ref_code = data.clientReference or generate_reference()
+    while not data.clientReference and db.query(Booking).filter(Booking.reference_code == ref_code).first():
         ref_code = generate_reference()
 
     waiver_signed_by = (data.electronicSignature or data.fullName).strip()
@@ -170,8 +201,20 @@ def create_booking(
         status="pending_review"
     )
     db.add(new_booking)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        # A simultaneous retry of the same submission won the insert.
+        db.rollback()
+        existing = db.query(Booking).filter(Booking.reference_code == ref_code).first()
+        if not existing:
+            raise
+        return _duplicate_booking_response(existing, data)
     db.refresh(new_booking)
+    created_at = new_booking.created_at
+    # The background task opens its own session and FastAPI keeps this one until after it finishes.
+    # Holding both per booking exhausts the pool under a burst, so return this connection now.
+    db.close()
 
     retreat_info = retreat if retreat else {"title": retreat_title, "dates": "January 28 – 31, 2027"}
     data_dict = data.model_dump() if hasattr(data, "model_dump") else data.dict()
@@ -196,7 +239,7 @@ def create_booking(
         bookingReference=ref_code,
         retreatTitle=retreat_title,
         status="pending_review",
-        createdAt=new_booking.created_at,
+        createdAt=created_at,
         suggestedPlan=None,
         waiverSignedBy=waiver_signed_by,
         waiverSignedAt=waiver_signed_at,
@@ -227,7 +270,7 @@ def get_booking_by_reference(
     )
 
 
-@router.get("", response_model=List[BookingLookupResponse], dependencies=[Depends(verify_admin)])
+@router.get("", response_model=List[BookingLookupResponse], dependencies=[Depends(get_current_admin)])
 def list_bookings(
     retreat_id: Optional[str] = Query(None),
     status: Optional[str] = Query(None),

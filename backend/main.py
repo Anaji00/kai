@@ -14,6 +14,8 @@ import logging
 from backend.config import settings
 from backend.database import init_db
 from backend.routers import (
+    auth,
+    staff,
     health,
     retreats,
     bookings,
@@ -116,8 +118,10 @@ app = FastAPI(
     * **Private Priority Circle**: Confidential announcements for intimate 12–14 guest cohorts
     """,
     lifespan=lifespan,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    # The API docs list every admin endpoint, so they exist only outside production.
+    docs_url=None if settings.ENVIRONMENT == "production" else "/docs",
+    redoc_url=None if settings.ENVIRONMENT == "production" else "/redoc",
+    openapi_url=None if settings.ENVIRONMENT == "production" else "/openapi.json",
 )
 
 # Configure CORS
@@ -129,8 +133,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from backend.sidecar.routers.webhooks import verify_admin
+from backend.dependencies.auth import get_current_admin
 from fastapi import Depends
+
+app.include_router(auth.router)
+app.include_router(staff.router)
+app.include_router(sidecar_guest_portal.auth_router)
 
 # Mount Routers under /api/v1
 app.include_router(health.router, prefix=settings.API_V1_PREFIX)
@@ -140,24 +148,24 @@ app.include_router(concierge.router, prefix=settings.API_V1_PREFIX)
 app.include_router(wellness.router, prefix=settings.API_V1_PREFIX)
 app.include_router(newsletter.router, prefix=settings.API_V1_PREFIX)
 app.include_router(testimonials.router, prefix=settings.API_V1_PREFIX)
-app.include_router(drafts.router, prefix=settings.API_V1_PREFIX, dependencies=[Depends(verify_admin)])
+app.include_router(drafts.router, prefix=settings.API_V1_PREFIX, dependencies=[Depends(get_current_admin)])
 
 # Mount KAI Sanctuary Travel CRM Sidecar Routers
 # Note: sidecar_email_in, sidecar_whatsapp, and sidecar_webhooks contain public/webhook endpoints with their own granular auth
-app.include_router(sidecar_intakes.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
-app.include_router(sidecar_leads.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
-app.include_router(sidecar_messaging.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
-app.include_router(sidecar_reconciliation.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
+app.include_router(sidecar_intakes.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(get_current_admin)])
+app.include_router(sidecar_leads.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(get_current_admin)])
+app.include_router(sidecar_messaging.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(get_current_admin)])
+app.include_router(sidecar_reconciliation.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(get_current_admin)])
 app.include_router(sidecar_email_in.router, prefix=f"{settings.API_V1_PREFIX}/sidecar")
 app.include_router(sidecar_whatsapp.router, prefix=f"{settings.API_V1_PREFIX}/sidecar")
-app.include_router(sidecar_copilot.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
-app.include_router(sidecar_calendar.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
+app.include_router(sidecar_copilot.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(get_current_admin)])
+app.include_router(sidecar_calendar.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(get_current_admin)])
 app.include_router(sidecar_webhooks.router, prefix=f"{settings.API_V1_PREFIX}/sidecar")
-app.include_router(sidecar_travel.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
-app.include_router(sidecar_vendors.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
-app.include_router(sidecar_system.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
-app.include_router(sidecar_continuity.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
-app.include_router(sidecar_crm.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(verify_admin)])
+app.include_router(sidecar_travel.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(get_current_admin)])
+app.include_router(sidecar_vendors.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(get_current_admin)])
+app.include_router(sidecar_system.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(get_current_admin)])
+app.include_router(sidecar_continuity.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(get_current_admin)])
+app.include_router(sidecar_crm.router, prefix=f"{settings.API_V1_PREFIX}/sidecar", dependencies=[Depends(get_current_admin)])
 
 # Mount Guest Sanctuary Companion (Public — magic-link token auth, no admin credentials needed)
 app.include_router(sidecar_guest_portal.router, prefix=f"{settings.API_V1_PREFIX}/sidecar")
@@ -170,8 +178,6 @@ def root():
         "founder": "Kareena Islam",
         "partner": "Grand Travel & Cruise",
         "version": settings.VERSION,
-        "docs": "/docs",
-        "redoc": "/redoc",
         "health": f"{settings.API_V1_PREFIX}/health"
     }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useActionState, useState, useEffect } from "react";
+import React, { useActionState, useState, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -43,6 +43,15 @@ export default function BookingForm() {
   }
 
   const [state, formAction, isPending] = useActionState(submitBookingInquiry, initialState);
+  const resultRef = useRef<HTMLDivElement>(null);
+
+  // The result appears at the top of a long form, away from the submit button, so bring it into view.
+  // Without this a guest is left looking at the footer and never sees their reference number.
+  useEffect(() => {
+    if (!state.message) return;
+    resultRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    resultRef.current?.focus({ preventScroll: true });
+  }, [state]);
 
   useEffect(() => {
     if (state.success) {
@@ -159,9 +168,9 @@ export default function BookingForm() {
           ) : (
             <div className="p-6 space-y-3 text-center">
               <Compass className="h-10 w-10 text-terracotta mx-auto" />
-              <h3 className="font-serif text-xl text-sage">Custom Group Curation</h3>
+              <h3 className="font-serif text-xl text-sage">Custom Group Retreats</h3>
               <p className="text-xs text-sage/80 leading-relaxed">
-                Inquiring for a private sanctuary or corporate retreat? Kareena Islam, Armaan Islam, and Grand Travel &amp; Cruise will curate a bespoke proposal tailored to your group size, destination, and somatic goals.
+                Inquiring for a private sanctuary or corporate retreat? Kareena Islam, Armaan Islam, and Grand Travel &amp; Cruise will put together a proposal tailored to your group size, destination, and somatic goals.
               </p>
             </div>
           )}
@@ -207,7 +216,7 @@ export default function BookingForm() {
       </div>
 
       {/* RIGHT: Reservation Form or Confirmation Screen */}
-      <div className="lg:col-span-7">
+      <div ref={resultRef} tabIndex={-1} className="lg:col-span-7 scroll-mt-24 focus:outline-none">
         <AnimatePresence mode="wait">
           {state.success ? (
             <motion.div

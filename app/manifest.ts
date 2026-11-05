@@ -8,6 +8,9 @@ export default function manifest(): MetadataRoute.Manifest {
       "Nurse-led luxury wellness sanctuaries bridging clinical autonomic science, somatic movement, and crystal singing bowl sound healing.",
     start_url: "/",
     display: "standalone",
+    orientation: "portrait",
+    lang: "en",
+    categories: ["travel", "health", "lifestyle"],
     background_color: "#FAF7F2",
     theme_color: "#2D3E35",
     icons: [

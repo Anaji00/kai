@@ -1,277 +1,250 @@
-# 🌿 KAI Team Guide (How Everything Works)
+# 🌿 KAI Sanctuary & Wellness Retreats — Platform & Team Guide
 
-> **Internal Team Guide & Field Manual for Kareena Islam & the KAI Team**  
-> *Sanctuary Operations • Host Travel Partner: Grand Travel & Cruise • Travel System: KAI Sanctuary Travel CRM Platform & Card Vault*
-
----
-
-## 💡 What is KAI? (The Quick Version)
-
-KAI runs luxury, intimate wellness retreats in places like Costa Rica, the Amalfi Coast, Bali, and the Riviera Maya. 
-* **Who it's for**: Burned-out professionals (executives, founders, doctors) who need deep rest and restorative sleep.
-* **Who runs it**: Kareena Islam, a registered clinical nurse with a neuroscience background.
-* **Our golden rule**: Strictly **12 to 14 guests per trip**—never crowded, always quiet and restorative.
-* **Our travel partner**: We partner with a 25-year travel agency (**Grand Travel & Cruise**) to give our guests discounted first-class/business lie-flat flights, live radar flight tracking, and private luxury rides straight from the airport.
+> **Internal Operations Manual & Architecture Guide for Kareena Islam, RN, Armaan Islam & the KAI Team**  
+> *Sanctuary Operations • Host Agency Partner: Grand Travel & Cruise • Independent Sovereign CRM & Clinical Intelligence Core*
 
 ---
 
-## 🛡️ The #1 Rule: The AI Never Sends Anything on Its Own
+## 💡 What is KAI? (Executive Overview)
 
-We use smart AI in the background to handle the heavy paperwork, but we have an absolute rule called **Zero Autonomous Writes**:
-* **The AI only drafts**: The AI can write draft emails, draft text messages, flag delays, or plan driver pickups, but it is **never allowed to press send**.
-* **The Action Review Queue**: Everything the AI creates goes into Kareena's private review screen inside our portal (`/portal/drafts`).
-* **1-Click Human Approval**: Kareena or a team member reviews the draft, makes any changes, and clicks **"Approve & Dispatch"**. Only then does the text message send, the email go out, or the trip commit to our native Sanctuary Travel CRM.
-* **Why this matters**: High-net-worth guests always get warm, personal communication from a real human nurse—zero robot mistakes, zero awkward automated messages.
+KAI curates quiet luxury, medically informed wellness sanctuaries in Costa Rica, the Amalfi Coast, Bali, Riviera Maya, and Puerto Vallarta.
+* **Who it's for**: High-performing professionals, founders, and physicians seeking autonomic nervous system reset, deep circadian recovery, and cellular restoration.
+* **Clinical Leadership**: Founded by **Kareena Islam, BSN, RN**, uniting high-acuity nursing science with 432Hz crystal singing bowl acoustic restoration and anatomical movement.
+* **Strategic & Travel Backing**: Co-founded with **Armaan Islam**, backed by 25+ years of host agency mastery at **Grand Travel & Cruise** (elite Funjet 500 Club member) for private villa buyouts, contracted first-class lie-flat air, and VIP chauffeured transfers.
+* **The Golden Invariant**: Strictly **12 to 14 guests per retreat**—never overcrowded, always tranquil, intimate, and personalized.
 
 ---
 
-## 🤖 What the AI Helpers Do in the Background (In Plain English)
+## 🛡️ Core Architectural Invariants
 
-Here are all 12 automated helpers running in the background and what they do for our team:
+### 1. Strict Human-in-the-Loop (HITL) Sovereign State Mutation
+**The AI never autonomously writes to external systems or commits irreversible state.**
+* **All outputs are staged as versioned drafts**: Every outreach email, SMS alert, chauffeur adjustment, or folio update is held in the Action Review Queue (`/portal/drafts`).
+* **1-Click Human Approval**: Staff review, edit, and click **"Approve & Dispatch"**. Only then is the email transmitted, SMS sent, or reservation synced directly to the Sanctuary Database.
+* **Zero Autonomous Drift**: High-net-worth guests always receive verified, warm, personal communication from a real nurse clinician.
 
-| Helper / Agent | What It Watches For | What It Automatically Drafts for You |
+### 2. Deterministic Clinical Safety Before Probabilistic AI
+Probabilistic LLMs are **never** the sole arbiter of medical safety or modality clearances.
+* A synchronous Python clinical rules engine (`DeterministicClinicalEngine`) executes *before* any text generation.
+* Detects medication contraindications (SSRIs/SNRIs $\rightarrow$ blocks Holotropic Hyperventilation Breathwork; Anticoagulants $\rightarrow$ blocks High-Velocity Deep Tissue; Hypertension $\ge 160/100$ mmHg $\rightarrow$ blocks Cold Plunge / High-Heat Saunas).
+* Injects an immutable, cryptographically hashed `ClinicalEvaluationReport` into all staff tools and dossiers as ground truth.
+
+### 3. Cryptographic Optimistic Concurrency Control (OCC)
+* Staged drafts capture a canonical SHA-256 version hash of the target record at creation time.
+* If a record is modified elsewhere before approval, the system detects state drift and returns a friendly visual 3-way difference view (`Field` | `Original Draft` | `Current Database` | `Proposed Changes`) with optional force-approval override.
+
+---
+
+## 📊 The KAI Operations Portal (`/portal`)
+
+Log in to the staff operations portal at **`http://localhost:3536/portal`**. All screens use clean, non-technical language tailored for retreat coordinators:
+
+```
+┌───────────────────────────────────────────────────────────────────────────────────┐
+│                           KAI OPERATIONS PORTAL WORKSPACE                         │
+├─────────────────┬─────────────────────────────────────────────────────────────────┤
+│ Screen          │ What Staff Use It For                                           │
+├─────────────────┼─────────────────────────────────────────────────────────────────┤
+│ 1. Inquiries    │ Review inbound guest intake forms with nurse cheat-sheets.      │
+│ 2. Drafts Queue │ 1-Click approval center for staged emails, texts, & updates.     │
+│ 3. Sovereign CRM│ 7-Tab hub with Monday.com-style spreadsheet, folios, & profiles.│
+│ 4. Calendar     │ Visual cohort schedule with 14-guest capacity meters & flights. │
+│ 5. Logistics    │ Chauffeur routes, high-clearance 4WD vehicles, & clinic maps.   │
+│ 6. Vendors      │ Luxury chauffeurs, private chefs, sound healers, & rate cards.  │
+│ 7. Partners     │ Outreach list for vetted medical spas and yoga studios.         │
+│ 8. Broadcasts   │ Staged mass SMS announcements to retreat alumni.                │
+│ 9. Audit & Room │ Compare room vouchers against guest rosters to prevent errors.  │
+│ 10. Inbox       │ Shared travel desk email organizer.                             │
+│ 11. Connections │ Live system connections for flight radar and text gateways.     │
+│ 12. Copilot     │ Slide-out clinical & operations assistant with "Explain This".  │
+└─────────────────┴─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📋 The Monday.com-Style Vacation & Attendee Spreadsheet Grid
+
+Located at **`/portal/crm`** under the **Attendee Spreadsheet** tab, this interactive grid gives staff immediate, spreadsheet-style control over every guest:
+
+### Key Capabilities
+* **Grouped Lifecycle Containers**:
+  * 🟢 **Confirmed Sanctuary Guests**: Shows confirmed attendees, group revenue, paid sum, and remaining balance due.
+  * 🟡 **Inquiries & Deposit Pending**: Tracks pending deposits and intake reviews.
+  * 🟣 **Waitlist & Completed Journeys**: Manages waitlist positions and past retreat archives.
+* **100% Inline-Editable Cells**:
+  * **Guest Name & Contact**: Click to edit full name, email, and phone with avatar initials.
+  * **Retreat Location**: Dropdown with country flags (🇲🇽 Puerto Vallarta, 🇨🇷 Nosara, 🇮🇹 Amalfi Coast, 🇮🇩 Sacred Springs Bali, 🇺🇸 Sedona).
+  * **Travel Dates**: Integrated Check-In and Check-Out date pickers with automatic night calculation (e.g. `Nov 14 → Nov 21 · 7n`).
+  * **Room & Suite**: Dropdown (Oceanfront Villa Suite, Master Sanctuary Villa, Garden Canopy Suite, Cliffside Sunset Pavilion) + room number.
+  * **RSVP Status**: Monday.com signature vibrant color blocks (Confirmed [Emerald], Deposit Paid [Amber], In Review [Sky], Waitlist [Purple], Completed [Slate]).
+  * **Package Total ($) & Paid ($)**: Clean inline currency inputs.
+  * **Remaining Balance ($)**: Auto-calculated indicator showing `Paid in Full ✓` (green) or `⚠️ $X,XXX Due` (amber).
+  * **Flight & Chauffeur**: Status chip (`Flight Booked & Chauffeur Set`, `Awaiting Flight Details`, etc.) + flight number notes.
+  * **Dietary & Health**: Inline text cell for food allergies and movement preferences.
+  * **Nurse Safety Clearance**: Status badge (`Cleared by Nurse`, `Awaiting Medical Intake`, `Special Attention`).
+* **One-Click Actions & Exports**:
+  * **`+ Add Attendee Row`**: Inserts a new row with instant focus.
+  * **`Export to Excel (CSV)`**: Formatted `.csv` download ready for Microsoft Excel or Google Sheets.
+  * **`Print Roster`**: Generates a clean printable cohort manifest.
+  * **Row Actions**: 1-click **Print Guest Dossier**, **Duplicate Row**, and **Delete Row**.
+  * **Direct Sanctuary Database Auto-Save**: Seamless persistence with local storage fallback.
+
+---
+
+## 🖨️ One-Click Printable Document Engine (`lib/print-export.ts`)
+
+Staff can generate branded, high-resolution printable documents formatted with dedicated `@media print` CSS:
+1. **Rooming & Guest Manifest**: Complete villa room allocations, airport chauffeur waves, flight arrival times, and kitchen dietary protocols.
+2. **Itemized Billing Folios**: Multi-currency wire settlement receipts, deposit breakdowns, and zero-cent balance reconciliation.
+3. **Guest Clinical & Dietary Dossiers**: Personalized medical clearance summaries, safe alternative modalities, and dietary guidelines.
+
+---
+
+## 🤖 Background Automation Helpers (In Plain English)
+
+| Helper / Agent | What It Monitors | What It Stages in the Review Queue |
 | :--- | :--- | :--- |
-| **1. The Booking & Quote Helper** | Guest chats, room requests, and budget questions | Drafts a booking hold with the 30% deposit and 70% balance calculated, ready to commit to Sanctuary CRM. |
-| **2. The Flight Delay Watcher** | Live satellite flight radar (Cirium) for guest flights | If a plane is delayed by 45+ minutes, it automatically recalibrates the driver's pickup window and drafts an SMS update. |
-| **3. The Email Reader** | Inbound emails from guests or airlines | Pulls out flight numbers, airline names, and arrival times, and drafts a flight coordination update. |
-| **4. The Doctor Note & Health Checker** | Uploaded medical forms, waivers, or doctor notes | Flags pregnancy or health issues as "Needs Attention" so Nurse Kareena can clear or adjust their schedule. |
-| **5. The Guest List & Room Checker** | Hotel room lists and vouchers vs. our Sanctuary CRM guest list | Double-checks that no more than 14 guests are booked and flags any room mismatches. |
-| **6. The Partner Studio Finder** | Wellness clinics and yoga studios in cities like Austin, Houston, and New York | Finds great partner clinics and drafts an introduction email offering our group flight perks to their clients. |
-| **7. The Packing List Creator** | The destination weather and the guest's health profile | Drafts a personalized packing checklist (organic linen, earplugs, swimwear) for the guest. |
-| **8. The Welcome Text Helper** | The night before a guest arrives | Drafts a welcoming WhatsApp text with driver details and calming sound tracks to listen to. |
-| **9. The 2-Week Follow-Up Helper** | Exactly 14 days after a guest checks out | Drafts a check-in email for Kareena to see how their sleep and recovery are going at home. |
-| **10. The Review Publisher** | New guest reviews submitted on the web | Holds the review for our team to approve before publishing it to the Destination Journal. |
-| **11. The Newsletter Welcome Helper** | When someone joins our VIP Priority Circle email list | Drafts a welcome email with early access to upcoming retreat dates. |
-| **12. The B2B Sales & Outreach Helper** | Executive life milestones or corporate burnout signals | Suggests prospects who might need a retreat and drafts a customized outreach note. |
+| **1. Booking & Quote Helper** | Inquiries, suite choices, and budgets | Drafts booking holds with 30% deposit and 70% balance calculations. |
+| **2. Flight Delay Radar** | Live Cirium satellite radar for guest flights | If delayed $\ge 45$ min, recalibrates driver pickup windows and drafts an alert. |
+| **3. Concierge Email Parser** | Inbound guest and airline emails | Extracts flight numbers, arrival times, and drafts itinerary updates. |
+| **4. Clinical Safety Checker** | Medical waivers and intake notes | Runs deterministic contraindication rules and flags items for Nurse Kareena. |
+| **5. Rooming Manifest Auditor** | Rooming vouchers vs. database records | Verifies cohort capacity (max 14) and highlights room mismatches. |
+| **6. Partner Studio Finder** | High-end wellness clinics in NY, Austin, LA | Drafts personalized collaboration proposals highlighting group air perks. |
+| **7. Bespoke Packing Stylist** | Microclimate weather and health notes | Drafts curated packing checklists (organic linens, earplugs, hydration). |
+| **8. Pre-Arrival Welcome Host** | Evening prior to arrival | Drafts welcoming WhatsApp messages with driver contacts and calming sound tracks. |
+| **9. 14-Day Post-Retreat Arc** | Exactly 14 days after departure | Drafts a personalized nervous system integration check-in note. |
+| **10. Guest Journal Reviewer** | New submitted guest testimonials | Holds reviews for staff moderation before publishing to the Destination Journal. |
+| **11. Priority Circle Concierge** | VIP newsletter signups | Stages early-access invitation letters for upcoming sanctuaries. |
+| **12. Executive Burnout Outreach**| High-stress corporate signals | Suggests prospective guests and drafts personalized restorative retreat invitations. |
 
 ---
 
-## 📱 The KAI Portal: What Each Screen Does (`/portal`)
+## 🌐 Full-Stack SEO & Schema.org Rich Snippets
 
-Log in to the team portal at **`http://localhost:3536/portal`** with `ADMIN_USERNAME` / `ADMIN_PASSWORD` (local development falls back to `admin` / `kai_admin_2026`; production refuses to start without real values).
+All public marketing routes (`/`, `/retreats`, `/retreats/*`, `/about`, `/book`, `/testimonials`) are optimized for search engine crawlers while preserving visual designs:
 
-1. **Guest Inquiries (`/portal`)**: 
-   View everyone who applied for a retreat. The AI generates a quick "Cheat Sheet" for Nurse Kareena before her consultation call. With 1 click, you can commit the guest to our native Sanctuary Travel CRM.
-2. **Action Review Queue (`/portal/drafts`)**: 
-   **The most important screen!** Shows every text, email, flight alert, or note waiting for your approval. You can read it, edit it in place, and click **"Approve & Dispatch"** or **"Discard"**. The top navigation bar shows a live badge with how many drafts are waiting.
-3. **Retreat Calendar (`/portal/calendar`)**: 
-   A visual calendar of upcoming retreat cohorts (with 14-guest capacity meters), 20-minute phone consultations with guests, and airport flight arrival times.
-4. **Travel & Destinations (`/portal/travel-logistics`)**: 
-   Maps showing driving routes from gateway airports to each villa, what cars to use (like 4WD Suburbans for mountain roads), and nearby nature spots (waterfalls, sacred springs, sunset views).
-5. **Vendors & Suppliers (`/portal/vendors`)**: 
-   Our contact book for luxury drivers, private chefs, sound healers, and emergency clinics, including our commission rates and payment terms.
-6. **Partner Studios (`/portal/leads`)**: 
-   A list of wellness clinics and yoga studios we want to partner with, with ready-to-send collaboration emails.
-7. **Text Broadcasts (`/portal/campaigns`)**: 
-   Draft mass text messages to alumni guests (e.g. *"Private invites for Italy May 2027 are now open"*). Nothing sends until you approve it.
-8. **Guest List Check (`/portal/reconciliation`)**: 
-   Drop in hotel room lists or flight manifests to make sure no extra rooms are booked and nobody was missed.
-9. **Concierge Inbox (`/portal/emails`)**: 
-   A shared inbox where incoming travel emails are organized and tagged automatically.
-10. **Service Connections (`/portal/webhooks`)**: 
-    A technical screen showing live connections to our travel software (Sanctuary CRM), flight radar, and text services, with a button to simulate test events.
-11. **Clinical Copilot (The Slide-Out Assistant)**: 
-    Click the button on the bottom right of any portal screen to open a smart assistant. You can ask it to look up flights, draft an email, check health notes, or summarize sales.
+* **Robots Directives (`app/robots.ts`)**: Whitelists public marketing routes and image assets while strictly disallowing private endpoints (`/portal`, `/api/*`, `/my-retreat*`). Declares canonical XML sitemap and host.
+* **Dynamic XML Sitemap (`app/sitemap.ts`)**: Auto-indexes all static and dynamic retreat paths with priority weightings and featured image links for Google Image SEO.
+* **Core Brand & FAQ Schema (`app/layout.tsx`)**:
+  * `HealthAndBeautyBusiness` + `TravelAgency` JSON-LD schema with founder credentials and clinical knowledge domains.
+  * `WebSite` schema with sitename aliases (`KAI`, `KAI Sanctuaries`).
+  * `FAQPage` schema indexing common retreat questions directly for Google SERP accordion rich snippets.
+* **Collection & Destination Schemas**:
+  * `/retreats` (`app/retreats/layout.tsx`): `ItemList` + `BreadcrumbList` schemas.
+  * `/retreats/[slug]` (`app/retreats/[slug]/page.tsx`): Itemized `TouristTrip` itineraries, pricing offers, and breadcrumbs.
+* **Founder Authority & E-E-A-T (`app/about/layout.tsx`)**: `AboutPage` and `Person` schema documenting Kareena Islam's BSN RN credentials and Grand Travel host agency lineage.
+* **Guest Review Rich Snippets (`app/testimonials/layout.tsx`)**: `AggregateRating` schema (5.0 stars over 48 reviews) and verified guest reflections for golden search review stars.
+* **Reservation Schema (`app/book/page.tsx`)**: `Service` + `BreadcrumbList` structured data.
+* **Privacy Isolation (`app/my-retreat/layout.tsx`)**: Disallowed in robots.txt and tagged with `robots: { index: false, follow: false }` to protect guest itineraries.
 
 ---
 
-## 🌿 What Guests See on the Public Website
+## 📬 Transactional Email Architecture
 
-* **Sanctuary Showcases**: Photos, daily schedules, and villa room choices for Costa Rica, Italy, Bali, and Mexico.
-* **Flight Request Form**: Where guests can request lie-flat business class seats and private airport pickups.
-* **Sound & Breath Tools**:
-  * **Solfeggio Sound Player**: Streams pure 432Hz (deep sleep and calm) and 528Hz (recovery) audio tones.
-  * **4-7-8 Breathing Circle**: An animated circle guiding guests through 4 seconds in, 7 seconds hold, and 8 seconds out to calm their nervous system.
-* **Travel Guides**: Passport rules, entry requirements, local customs, and distances to the nearest medical clinics.
-* **Healthy Food Guide**: Searchable directory of nearby restaurants that cater to gluten-free, dairy-free, and plant-based diets.
-* **Guest Reflections**: Real reviews from past guests scored on sleep quality and quietude.
+KAI uses a **Dual-Dispatch Email Architecture** for reservation inquiries submitted on `/book`:
+
+```
+                        ┌───────────────────────────────────┐
+                        │    Guest Reservation on /book     │
+                        │    (with legal waiver e-sign)     │
+                        └─────────────────┬─────────────────┘
+                                          │
+                ┌─────────────────────────┴─────────────────────────┐
+                ▼                                                   ▼
+┌───────────────────────────────┐                   ┌───────────────────────────────┐
+│ 1. Customer Confirmation      │                   │ 2. Founder / Staff Alert      │
+├───────────────────────────────┤                   ├───────────────────────────────┤
+│ • Booking Reference (KAI-XXXX)│                   │ • Full medical / health notes │
+│ • Retreat dates & suite tier  │                   │ • Movement experience level   │
+│ • Liability waiver receipt    │                   │ • Passport readiness status   │
+│ • 24–48hr concierge call info │                   │ • Legal waiver e-sign receipt │
+│ • Grand Travel air assistance │                   │ • Staged CRM intake & draft   │
+├───────────────────────────────┤                   ├───────────────────────────────┤
+│ TO: Customer / Guest          │                   │ TO: Kareena & Armaan Islam    │
+│ FROM: KAI Concierge Desk      │                   │ FROM: KAI Sanctuary Inquiries │
+└───────────────────────────────┘                   └───────────────────────────────┘
+```
+
+### Production Email Setup (Resend)
+* **Domain Verification**: Add `kaiwellnessretreats.com` or `grandtravelcruise.com` at [resend.com/domains](https://resend.com/domains) and set DNS records (DKIM, SPF, DMARC).
+* **Environment Variables**:
+  ```env
+  RESEND_API_KEY="re_..."
+  RESEND_FROM_EMAIL="KAI Sanctuary Reservations <inquiries@kaiwellnessretreats.com>"
+  RESEND_CONCIERGE_FROM_EMAIL="KAI Concierge Desk <concierge@kaiwellnessretreats.com>"
+  KAREENA_ROUTING_EMAIL="kareena@grandtravelcruise.com"
+  ARMAAN_ROUTING_EMAIL="armaan@grandtravelcruise.com"
+  ```
+* **Zero-DNS Fallbacks**: Native Microsoft 365 SMTP (`smtp.office365.com:587`) or Google Workspace SMTP (`smtp.gmail.com:587`) with App Passwords require zero DNS modifications.
 
 ---
 
-## 💻 How to Run the App (For Developers)
+## 💻 Developer Quickstart & Commands
 
-### Setup
+### Prerequisites
+* **Node.js**: v18.18+ or v20+
+* **Python**: v3.11+
+* **Docker** (optional for local multi-container development)
+
+### Local Development Setup
 ```bash
-# 1. Download the code
+# 1. Clone repository
 git clone https://github.com/Anaji00/kai.git
 cd kai
 
-# 2. Setup the Python backend (Python 3.11+)
+# 2. Setup Python environment
 python -m venv venv
-venv\Scripts\activate      # On Windows (use source venv/bin/activate on Mac/Linux)
+venv\Scripts\activate      # Windows (Mac/Linux: source venv/bin/activate)
 pip install -r backend/requirements.txt
 
-# 3. Setup the Next.js frontend (Node 18+)
+# 3. Setup Next.js dependencies
 npm install
 
-# 4. Fill the database with realistic sample data (guests, drivers, routes, drafts)
+# 4. Seed database with realistic sanctuary data
 python -m backend.sidecar.services.synthetic_data_seeder
 ```
 
-### Starting the App
+### Running the Services
 Open two terminal windows:
 ```bash
-# Terminal 1: Backend Engine
+# Terminal 1: FastAPI Backend Sidecar (port 8972)
 npm run backend
-# Runs at http://127.0.0.1:8972 (API docs at http://127.0.0.1:8972/docs)
+# API docs available at: http://127.0.0.1:8972/docs
 
-# Terminal 2: Website & Portal
+# Terminal 2: Next.js Frontend (port 3536)
 npm run dev
-# Runs at http://localhost:3536
+# Website: http://localhost:3536
+# Operations Portal: http://localhost:3536/portal
 ```
-* **Public Website**: http://localhost:3536
-* **Team Portal**: http://localhost:3536/portal (development login: `admin` / `kai_admin_2026`)
-* **Review Queue**: http://localhost:3536/portal/drafts
 
-### Running with Docker
+### Docker Compose
 ```bash
-cp .env.example .env      # fill in every empty secret (ADMIN_PASSWORD, JWT_SECRET_KEY, webhook secrets)
+cp .env.example .env      # Fill in ADMIN_PASSWORD, AUTH_SECRET_KEY, WEBHOOK_HMAC_SECRET and WHATSAPP_WEBHOOK_VERIFY_TOKEN
 docker compose up --build
 ```
-* Site: http://localhost:3536, portal: http://localhost:3536/portal, API docs: http://localhost:8972/docs
-* The backend runs with `ENVIRONMENT=production` and stores SQLite on the `kai_data` volume.
-* Compose stops with an error if any required secret is empty; the backend also refuses to boot on the old default values.
-* AI features (copilot, inquiry parsing, voice transcription) use Groq: set `GROQ_API_KEY` from https://console.groq.com/keys.
+* Frontend: `http://localhost:3536`
+* Backend API: `http://localhost:8972`
 
-### Deploying (kaiwellnessretreats.com)
-Everything runs on **Vercel**, in one project: the Next.js site plus the FastAPI backend as a Python
-function (`api/index.py`, reached through the `/api/v1/*` rewrite in `vercel.json`), backed by
-**Neon Postgres**. Step-by-step runbook including Squarespace DNS: [DEPLOYMENT.md](DEPLOYMENT.md).
-
-Docker (`docker compose up`) remains the way to run the full stack locally.
-
-### Running Tests
+### Verification & Testing
 ```bash
-# Test the Action Draft approval and dispatch system (6 tests)
-python backend/sidecar/test_drafts_execution.py
-
-# Test the Sanctuary CRM integration
-pytest backend/sidecar/test_sidecar.py -k "test_seed_and_list_intakes or test_pre_call_thesis_and_crm_commit" -v
-
-# Check for TypeScript errors
+# 1. Frontend TypeScript type checking (must exit with 0 errors)
 npx tsc --noEmit
 
-# Test transactional email dispatch & booking pipeline
+# 2. Backend unit tests (deterministic clinical gate, prompt spotlighting, OCC)
+python -m pytest backend/sidecar/test_system_hardening.py -v
+
+# 3. Test transactional email pipeline via CLI
 python scripts/send_test_email.py --to your-email@gmail.com --pipeline
 ```
 
 ---
 
-## 📬 Transactional Email Architecture & Go-Live Guide
+## 🔒 Security, Privacy & Compliance
 
-KAI uses a **Dual-Dispatch Email Architecture** for every reservation inquiry submitted on the website (`/book`).
-
-```
-                            ┌───────────────────────────────────┐
-                            │    Guest Booking on /book         │
-                            │    (with legal waiver e-sign)     │
-                            └─────────────────┬─────────────────┘
-                                              │
-                    ┌─────────────────────────┴─────────────────────────┐
-                    ▼                                                   ▼
-    ┌───────────────────────────────┐                   ┌───────────────────────────────┐
-    │ 1. Customer Confirmation      │                   │ 2. Founder / Staff Alert      │
-    ├───────────────────────────────┤                   ├───────────────────────────────┤
-    │ • Booking Reference (KAI-XXXX)│                   │ • Full medical / health notes │
-    │ • Retreat dates & suite tier  │                   │ • Movement experience tier    │
-    │ • Liability waiver receipt    │                   │ • Passport readiness status   │
-    │ • 24–48hr concierge call info │                   │ • Legal waiver e-sign receipt │
-    │ • Grand Travel air assistance │                   │ • Staged CRM intake & draft   │
-    ├───────────────────────────────┤                   ├───────────────────────────────┤
-    │ TO: Customer / Guest          │                   │ TO: Kareena & Armaan Islam    │
-    │ FROM: KAI Concierge Desk      │                   │ FROM: KAI Sanctuary Inquiries │
-    └───────────────────────────────┘                   └───────────────────────────────┘
-```
-
-### 1. Production Go-Live: Domain Verification (Standard Method)
-
-The gold standard for brand trust and deliverability is verifying your domain on [Resend](https://resend.com/domains):
-
-* **Choice A: Host Agency Domain (`grandtravelcruise.com`)**
-  1. Go to [resend.com/domains](https://resend.com/domains) and click **Add Domain** (`grandtravelcruise.com`).
-  2. Add the 3 DNS records (DKIM, SPF, DMARC) in your domain DNS host (GoDaddy, Cloudflare, etc.).
-  3. In `.env`:
-     ```env
-     RESEND_FROM_EMAIL="KAI Sanctuary Reservations <kareena@grandtravelcruise.com>"
-     RESEND_CONCIERGE_FROM_EMAIL="KAI Concierge Desk <armaan@grandtravelcruise.com>"
-     KAREENA_ROUTING_EMAIL="kareena@grandtravelcruise.com"
-     ARMAAN_ROUTING_EMAIL="armaan@grandtravelcruise.com"
-     ```
-
-* **Choice B: Sanctuary Brand Domain (`kaiwellnessretreats.com`)**
-  1. In [resend.com/domains](https://resend.com/domains), click **Add Domain** (`kaiwellnessretreats.com`).
-  2. Add the 3 DNS records at your domain host.
-  3. In `.env`:
-     ```env
-     RESEND_FROM_EMAIL="KAI Sanctuary Reservations <inquiries@kaiwellnessretreats.com>"
-     RESEND_CONCIERGE_FROM_EMAIL="KAI Concierge Desk <concierge@kaiwellnessretreats.com>"
-     KAREENA_ROUTING_EMAIL="kareena@grandtravelcruise.com"
-     ARMAAN_ROUTING_EMAIL="armaan@grandtravelcruise.com"
-     ```
+* **Zero Direct Card Storage**: All guest payments are handled through the native Sanctuary Travel Card Vault & Proposal e-sign platform.
+* **Strict Medical Privacy**: Guest clinical intakes, contraindications, and dietary restrictions are isolated in encrypted database fields and never shared with third-party advertising or marketing services.
+* **Session Cookie Protection**: Portal access is secured by Next.js 16's consolidated `proxy.ts` gateway with server-side administrative credential injection.
 
 ---
 
-### 2. Alternative Fallback Methods (Zero DNS Access Required)
-
-If you or Kareena/Armaan do not have immediate access to your DNS host, use one of these verified zero-DNS fallbacks:
-
-#### Fallback A: Microsoft 365 SMTP (Native to Grand Travel & Cruise)
-*Grand Travel & Cruise (`grandtravelcruise.com`) email is hosted on Microsoft 365 (`mail.protection.outlook.com`). SPF and DKIM are already configured on Microsoft's servers.*
-
-1. In Kareena or Armaan's Microsoft 365 account, create an **App Password** (or enable SMTP AUTH).
-2. Configure in `.env`:
-   ```env
-   SMTP_HOST="smtp.office365.com"
-   SMTP_PORT="587"
-   SMTP_USER="kareena@grandtravelcruise.com"
-   SMTP_PASSWORD="<your-365-app-password>"
-   SMTP_USE_TLS="true"
-   ```
-* **Benefits**: Zero DNS changes. Emails send directly through Kareena's actual Microsoft 365 mailbox, appear in her Sent folder, and deliver to any customer worldwide without sandbox restrictions.
-
-#### Fallback B: Google / Gmail SMTP with App Password (60-Second Setup)
-*Fastest fallback to send to any real email without touching Microsoft 365 or DNS.*
-
-1. Go to [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) on any Google Account with 2-Step Verification enabled.
-2. Create an App Password named `KAI Sanctuary` (Google generates a 16-character code).
-3. Configure in `.env`:
-   ```env
-   SMTP_HOST="smtp.gmail.com"
-   SMTP_PORT="587"
-   SMTP_USER="your-email@gmail.com"
-   SMTP_PASSWORD="<16-character-app-password>"
-   SMTP_USE_TLS="true"
-   ```
-* **Benefits**: Zero DNS changes. Instantly bypasses Resend sandbox restrictions and delivers confirmations to any customer email.
-
-#### Fallback C: Email-Link Single Sender Verification (Brevo / Postmark)
-*Services like Brevo or Postmark allow sending from `kareena@grandtravelcruise.com` without DNS by sending a one-click confirmation link to her inbox.*
-
-#### Fallback D: Built-In Sandbox Testing Mirror (Active by Default)
-*While in testing mode using `onboarding@resend.dev`, Resend blocks delivery to external recipients. Our code automatically catches this and forwards a complete **Customer Confirmation Carbon Copy** to `alessionaji1@gmail.com` labeled `[CUSTOMER CONFIRMATION: <email>]` so you can verify the email design and reference code without any setup.*
-
----
-
-### 3. Testing the Email Pipeline via CLI
-
-To verify transactional delivery at any time from your terminal:
-
-```bash
-# Test direct API handshake and recipient delivery:
-python scripts/send_test_email.py --to your-email@gmail.com
-
-# Test the complete intake pipeline (Founder Alert + Customer Confirmation):
-python scripts/send_test_email.py --to your-email@gmail.com --pipeline
-```
-
----
-
-## 🔒 Security, Privacy & Payments (In Plain English)
-
-* **We Never Touch Credit Card Numbers**: All guest payments are handled directly through our native Sanctuary Travel Card Vault & Proposal e-sign platform. We have zero payment liability.
-* **Private Medical Info**: Guest medical notes, injuries, and dietary needs are stored in private clinical files and are never shared or used for marketing.
-* **Password-Protected Portal**: The entire team portal is locked behind admin login credentials.
-
----
-
-© 2026 KAI Wellness Retreats • Grand Travel & Cruise Partnered • Questions? Email `kareena@kaiwellnessretreats.com`.
+© 2026 KAI Wellness Retreats • Grand Travel & Cruise Partnered • Concierge Desk: `concierge@kaiwellnessretreats.com`.

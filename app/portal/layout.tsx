@@ -12,23 +12,89 @@ import {
   RefreshCw,
   ExternalLink,
   Sparkles,
-  HeartPulse,
-  FileText,
+    FileText,
   Calendar,
   Globe2,
   HelpCircle,
   Compass,
   Briefcase,
   Mic,
-  Database
+  Database,
+  Search,
+  LogOut
 } from "lucide-react";
+import { authFetch } from "@/lib/auth-fetch";
 import { fetchCohortCapacities, SanctuaryCohortStatus, seedDemoIntakes, fetchDraftStats } from "@/lib/sidecar-api";
 import NativeFormsModal from "@/components/portal/NativeFormsModal";
 import PortalHelpModal from "@/components/portal/PortalHelpModal";
 import ClinicalCopilotDrawer from "@/components/portal/ClinicalCopilotDrawer";
 import VoiceConsultationModal from "@/components/portal/VoiceConsultationModal";
+import GlobalCommandPaletteModal from "@/components/portal/GlobalCommandPaletteModal";
+
+interface OperatorIdentity {
+  email: string;
+  full_name: string;
+  role: string;
+}
+
+function OperatorSessionBadge() {
+  const [operator, setOperator] = useState<OperatorIdentity | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    authFetch("/api/auth/me")
+      .then(async (res) => {
+        if (active && res.ok) setOperator(await res.json());
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const signOut = async () => {
+    setSigningOut(true);
+    try {
+      await authFetch("/api/auth/operator/logout", { method: "POST" });
+    } finally {
+      window.location.assign("/portal/login");
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-2 pl-2 border-l border-[#E5DDD0]">
+      <div className="hidden xl:block text-right leading-tight">
+        <p className="text-xs font-medium text-[#2D3E35]" title={operator?.email}>{operator?.full_name ?? "Checking session…"}</p>
+        <p className="text-[10px] text-emerald-700">{operator ? "Session active" : ""}</p>
+      </div>
+      {operator && (
+        <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-200">
+          Admin
+        </span>
+      )}
+      <button
+        type="button"
+        onClick={signOut}
+        aria-label="Sign out"
+        disabled={signingOut}
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs text-[#5C6B5E] hover:text-[#2D3E35] hover:bg-[#F2ECE4] disabled:opacity-60 transition-colors"
+      >
+        <LogOut className="w-3.5 h-3.5" />
+        <span className="hidden sm:inline">Sign out</span>
+      </button>
+    </div>
+  );
+}
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  // Sign-in renders without the portal shell, whose effects would call authenticated APIs.
+  if (pathname === "/portal/login" || pathname === "/portal/reset-password") return <>{children}</>;
+  return <AuthenticatedPortalShell>{children}</AuthenticatedPortalShell>;
+}
+
+function AuthenticatedPortalShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [cohorts, setCohorts] = useState<SanctuaryCohortStatus[]>([]);
   const [seeding, setSeeding] = useState(false);
@@ -36,7 +102,10 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const [isFormsOpen, setIsFormsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
+  const [copilotInitialQuery, setCopilotInitialQuery] = useState<string | undefined>(undefined);
+  const [copilotInitialMode, setCopilotInitialMode] = useState<any>(undefined);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [pendingDraftsCount, setPendingDraftsCount] = useState<number>(0);
 
   const loadDraftsCount = async () => {
@@ -70,11 +139,39 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     };
     fetchTelemetry();
     window.addEventListener("drafts-updated", loadDraftsCount);
+
+    const handleOpenCopilot = (e: Event) => {
+      const customEvent = e as CustomEvent<{ query?: string; mode?: string }>;
+      if (customEvent.detail?.query) {
+        setCopilotInitialQuery(customEvent.detail.query);
+      }
+      if (customEvent.detail?.mode) {
+        setCopilotInitialMode(customEvent.detail.mode);
+      }
+      setIsCopilotOpen(true);
+    };
+    window.addEventListener("kai:copilot:open", handleOpenCopilot);
+
+    const handleOpenVoice = () => setIsVoiceOpen(true);
+    window.addEventListener("kai:voice:open", handleOpenVoice);
+
+    // Global Command Palette Shortcut (Cmd+K / Ctrl+K)
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleGlobalKeyDown);
+
     const interval = setInterval(fetchTelemetry, 20000);
     return () => {
       active = false;
       clearInterval(interval);
       window.removeEventListener("drafts-updated", loadDraftsCount);
+      window.removeEventListener("kai:copilot:open", handleOpenCopilot);
+      window.removeEventListener("kai:voice:open", handleOpenVoice);
+      window.removeEventListener("keydown", handleGlobalKeyDown);
     };
   }, []);
 
@@ -112,10 +209,11 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
     { href: "/portal/reconciliation", label: "Guest List Check", icon: Scale, badge: "Manifest" },
     { href: "/portal/emails", label: "Concierge Inbox", icon: Mail, badge: "Inbound" },
     { href: "/portal/webhooks", label: "Service Connections", icon: Globe2, badge: "Integrations" },
+    { href: "/portal/staff", label: "Staff", icon: Users, badge: "Accounts" },
   ];
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2] text-[#2D3E35] flex flex-col font-sans selection:bg-[#5C6B5E] selection:text-[#FAF7F2]">
+    <div className="-mt-20 min-h-screen bg-[#FAF7F2] text-[#2D3E35] flex flex-col font-sans selection:bg-[#5C6B5E] selection:text-[#FAF7F2]">
       {/* Top Founder Operator Header */}
       <header className="sticky top-0 z-40 bg-[#FAF7F2]/90 backdrop-blur-md border-b border-[#E5DDD0]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -130,24 +228,23 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                   STAFF STUDIO
                 </span>
               </Link>
-              <span className="text-[#C07D63] text-sm">/</span>
-              <span className="text-xs text-[#5C6B5E] hidden sm:inline-block font-medium">
-                Staff Operations & Travel Planner
-              </span>
-
-              {/* Staff Operator Active Pill */}
-              <div className="hidden md:flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[11px] text-emerald-800 font-medium">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Staff Operator Active</span>
-              </div>
             </div>
 
-            {/* Right: Help Guide, Forms Hub, Seeder, Operator Profile */}
-            <div className="flex items-center space-x-2">
+            {/* Right: labels collapse to icons on narrower screens so Sign Out always stays visible */}
+            <div className="flex items-center space-x-2 whitespace-nowrap">
+              {/* Global Command Palette Trigger */}
+              <button
+                onClick={() => setIsCommandPaletteOpen(true)}
+                className="inline-flex items-center space-x-2 px-2.5 py-1 text-xs text-[#5C6B5E] hover:text-[#2D3E35] bg-[#F2ECE4] hover:bg-[#EBE3D8] border border-[#E5DDD0] rounded-md transition-all shadow-2xs group cursor-pointer"
+                title="Open Global Command Palette (Cmd+K / Ctrl+K)"
+              >
+                <Search className="w-3.5 h-3.5 text-[#5C6B5E] group-hover:text-[#2D3E35]" />
+                <span className="hidden xl:inline font-medium">Quick search...</span>
+                <kbd className="hidden xl:inline-flex items-center px-1.5 py-0.2 text-[10px] font-mono bg-white/90 border border-[#E5DDD0] rounded text-[#5C6B5E] group-hover:border-[#C07D63]">
+                  ⌘K
+                </kbd>
+              </button>
+
               <button
                 onClick={() => setIsVoiceOpen(true)}
                 className="inline-flex items-center space-x-1.5 px-3 py-1 text-xs font-semibold text-[#2D3E35] bg-gradient-to-r from-amber-100 to-amber-50 hover:from-amber-200 hover:to-amber-100 border border-amber-300/80 rounded-md transition-all shadow-sm"
@@ -163,7 +260,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 title="Open Studio Orientation & Layman's Terms Guide"
               >
                 <HelpCircle className="w-3.5 h-3.5 text-amber-600" />
-                <span>Help & Guide</span>
+                <span className="hidden xl:inline">Help & Guide</span>
               </button>
 
               <button
@@ -172,9 +269,10 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 title="Open KAI Native Forms Hub"
               >
                 <FileText className="w-3.5 h-3.5 text-[#C07D63]" />
-                <span>Native Forms Hub</span>
+                <span className="hidden xl:inline">Native Forms Hub</span>
               </button>
 
+              {process.env.NODE_ENV !== "production" && (
               <button
                 onClick={handleSeedDemo}
                 disabled={seeding}
@@ -182,29 +280,19 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 title="Populate test sample submissions for Nosara, Amalfi, and Bali"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${seeding ? "animate-spin" : ""}`} />
-                <span>{seedSuccess ? "Sample Seeded!" : "Test Sample Submission"}</span>
+                <span className="hidden 2xl:inline">{seedSuccess ? "Sample Seeded!" : "Test Sample Submission"}</span>
               </button>
-
-              <div className="hidden sm:flex items-center space-x-2 border-l border-[#E5DDD0] pl-3">
-                <div className="text-right">
-                  <div className="text-xs font-semibold text-[#2D3E35] leading-tight">
-                    Kareena Islam, BSN, RN
-                  </div>
-                  <div className="text-[10px] text-[#5C6B5E] flex items-center justify-end space-x-1">
-                    <HeartPulse className="w-3 h-3 text-[#C07D63]" />
-                    <span>Founder & Restorative Curator</span>
-                  </div>
-                </div>
-              </div>
+              )}
 
               <Link
                 href="/"
                 target="_blank"
                 className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs text-[#5C6B5E] hover:text-[#2D3E35] border border-[#E5DDD0] rounded-md hover:bg-white/50 transition-colors"
               >
-                <span>Live Site</span>
+                <span className="hidden xl:inline">Live Site</span>
                 <ExternalLink className="w-3 h-3" />
               </Link>
+              <OperatorSessionBadge />
             </div>
           </div>
 
@@ -323,9 +411,29 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       </footer>
 
       {/* Modals and Drawers */}
+      <GlobalCommandPaletteModal
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onOpenVoiceMemo={() => setIsVoiceOpen(true)}
+        onOpenFormsHub={() => setIsFormsOpen(true)}
+        onOpenCopilot={(query, mode) => {
+          setCopilotInitialQuery(query);
+          setCopilotInitialMode(mode);
+          setIsCopilotOpen(true);
+        }}
+      />
       <NativeFormsModal isOpen={isFormsOpen} onClose={() => setIsFormsOpen(false)} />
       <PortalHelpModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
-      <ClinicalCopilotDrawer isOpen={isCopilotOpen} onClose={() => setIsCopilotOpen(false)} />
+      <ClinicalCopilotDrawer 
+        isOpen={isCopilotOpen} 
+        onClose={() => {
+          setIsCopilotOpen(false);
+          setCopilotInitialQuery(undefined);
+          setCopilotInitialMode(undefined);
+        }} 
+        initialQuery={copilotInitialQuery}
+        initialMode={copilotInitialMode}
+      />
       <VoiceConsultationModal
         isOpen={isVoiceOpen}
         onClose={() => setIsVoiceOpen(false)}

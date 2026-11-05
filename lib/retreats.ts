@@ -9,6 +9,8 @@ export const RETREATS: Retreat[] = [
     country: "Mexico",
     locationDetails: "Marival Armony (Harmony) Luxury Resort & Suites • Punta de Mita & Banderas Bay",
     dates: "January 28 – 31, 2027",
+    startDate: "2027-01-28",
+    endDate: "2027-01-31",
     year: 2027,
     season: "Winter",
     duration: "4 Days / 3 Nights",
@@ -18,8 +20,8 @@ export const RETREATS: Retreat[] = [
     tagline: "The inaugural 2027 KAI retreat at Marival Harmony — where your peace within blends with the pieces around on the Sierra Madre coast.",
     description: "Our flagship First Retreat of 2027 at Marival Armony (Harmony) in Puerto Vallarta / Punta de Mita. Set where the emerald Sierra Madre Occidental mountains meet the tranquil sapphire waters of Banderas Bay, this 4-day sanctuary blends Kareena Islam's clinical somatic restoration and 432Hz crystal bowl acoustics with Armaan Islam's endurance recovery protocols and deep Jalisco cultural integration.",
     clinicalFocus: [
-      "Post-winter circadian and cortisol reset via morning Pacific solar light and negative marine ion immersion",
-      "Vagus nerve down-regulation combining 432Hz crystal singing bowls with rhythmic ocean acoustics",
+      "A winter break with morning sunshine and time by the Pacific",
+      "Crystal singing bowls and ocean sounds that can help you unwind",
       "Endurance recovery & metabolic restoration co-designed with Ironman athlete Armaan Islam & nurse clinician Kareena Islam, BSN, RN"
     ],
     somaticPractices: [
@@ -68,7 +70,7 @@ export const RETREATS: Retreat[] = [
       "All gourmet farm-and-sea-to-table meals, organic cold-pressed juices, and zero-proof botanical elixirs",
       "Daily sunrise somatic vinyasa, pranayama, and sunset 432Hz crystal bowl sound baths led by Kareena Islam, BSN, RN, RYT",
       "Endurance recovery, metabolic longevity & nervous-system resilience workshop with Co-Founder & Ironman Athlete Armaan Islam",
-      "Curated Jalisco cultural integration: Wixárika artisan cultural exchange & sacred coastal cacao ceremony",
+      "Jalisco cultural experiences: Wixárika artisan cultural exchange & sacred coastal cacao ceremony",
       "VIP roundtrip private transfers from Puerto Vallarta International Airport (PVR) coordinated by Grand Travel & Cruise",
       "Signature KAI restorative welcome kit (somatic eye pillow, electrolytes, herbal tinctures, custom grounding journal)"
     ],
@@ -105,7 +107,7 @@ export const RETREATS: Retreat[] = [
         title: "Ocean Hydrotherapy, Sierra Madre Wisdom & Integration",
         highlights: [
           "Morning coastal mobility, myofascial release & guided ocean immersion",
-          "Curated culinary masterclass: Anti-inflammatory Mexican heritage botanicals & coastal nutrition",
+          "Culinary masterclass: Anti-inflammatory Mexican heritage botanicals & coastal nutrition",
           "1-on-1 somatic & lifestyle integration check-ins with Kareena and Armaan",
           "Golden hour farewell banquet & closing acoustic sound ceremony"
         ]
@@ -131,6 +133,8 @@ export const RETREATS: Retreat[] = [
     country: "Costa Rica",
     locationDetails: "Playa Guiones & Sacred Jungle Canopy (Placeholder • Dates Coming Soon)",
     dates: "Coming Soon • 2027 Season",
+    startDate: "2027-04-15",
+    endDate: "2027-04-21",
     year: 2027,
     season: "Winter",
     duration: "7 Days / 6 Nights",
@@ -138,10 +142,10 @@ export const RETREATS: Retreat[] = [
     spotsRemaining: 14,
     investmentStarting: "$3,850",
     tagline: "Canopy seclusion, surf therapy, anatomically grounded vinyasa, and Blue Zone cultural nourishment.",
-    description: "Nestled in the lush biodiversity of Costa Rica's Nicoya Peninsula Blue Zone, this upcoming 2027 sanctuary blends ocean saltwater hydrotherapy, daily alignment-focused vinyasa, Chorotega ancestral pottery & herbal traditions, and deep parasympathetic recovery beneath ancient forest canopies.",
+    description: "Nestled in the lush biodiversity of Costa Rica's Nicoya Peninsula Blue Zone, this upcoming 2027 sanctuary blends ocean saltwater hydrotherapy, daily alignment-focused vinyasa, Chorotega ancestral pottery & herbal traditions, and quiet time beneath the forest canopy.",
     clinicalFocus: [
-      "Circadian cortisol curve re-synchronization through natural sunrise exposure",
-      "Vagus nerve stimulation via thermal & saltwater ocean immersion",
+      "Morning light and early starts, which can help reset your sleep rhythm",
+      "Warm-water and ocean swims for relaxation",
       "Reduction of systemic inflammation through anti-inflammatory Blue Zone culinary sourcing"
     ],
     somaticPractices: [
@@ -189,7 +193,7 @@ export const RETREATS: Retreat[] = [
       "Daily clinical grounding workshops, guided yoga & 432Hz crystal sound baths",
       "Private saltwater surf coaching and ocean hydro-restoration session",
       "Full VIP airport arrival coordination and private chauffeured transfers via Grand Travel & Cruise concierge",
-      "Curated KAI restorative welcome kit (somatic eye pillows, mineral tinctures)"
+      "KAI welcome kit (somatic eye pillows, mineral tinctures)"
     ],
     accommodations: "Private teakwood sanctuary suites with outdoor open-air rain showers, stone soaking tubs, and panoramic ocean-canopy views.",
     heroImage: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1600&q=85",
@@ -207,7 +211,7 @@ export const RETREATS: Retreat[] = [
       {
         day: "Day 2",
         title: "Circadian Awakening & Ocean Breath",
-        highlights: ["Sunrise pranayama on Guiones beach", "Anatomical alignment vinyasa", "Clinical seminar: Cortisol, Sleep Architecture & The Modern Nervous System", "Crystal singing bowl sound bath at dusk"]
+        highlights: ["Sunrise pranayama on Guiones beach", "Anatomical alignment vinyasa", "Talk with Kareena: Stress, Sleep and Everyday Habits", "Crystal singing bowl sound bath at dusk"]
       },
       {
         day: "Day 3",
@@ -221,7 +225,7 @@ export const RETREATS: Retreat[] = [
       },
       {
         day: "Day 5",
-        title: "Deep Parasympathetic Immersion",
+        title: "A Slower Day",
         highlights: ["Vinyasa flow focusing on pelvic and spinal alignment", "Apothecary workshop with native Costa Rican botanicals", "Group sound bath under starlight", "Nourishing farm-to-table dinner"]
       },
       {
@@ -246,6 +250,8 @@ export const RETREATS: Retreat[] = [
     country: "Italy",
     locationDetails: "Ravello & Positano Cliffside Haven (Placeholder • Dates Coming Soon)",
     dates: "Coming Soon • 2027 Season",
+    startDate: "2027-05-20",
+    endDate: "2027-05-26",
     year: 2027,
     season: "Spring",
     duration: "7 Days / 6 Nights",
@@ -257,11 +263,11 @@ export const RETREATS: Retreat[] = [
     clinicalFocus: [
       "Autonomic nervous system recovery from chronic cognitive fatigue",
       "Cardiovascular and metabolic harmony through polyphenol-rich Mediterranean nutrition",
-      "Decreased arterial tension through acoustic sound therapy and sea breeze negative ionization"
+      "Sound baths and sea air for a slower pace"
     ],
     somaticPractices: [
       "Restorative Yin overlooking coastal vistas",
-      "Pranayama & therapeutic breath pacing for deep vagal tone elevation",
+      "Pranayama and slow breathing that can help ease stress",
       "Crystal singing bowl sound baths at sunset",
       "Walking meditation along ancient lemon terraces"
     ],
@@ -336,7 +342,7 @@ export const RETREATS: Retreat[] = [
       },
       {
         day: "Day 5",
-        title: "Breath & Cellular Renewal",
+        title: "Breath & Rest",
         highlights: ["Pranayama practice greeting the Mediterranean sun", "Workshop: Establishing Circadian Boundaries at Home", "Afternoon spa hydrotherapy or quiet poolside contemplation", "Family-style Italian longevity banquet"]
       },
       {
@@ -361,6 +367,8 @@ export const RETREATS: Retreat[] = [
     country: "Indonesia",
     locationDetails: "Ayung River Sanctuary & Sacred Rice Terraces (Placeholder • Dates Coming Soon)",
     dates: "Coming Soon • 2027 Season",
+    startDate: "2027-10-10",
+    endDate: "2027-10-17",
     year: 2027,
     season: "Autumn",
     duration: "9 Days / 8 Nights",
@@ -413,7 +421,7 @@ export const RETREATS: Retreat[] = [
       ]
     },
     inclusions: [
-      "8 nights in secluded river & valley estate buyouts curated exclusively by Grand Travel & Cruise",
+      "8 nights in secluded river & valley estate buyouts arranged by Grand Travel & Cruise",
       "All nourishing organic Balinese meals prepared by dedicated private estate wellness chefs",
       "Private traditional Melukat water purification ceremony conducted by a hereditary Balinese high priest",
       "Traditional Balinese botanical Jamu crafting & herbal boreh therapy with village healing elders",
@@ -461,7 +469,7 @@ export const RETREATS: Retreat[] = [
       {
         day: "Day 7",
         title: "The Architecture of Daily Stillness",
-        highlights: ["Gentle vinyasa flow amidst the morning mist", "Clinical workshop: Preserving Your Vagal Tone in High-Stress Workplaces", "Private 1-on-1 check-ins with Kareena", "Candlelit feast with traditional gamelan music"]
+        highlights: ["Gentle vinyasa flow amidst the morning mist", "Workshop: Managing Stress at Work", "Private 1-on-1 check-ins with Kareena", "Candlelit feast with traditional gamelan music"]
       },
       {
         day: "Day 8",
@@ -485,6 +493,8 @@ export const RETREATS: Retreat[] = [
     country: "Mexico",
     locationDetails: "El Dorado Seaside Palms Adults-Only Sanctuary (Past Cohort / Future Dates TBA)",
     dates: "Coming Soon • Future Cohort TBA",
+    startDate: "2026-11-12",
+    endDate: "2026-11-16",
     year: 2026,
     season: "Autumn",
     duration: "4 Days / 3 Nights",
@@ -496,7 +506,7 @@ export const RETREATS: Retreat[] = [
     clinicalFocus: [
       "Rapid acute nervous system reset before end-of-year burnout",
       "Restoration of natural circadian sleep markers via oceanfront sunrise exposure",
-      "Somatic grounding through sand therapy, saltwater negative ions, and guided breath"
+      "Beach time, saltwater, and guided breathing"
     ],
     somaticPractices: [
       "Oceanfront sunrise vinyasa & alignment yoga",
@@ -522,7 +532,7 @@ export const RETREATS: Retreat[] = [
       climateClassification: "Tropical Savanna (Aw)",
       climateSummary: "Warm turquoise Caribbean waters (82°F), steady easterly trade breezes, and lush tropical warmth.",
       historicalPattern: "Consistent coastal warmth with brief tropical passing showers that quickly clear to sunny skies.",
-      weatherModelNote: "Easterly trade winds provide continuous negative ion circulation along the beachfront shala.",
+      weatherModelNote: "Easterly trade winds keep the beachfront shala breezy.",
       whatToWear: {
         morningPractice: "Light moisture-wicking yoga tank and shorts.",
         daytimeExcursion: "Swimwear, linen cover-up, and sun hat.",
@@ -539,7 +549,7 @@ export const RETREATS: Retreat[] = [
       "Gourmet culinary experiences and restorative botanicals crafted with local Mexican ingredients",
       "Daily sunrise yoga, breathwork, and crystal singing bowl sessions led by Kareena Islam",
       "Round-trip Cancun (CUN) airport private chauffeured transfers and flight monitoring by Grand Travel & Cruise",
-      "Curated KAI travel wellness kit & personalized clinical grounding journal"
+      "KAI travel wellness kit & personalized clinical grounding journal"
     ],
     accommodations: "Oceanfront luxury suites with private swim-up access or ocean-view balconies, hydro-massage tubs, and 24-hour room service.",
     heroImage: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=85",
@@ -557,7 +567,7 @@ export const RETREATS: Retreat[] = [
       {
         day: "Day 2",
         title: "Sound Bath & Nervous System Reset",
-        highlights: ["Morning sunrise ocean yoga", "Clinical talk: The Science of Parasympathetic Activation", "Signature crystal singing bowl sound healing experience", "Free afternoon for beach lounging and spa hydrotherapy"]
+        highlights: ["Morning sunrise ocean yoga", "Talk with Kareena: How Rest Works", "Signature crystal singing bowl sound healing experience", "Free afternoon for beach lounging and spa hydrotherapy"]
       },
       {
         day: "Day 3",

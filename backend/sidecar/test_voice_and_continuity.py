@@ -8,24 +8,16 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../.
 from starlette.testclient import TestClient
 from backend.main import app
 from backend.database import SessionLocal
-from backend.sidecar.routers.webhooks import verify_admin
+from backend.testing import admin_headers
 from backend.models import ActionDraft
 from backend.sidecar.models import StagingIntake
 from backend.sidecar.services.voice_transcriber import extract_entities_from_transcript
 from backend.sidecar.services.continuity_service import generate_continuity_milestones
 
-client = TestClient(app)
+client = TestClient(app, headers=admin_headers())
 
 
 class TestVoiceAndContinuity(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        app.dependency_overrides[verify_admin] = lambda: "admin"
-
-    @classmethod
-    def tearDownClass(cls):
-        app.dependency_overrides.pop(verify_admin, None)
-
     def setUp(self):
         self.db = SessionLocal()
 
