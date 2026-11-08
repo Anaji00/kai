@@ -189,7 +189,7 @@ def send_booking_confirmation(booking_data: dict, retreat_info: dict) -> bool:
         </div>
 
         <p style="font-size: 14px; margin: 20px 0 0 0; color: #2D3E35;">
-            If you have any immediate questions, feel free to reply directly to this email or reach us at <a href="mailto:kareena@grandtravelcruise.com" style="color: #C07D63;">kareena@grandtravelcruise.com</a> &amp; <a href="mailto:armaan@grandtravelcruise.com" style="color: #C07D63;">armaan@grandtravelcruise.com</a>.
+            If you have any immediate questions, reply directly to this email or reach us at <a href="mailto:kareena@grandtravelcruise.com" style="color: #C07D63;">kareena@grandtravelcruise.com</a> &amp; <a href="mailto:armaan@grandtravelcruise.com" style="color: #C07D63;">armaan@grandtravelcruise.com</a>.
         </p>
 
         <div style="margin-top: 32px; padding-top: 20px; border-top: 1px solid #E5DDD0;">

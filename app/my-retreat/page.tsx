@@ -42,7 +42,10 @@ import {
   Check,
   FileCheck2,
   ExternalLink,
+  BedDouble,
   X,
+  WifiOff,
+  Layers,
 } from "lucide-react";
 import { authFetch } from "@/lib/auth-fetch";
 
@@ -297,6 +300,12 @@ function MyRetreatContent() {
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [approvalError, setApprovalError] = useState<string | null>(null);
 
+  // Tern Parity: Dynamic Room Option & Suite Tier selection on proposal
+  const [selectedSuiteTier, setSelectedSuiteTier] = useState<string | null>(null);
+  const [suitePriceAdjustment, setSuitePriceAdjustment] = useState<number>(0);
+  const [showSuiteComparison, setShowSuiteComparison] = useState(false);
+  const [isOfflineMode, setIsOfflineMode] = useState(false);
+
   // Sound & Breath
   const sound = useSolfeggioPlayer();
   const breath = useBreathingCycle();
@@ -309,7 +318,7 @@ function MyRetreatContent() {
       const res = await authFetch(`${backendUrl}/api/v1/sidecar/guest-portal/demo-token`, {
         method: "POST",
       });
-      if (!res.ok) throw new Error("Backend unavailable");
+      if (!res.ok) throw new Error("Our sanctuary reservation system is momentarily unavailable. Please refresh or contact concierge@kaiwellnessretreats.com.");
       const json = await res.json();
       if (json.token) {
         window.location.assign(`/my-retreat?token=${encodeURIComponent(json.token)}`);
@@ -353,18 +362,45 @@ function MyRetreatContent() {
         try {
           const res = await authFetch(`${backendUrl}/api/v1/sidecar/guest-portal/proposal?ref=${encodeURIComponent(ref)}`);
           if (!res.ok) {
+            const cached = typeof window !== "undefined" ? window.localStorage.getItem(`kai_proposal_${ref}`) : null;
+            if (cached) {
+              try {
+                const parsed = JSON.parse(cached);
+                setProposal(parsed);
+                setSelectedSuiteTier(parsed.room_tier);
+                setIsOfflineMode(true);
+                return;
+              } catch {}
+            }
             setError("We could not locate this sanctuary proposal. Please check your reservation link or contact concierge@kaiwellnessretreats.com.");
             return;
           }
           const json = await res.json();
           if (json.success && json.proposal) {
             setProposal(json.proposal);
+            if (typeof window !== "undefined") {
+              try {
+                window.localStorage.setItem(`kai_proposal_${ref}`, JSON.stringify(json.proposal));
+              } catch {}
+            }
+            setSelectedSuiteTier(json.proposal.room_tier);
+            setSuitePriceAdjustment(0);
             setCardholderName(json.proposal.guest_name || "");
             setESignature(json.proposal.guest_name || "");
           } else {
             setError("Unable to display proposal. Please contact your concierge.");
           }
         } catch {
+          const cached = typeof window !== "undefined" ? window.localStorage.getItem(`kai_proposal_${ref}`) : null;
+          if (cached) {
+            try {
+              const parsed = JSON.parse(cached);
+              setProposal(parsed);
+              setSelectedSuiteTier(parsed.room_tier);
+              setIsOfflineMode(true);
+              return;
+            } catch {}
+          }
           setError("Connection error. Please check your internet and try again.");
         } finally {
           setLoading(false);
@@ -379,11 +415,33 @@ function MyRetreatContent() {
       try {
         const res = await authFetch(`${backendUrl}/api/v1/sidecar/guest-portal/me`);
         if (!res.ok) {
+          const cached = typeof window !== "undefined" ? window.localStorage.getItem("kai_guest_session_me") : null;
+          if (cached) {
+            try {
+              setData(JSON.parse(cached));
+              setIsOfflineMode(true);
+              return;
+            } catch {}
+          }
           setError("Unable to load your retreat companion. Please try again later.");
           return;
         }
-        setData(await res.json());
+        const json = await res.json();
+        setData(json);
+        if (typeof window !== "undefined") {
+          try {
+            window.localStorage.setItem("kai_guest_session_me", JSON.stringify(json));
+          } catch {}
+        }
       } catch {
+        const cached = typeof window !== "undefined" ? window.localStorage.getItem("kai_guest_session_me") : null;
+        if (cached) {
+          try {
+            setData(JSON.parse(cached));
+            setIsOfflineMode(true);
+            return;
+          } catch {}
+        }
         setError("Connection error. Please check your internet and try again.");
       } finally {
         setLoading(false);
@@ -399,6 +457,11 @@ function MyRetreatContent() {
       return next;
     });
   };
+
+  const effectiveSuiteTier = selectedSuiteTier || proposal?.room_tier || "Oceanfront King Suite";
+  const effectiveTotalInvestment = (proposal?.total_investment || 0) + suitePriceAdjustment;
+  const effectiveDepositAmount = Math.round(effectiveTotalInvestment * 0.3 * 100) / 100;
+  const effectiveFinalBalance = Math.round(effectiveTotalInvestment * 0.7 * 100) / 100;
 
   const handleApproveProposal = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -427,6 +490,8 @@ function MyRetreatContent() {
           card_brand: cardBrand,
           e_signature: eSignature,
           agreed_to_terms: true,
+          selected_room_tier: effectiveSuiteTier,
+          custom_total_investment: effectiveTotalInvestment,
         }),
       });
 
@@ -441,6 +506,10 @@ function MyRetreatContent() {
           ...proposal,
           status: "CONFIRMED",
           deposit_status: "PAID",
+          room_tier: effectiveSuiteTier,
+          total_investment: effectiveTotalInvestment,
+          deposit_amount: effectiveDepositAmount,
+          final_balance: effectiveFinalBalance,
         });
       }
     } catch (err: unknown) {
@@ -475,16 +544,23 @@ function MyRetreatContent() {
         {/* Proposal Top Bar */}
         <section className="bg-sand/40 border-b border-sand-border/70 py-6 px-6">
           <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <span className="text-[10px] uppercase tracking-[0.25em] text-terracotta font-semibold block mb-1">
-                KAI Wellness Retreats &middot; Grand Travel &amp; Cruise
-              </span>
-              <h1 className="font-serif text-2xl sm:text-3xl text-sage font-light">
-                Private Sanctuary Reservation Proposal
-              </h1>
-              <p className="text-xs text-sage/70 mt-1">
-                Prepared for <span className="font-semibold text-sage">{proposal.guest_name}</span> &middot; Reference: <span className="font-mono text-terracotta">{proposal.ref}</span>
-              </p>
+            <div className="flex items-center gap-4">
+              <img
+                src="/kai-logo.png"
+                alt="KAI Wellness Retreats"
+                className="w-12 h-12 rounded-full object-contain shrink-0 ring-1 ring-sand-border/80 shadow-xs"
+              />
+              <div>
+                <span className="text-[10px] uppercase tracking-[0.25em] text-terracotta font-semibold block mb-1">
+                  KAI Wellness Retreats &middot; Grand Travel &amp; Cruise
+                </span>
+                <h1 className="font-serif text-2xl sm:text-3xl text-sage font-light">
+                  Private Sanctuary Reservation Proposal
+                </h1>
+                <p className="text-xs text-sage/70 mt-1">
+                  Prepared for <span className="font-semibold text-sage">{proposal.guest_name}</span> &middot; Reference: <span className="font-mono text-terracotta">{proposal.ref}</span>
+                </p>
+              </div>
             </div>
 
             <div>
@@ -505,6 +581,17 @@ function MyRetreatContent() {
 
         {/* Proposal Body */}
         <div className="max-w-4xl mx-auto px-6 py-8 space-y-8">
+          {/* Offline Mode Banner */}
+          {isOfflineMode && (
+            <div className="px-4 py-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-1 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <WifiOff className="w-4 h-4 text-amber-700 shrink-0" />
+                <span className="font-semibold">In-Flight Offline Mode Active &middot; Displaying verified offline cache</span>
+              </div>
+              <span className="text-[10px] text-amber-700">All schedules, flight legs &amp; 432Hz sound immersion available offline</span>
+            </div>
+          )}
+
           {/* Sanctuary Overview Card */}
           <div className="glass-card rounded-2xl p-6 sm:p-8 space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-sand-border/60 pb-5">
@@ -514,21 +601,158 @@ function MyRetreatContent() {
               </div>
               <div className="text-left sm:text-right">
                 <span className="text-[10px] uppercase tracking-wider text-sage/50 block">Sanctuary Suite Tier</span>
-                <span className="text-sm font-semibold text-sage">{proposal.room_tier}</span>
+                <span className="text-sm font-semibold text-sage">{effectiveSuiteTier}</span>
               </div>
             </div>
+
+            {/* Tern Parity: Self-Service Suite Option Selection */}
+            {!isConfirmed && (
+              <div className="space-y-3 pt-1">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-serif font-bold uppercase tracking-wider text-sage flex items-center gap-1.5">
+                    <BedDouble className="w-4 h-4 text-terracotta" />
+                    <span>Select Suite Tier (Dynamic Pricing)</span>
+                  </span>
+                  <span className="text-[10px] text-sage/60">
+                    Deposit &amp; balance update live
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    {
+                      name: "Oceanfront King Suite",
+                      diff: 0,
+                      tag: "Base Curated Suite",
+                      desc: "King organic linen bed, panoramic ocean views, private soaking terrace.",
+                    },
+                    {
+                      name: "Private Cliffside Plunge Villa",
+                      diff: 3200,
+                      tag: "+$3,200 Total",
+                      desc: "Freestanding cliffside villa, private magnesium plunge, private sun deck.",
+                    },
+                    {
+                      name: "Master Penthouse Sanctuary",
+                      diff: 5500,
+                      tag: "+$5,500 Total",
+                      desc: "Dual-aspect penthouse, private infrared cedar sauna, private treatment pavilion.",
+                    },
+                  ].map((opt) => {
+                    const isSelected = effectiveSuiteTier === opt.name;
+                    return (
+                      <button
+                        key={opt.name}
+                        type="button"
+                        onClick={() => {
+                          setSelectedSuiteTier(opt.name);
+                          setSuitePriceAdjustment(opt.diff);
+                        }}
+                        className={`p-3.5 rounded-xl text-left border transition-all cursor-pointer flex flex-col justify-between ${
+                          isSelected
+                            ? "bg-terracotta-soft/70 border-terracotta ring-2 ring-terracotta/30 shadow-xs"
+                            : "bg-sand/40 border-sand-border/80 hover:bg-sand/70"
+                        }`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-serif font-bold text-xs text-sage">
+                              {opt.name}
+                            </span>
+                            {isSelected && (
+                              <CheckCircle2 className="w-3.5 h-3.5 text-terracotta shrink-0" />
+                            )}
+                          </div>
+                          <p className="text-[10px] text-sage/70 leading-relaxed">
+                            {opt.desc}
+                          </p>
+                        </div>
+                        <span
+                          className={`mt-2.5 text-[10px] font-semibold uppercase tracking-wider inline-block px-2 py-0.5 rounded ${
+                            isSelected
+                              ? "bg-terracotta text-linen"
+                              : "bg-sand text-sage/80"
+                          }`}
+                        >
+                          {opt.tag}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Tern Parity: Side-by-Side Suite Inclusions Comparison Table */}
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setShowSuiteComparison((prev) => !prev)}
+                    className="text-[11px] font-semibold text-terracotta hover:text-terracotta/80 flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Layers className="w-3.5 h-3.5" />
+                    <span>{showSuiteComparison ? "Hide Side-by-Side Suite Comparison" : "Compare Suite Features Side-by-Side"}</span>
+                  </button>
+
+                  {showSuiteComparison && (
+                    <div className="mt-3 overflow-x-auto rounded-xl border border-sand-border/80 bg-sand/30 p-3 text-xs">
+                      <table className="w-full text-left border-collapse">
+                        <thead>
+                          <tr className="border-b border-sand-border/80 text-[10px] uppercase tracking-wider text-sage/70 font-semibold">
+                            <th className="py-2 pr-3">Sanctuary Inclusions</th>
+                            <th className="py-2 px-3 text-center">Oceanfront King</th>
+                            <th className="py-2 px-3 text-center">Cliffside Plunge Villa</th>
+                            <th className="py-2 pl-3 text-center">Master Penthouse</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-sand-border/60 text-[11px] text-sage/80">
+                          <tr>
+                            <td className="py-2 pr-3 font-medium text-sage">Living Space</td>
+                            <td className="py-2 px-3 text-center">750 sq. ft.</td>
+                            <td className="py-2 px-3 text-center">1,450 sq. ft.</td>
+                            <td className="py-2 pl-3 text-center font-bold text-terracotta">2,800 sq. ft. (2-story)</td>
+                          </tr>
+                          <tr>
+                            <td className="py-2 pr-3 font-medium text-sage">Private Hydrotherapy</td>
+                            <td className="py-2 px-3 text-center">Deep Soaking Tub</td>
+                            <td className="py-2 px-3 text-center font-bold text-emerald-800">Private Heated Plunge Pool</td>
+                            <td className="py-2 pl-3 text-center font-bold text-emerald-800">Dual Hot/Cold Plunge Pools</td>
+                          </tr>
+                          <tr>
+                            <td className="py-2 pr-3 font-medium text-sage">Thermal Sauna</td>
+                            <td className="py-2 px-3 text-center">Sanctuary Shala Access</td>
+                            <td className="py-2 px-3 text-center">Sanctuary Shala Access</td>
+                            <td className="py-2 pl-3 text-center font-bold text-emerald-800">In-Suite Infrared Cedar Sauna</td>
+                          </tr>
+                          <tr>
+                            <td className="py-2 pr-3 font-medium text-sage">Private Tarmac Transit</td>
+                            <td className="py-2 px-3 text-center">VIP Chauffeur SUV</td>
+                            <td className="py-2 px-3 text-center">VIP Chauffeur SUV</td>
+                            <td className="py-2 pl-3 text-center font-bold text-terracotta">Dedicated Mercedes Van &amp; Butler</td>
+                          </tr>
+                          <tr>
+                            <td className="py-2 pr-3 font-medium text-sage">Investment Adjustment</td>
+                            <td className="py-2 px-3 text-center font-medium">Included in Base</td>
+                            <td className="py-2 px-3 text-center font-semibold text-terracotta">+$3,200 Total</td>
+                            <td className="py-2 pl-3 text-center font-semibold text-terracotta">+$5,500 Total</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Financial Schedule */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="p-4 rounded-xl bg-sand/50 border border-sand-border/80">
                 <span className="text-[10px] uppercase tracking-wider text-sage/60 block">Total Stay Investment</span>
-                <span className="font-serif text-2xl text-sage font-medium">${proposal.total_investment.toLocaleString()}</span>
+                <span className="font-serif text-2xl text-sage font-medium">${effectiveTotalInvestment.toLocaleString()}</span>
                 <span className="text-[10px] text-sage/50 block mt-0.5">{proposal.currency} &middot; All-Inclusive Sanctuary</span>
               </div>
 
               <div className="p-4 rounded-xl bg-terracotta-soft/50 border border-terracotta/20">
                 <span className="text-[10px] uppercase tracking-wider text-terracotta block">30% Suite Retainer Deposit</span>
-                <span className="font-serif text-2xl text-terracotta font-medium">${proposal.deposit_amount.toLocaleString()}</span>
+                <span className="font-serif text-2xl text-terracotta font-medium">${effectiveDepositAmount.toLocaleString()}</span>
                 <span className="text-[10px] text-sage/60 block mt-0.5">
                   {isConfirmed ? "Paid & Authorized" : "Due Upon Proposal Approval"}
                 </span>
@@ -536,7 +760,7 @@ function MyRetreatContent() {
 
               <div className="p-4 rounded-xl bg-sand/50 border border-sand-border/80">
                 <span className="text-[10px] uppercase tracking-wider text-sage/60 block">70% Final Balance</span>
-                <span className="font-serif text-2xl text-sage font-medium">${proposal.final_balance.toLocaleString()}</span>
+                <span className="font-serif text-2xl text-sage font-medium">${effectiveFinalBalance.toLocaleString()}</span>
                 <span className="text-[10px] text-sage/50 block mt-0.5">Scheduled 45 Days Prior</span>
               </div>
             </div>
@@ -595,7 +819,7 @@ function MyRetreatContent() {
               <div className="space-y-1">
                 <h4 className="font-serif text-lg text-sage">Grand Travel &amp; Cruise Host Agency Guarantee</h4>
                 <p className="text-xs text-sage/70 leading-relaxed">
-                  25-year travel legacy (Funjet 500 Club tier). All authorizations feature automated legal chargeback shielding,
+                  25-year premier host agency legacy. All reservations feature encrypted card security, transparent booking terms,
                   PCI-compliant tokenization, and strict adherence to luxury travel consumer protection guidelines.
                 </p>
               </div>
@@ -630,7 +854,7 @@ function MyRetreatContent() {
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-terracotta hover:bg-terracotta/90 text-linen px-8 py-4 text-xs uppercase tracking-widest font-semibold transition-all shadow-md hover:shadow-lg"
                 >
                   <CreditCard className="h-4 w-4" />
-                  Approve Proposal &amp; Authorize 30% Deposit (${proposal.deposit_amount.toLocaleString()} USD)
+                  Approve {effectiveSuiteTier} &amp; Authorize Deposit (${effectiveDepositAmount.toLocaleString()} USD)
                 </button>
                 <a
                   href="mailto:concierge@kaiwellnessretreats.com?subject=Proposal%20Inquiry"
@@ -686,9 +910,9 @@ function MyRetreatContent() {
                   )}
 
                   <div className="p-3.5 rounded-xl bg-sand/60 border border-sand-border/80 space-y-1">
-                    <span className="text-[10px] uppercase tracking-wider text-sage/60 block">Authorization Total</span>
+                    <span className="text-[10px] uppercase tracking-wider text-sage/60 block">Authorization Total ({effectiveSuiteTier})</span>
                     <p className="font-serif text-xl text-sage font-medium">
-                      ${proposal.deposit_amount.toLocaleString()} USD
+                      ${effectiveDepositAmount.toLocaleString()} USD
                     </p>
                     <p className="text-[11px] text-sage/60">
                       30% Suite Retainer for {proposal.title} ({proposal.dates})
@@ -781,8 +1005,8 @@ function MyRetreatContent() {
                       />
                       <span className="text-[11px] text-sage/75 leading-relaxed">
                         I hereby authorize KAI Wellness Retreats and host agency Grand Travel &amp; Cruise to charge the
-                        non-refundable 30% sanctuary deposit of <strong>${proposal.deposit_amount.toLocaleString()} USD</strong> to the
-                        card above. I acknowledge that the remaining 70% balance (${proposal.final_balance.toLocaleString()} USD)
+                        non-refundable 30% sanctuary deposit of <strong>${effectiveDepositAmount.toLocaleString()} USD</strong> to the
+                        card above for the {effectiveSuiteTier}. I acknowledge that the remaining 70% balance (${effectiveFinalBalance.toLocaleString()} USD)
                         will be automatically scheduled 45 days prior to retreat departure in accordance with the luxury cancellation policy.
                       </span>
                     </label>
@@ -809,7 +1033,7 @@ function MyRetreatContent() {
                       ) : (
                         <>
                           <Check className="h-3.5 w-3.5" />
-                          Authorize Deposit (${proposal.deposit_amount.toLocaleString()})
+                          Authorize Deposit (${effectiveDepositAmount.toLocaleString()})
                         </>
                       )}
                     </button>

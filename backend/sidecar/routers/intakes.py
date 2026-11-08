@@ -278,11 +278,11 @@ def get_cohort_capacities(db: Session = Depends(get_db)):
 
     results = []
     for s in sanctuaries:
-        staged_count = db.query(StagingIntake).filter(
+        staged_count = db.query(StagingIntake.id).filter(
             StagingIntake.sanctuary_slug == s["slug"],
             StagingIntake.status == "PENDING_APPROVAL"
         ).count()
-        crm_confirmed = db.query(StagingIntake).filter(
+        crm_confirmed = db.query(StagingIntake.id).filter(
             StagingIntake.sanctuary_slug == s["slug"],
             StagingIntake.status.in_(["APPROVED", "CONFIRMED_IN_CRM"])
         ).count()

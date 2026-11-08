@@ -17,7 +17,7 @@ import {
   Printer,
   Sparkles,
 } from "lucide-react";
-import { printBillingFolio } from "@/lib/print-export";
+import { printBillingFolio, printChargebackDefenseBundle } from "@/lib/print-export";
 import { triggerExplainThis } from "@/lib/portal-form-bus";
 import {
   CRMTripItem,
@@ -199,6 +199,36 @@ export function BillingFolioTab({
     } finally {
       setBusy(null);
     }
+  };
+
+  const handleExportChargebackShield = () => {
+    if (!activeTrip) {
+      onNotify("Please select an active trip first.");
+      return;
+    }
+    const depositAmt = activeTrip.deposit_amount || Math.round(activeTrip.total_investment * 0.3);
+    const balanceAmt = activeTrip.final_balance || Math.round(activeTrip.total_investment * 0.7);
+    const guestName = cardholderName.trim() || activeTrip.client_name;
+    const authCode = cardAuthResult?.auth_code || `AUTH-KAI-${cardBrand.substring(0, 4).toUpperCase().replace(/[^A-Z]/g, "")}-${cardLast4}`;
+
+    printChargebackDefenseBundle({
+      trip_id: activeTrip.crm_trip_id || activeTrip.id,
+      client_name: guestName,
+      client_email: activeTrip.client_email,
+      billing_address: billingAddress,
+      sanctuary_name: activeTrip.title || "Sanctuary Cohort",
+      dates: activeTrip.dates || "Upcoming Cohort",
+      room_tier: activeTrip.room_tier || "Oceanfront King Suite",
+      total_investment: activeTrip.total_investment || (depositAmt + balanceAmt),
+      deposit_authorized: depositAmt,
+      balance_scheduled: balanceAmt,
+      card_brand: cardBrand,
+      card_last4: cardLast4,
+      auth_reference: authCode,
+      signed_timestamp: cardAuthResult?.timestamp || new Date().toLocaleString(),
+      e_signature: guestName,
+    });
+    onNotify(`Generated Merchant Chargeback Defense Bundle for ${guestName} [${authCode}]`);
   };
 
   const handleMultiGuestSplitFolio = async () => {
@@ -468,10 +498,17 @@ export function BillingFolioTab({
                 Direct Credit Card Authorization &amp; Vault
               </h3>
             </div>
-            <span className="text-[10px] font-mono bg-emerald-50 text-emerald-900 border border-emerald-200 px-2 py-0.5 rounded font-bold flex items-center gap-1">
-              <ShieldCheck className="w-3 h-3 text-emerald-700" />
-              <span>Chargeback Shield</span>
-            </span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleExportChargebackShield}
+                className="text-[10px] font-mono bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 px-2.5 py-1 rounded font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                title="Generate instant chargeback defense dispute bundle"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-700" />
+                <span>Chargeback Shield Audit</span>
+              </button>
+            </div>
           </div>
 
           <form onSubmit={handleCardAuthorization} className="space-y-3 text-xs">
@@ -601,6 +638,17 @@ export function BillingFolioTab({
               <p className="text-[10px] text-emerald-800">
                 Host agency chargeback protection active &middot; Recorded at {cardAuthResult.timestamp}
               </p>
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleExportChargebackShield}
+                  className="w-full py-2 px-3 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white font-semibold flex items-center justify-center gap-2 transition-all shadow-xs cursor-pointer text-xs"
+                  title="Download legally binding dispute defense package for Stripe/Acquirer"
+                >
+                  <ShieldCheck className="w-4 h-4 text-emerald-300" />
+                  <span>Download Chargeback Dispute Defense Pack (PDF/Print)</span>
+                </button>
+              </div>
             </div>
           )}
         </div>

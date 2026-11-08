@@ -111,7 +111,7 @@ RETREATS_CATALOG: List[Dict[str, Any]] = [
         "baseSpotsRemaining": 14,
         "investmentStarting": "$3,850",
         "tagline": "Canopy seclusion, surf therapy, anatomically grounded vinyasa, and organic nourishment.",
-        "description": "Nestled in the lush biodiversity of Costa Rica's Blue Zone, this sanctuary blends ocean saltwater hydrotherapy, daily alignment-focused vinyasa, and deep parasympathetic recovery beneath ancient forest canopies.",
+        "description": "Set within the rich biodiversity of Costa Rica's Blue Zone, this sanctuary blends ocean saltwater hydrotherapy, daily alignment-focused vinyasa, and deep parasympathetic recovery beneath ancient forest canopies.",
         "clinicalFocus": [
             "Circadian cortisol curve re-synchronization through natural sunrise exposure",
             "Vagus nerve stimulation via thermal & saltwater ocean immersion",

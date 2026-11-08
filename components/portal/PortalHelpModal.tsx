@@ -43,7 +43,7 @@ const TOOL_ENTRIES = [
     title: "Scenic Routes & Chauffeur Transit",
     subtitle: "Live Terrain, Elevation & Private Transfers",
     icon: Navigation,
-    layman: "Calculates gentle driving times, elevation shifts, scenic stops, and luxury vehicle options (4WD Prado, Mercedes Sprinter, private boat) from nearby airports to our sanctuaries. Coordinates private chauffeur dispatch seamlessly.",
+    layman: "Calculates gentle driving times, elevation shifts, scenic stops, and luxury vehicle options (4WD Prado, Mercedes Sprinter, private boat) from nearby airports to our sanctuaries. Coordinates private chauffeur dispatch directly without travel stress.",
     why_it_matters: "Ensures guests experience a relaxing, nervous-system soothing arrival without getting lost or stuck in bumpy unpaved terrain."
   },
   {
@@ -140,7 +140,7 @@ const TOOL_ENTRIES = [
     subtitle: "Curated Holistic Referral Network",
     icon: HeartHandshake,
     layman: "A directory of aligned functional medicine clinics, premier yoga sanctuaries, and private practices that refer their private clients to KAI retreats.",
-    why_it_matters: "Fosters trusted B2B referral partnerships with medical doctors and wellness leaders across major hubs."
+    why_it_matters: "Builds trusted referral partnerships with medical doctors, holistic clinics, and studio leaders across major wellness hubs."
   },
   {
     key: "flight_desk",

@@ -101,6 +101,8 @@ class GuestProposalApproveRequest(BaseModel):
     card_brand: str = Field("Visa", description="Card brand / network (Visa, Mastercard, Amex)")
     e_signature: str = Field(..., description="Legal electronic signature")
     agreed_to_terms: bool = Field(True, description="Consent to 30% deposit authorization and sanctuary cancellation policy")
+    selected_room_tier: Optional[str] = Field(None, description="Optional self-service suite tier selected by guest")
+    custom_total_investment: Optional[float] = Field(None, description="Updated total investment if suite tier upgraded")
 
 
 class GuestAccessRequest(BaseModel):
@@ -474,6 +476,33 @@ def get_guest_proposal(
     deposit = trip.deposit_amount or round(trip.total_investment * 0.3, 2)
     balance = trip.final_balance or round(trip.total_investment - deposit, 2)
 
+    # Tern CRM Parity: Log proposal view milestone to the trip's living timeline
+    now_iso = datetime.now(timezone.utc).isoformat()
+    timeline = list(trip.activity_timeline or [])
+    last_view = next((item for item in reversed(timeline) if item.get("event") == "PROPOSAL_VIEWED"), None)
+    should_log_view = True
+    if last_view and "timestamp" in last_view:
+        try:
+            last_ts = datetime.fromisoformat(last_view["timestamp"])
+            if (datetime.now(timezone.utc) - last_ts).total_seconds() < 600:
+                should_log_view = False
+        except Exception:
+            pass
+    if should_log_view:
+        timeline.append({
+            "event": "PROPOSAL_VIEWED",
+            "title": "Guest Opened Sanctuary Proposal",
+            "description": f"Proposal {trip.crm_trip_id} opened via secure web link.",
+            "timestamp": now_iso,
+            "badge": "Viewed",
+            "actor": "GUEST"
+        })
+        trip.activity_timeline = timeline
+        try:
+            db.commit()
+        except Exception:
+            db.rollback()
+
     return {
         "success": True,
         "proposal": {
@@ -496,6 +525,7 @@ def get_guest_proposal(
             "itinerary_blocks": trip.itinerary_blocks or [],
             "smart_flight": trip.smart_flight or {},
             "ground_transfer": trip.ground_transfer or {},
+            "activity_timeline": trip.activity_timeline or [],
             "created_by": trip.created_by,
             "created_at": trip.created_at.isoformat() if trip.created_at else None,
         }
@@ -533,6 +563,18 @@ def approve_guest_proposal(
     if not trip:
         raise HTTPException(status_code=404, detail="Sanctuary trip proposal not found.")
 
+    # Tern CRM Parity: Dynamic Room Option & Suite Tier selection on approval
+    if payload.selected_room_tier:
+        trip.room_tier = payload.selected_room_tier.strip()
+    if payload.custom_total_investment is not None:
+        # Security Guard: A guest cannot arbitrarily discount their stay below the baseline quote
+        min_allowed = round(float(trip.total_investment), 2)
+        proposed_total = round(float(payload.custom_total_investment), 2)
+        if proposed_total >= min_allowed:
+            trip.total_investment = proposed_total
+            trip.deposit_amount = round(trip.total_investment * 0.3, 2)
+            trip.final_balance = round(trip.total_investment * 0.7, 2)
+
     auth_ref = f"AUTH-DEP-{secrets.token_hex(4).upper()}"
     signed_timestamp = datetime.now(timezone.utc).isoformat()
 
@@ -559,6 +601,27 @@ def approve_guest_proposal(
     trip.status = "CONFIRMED"
     trip.final_balance_status = "SCHEDULED_45D"
 
+    # Tern CRM Parity: Append milestone events to trip's living activity timeline
+    timeline = list(trip.activity_timeline or [])
+    if payload.selected_room_tier:
+        timeline.append({
+            "event": "SUITE_UPGRADED",
+            "title": f"Suite Selection Confirmed: {trip.room_tier}",
+            "description": f"Guest finalized suite tier as {trip.room_tier} (${trip.total_investment:,.2f} {trip.currency}).",
+            "timestamp": signed_timestamp,
+            "badge": "Suite Tier",
+            "actor": "GUEST"
+        })
+    timeline.append({
+        "event": "DEPOSIT_AUTHORIZED",
+        "title": "30% Sanctuary Deposit Authorized",
+        "description": f"Authorized ${trip.deposit_amount:,.2f} {trip.currency} via {payload.card_brand} *{payload.card_last4} (Ref: {auth_ref}). E-Signature on file: '{payload.e_signature}'.",
+        "timestamp": signed_timestamp,
+        "badge": "Secured",
+        "actor": "GUEST"
+    })
+    trip.activity_timeline = timeline
+
     alert_content = (
         f"SANCTUARY PROPOSAL APPROVED & DEPOSIT AUTHORIZED\n"
         f"Guest: {trip.client_name} ({trip.client_email})\n"
@@ -581,6 +644,75 @@ def approve_guest_proposal(
         status="pending_review",
     )
     db.add(draft)
+
+    # Tern CRM Parity: Trip-Stage Triggered Human-in-the-Loop Automation Sequence
+    # Sequence 1: Welcome & Solfeggio Audio Access Draft (Held for Founder 1-Click Dispatch)
+    welcome_draft = ActionDraft(
+        type="welcome_audio_dispatch",
+        guest_name=trip.client_name,
+        recipient_email=trip.client_email,
+        content=(
+            f"KAI SANCTUARY — FOUNDER WELCOME & ACOUSTIC ACCESS\n"
+            f"To: {trip.client_name} <{trip.client_email}>\n"
+            f"Subject: Welcome to KAI {trip.title} — Your Sanctuary Companion Access\n\n"
+            f"Dear {trip.client_name},\n\n"
+            f"Welcome to KAI Wellness Retreats. Your reservation for {trip.title} in our "
+            f"{trip.room_tier} is officially confirmed.\n\n"
+            f"As your retreat coordinator and clinical nurse director, I am personally reviewing your intake preferences. "
+            f"Ahead of your journey, you can begin gentle parasympathetic downregulation through our private 432Hz "
+            f"crystal sound immersion player, accessible through your guest sanctuary companion:\n\n"
+            f"Companion Access: https://kaiwellnessretreats.com/my-retreat?ref={trip.crm_trip_id}\n\n"
+            f"With warmth and restorative stillness,\n"
+            f"Kareena Islam, BSN, RN\n"
+            f"Founder & Somatic Director | KAI Wellness Retreats"
+        ),
+        status="pending_review",
+    )
+    db.add(welcome_draft)
+
+    # Sequence 2: 30-Day Packing Checklist & Microclimate Weather Brief Draft
+    packing_draft = ActionDraft(
+        type="packing_and_microclimate_brief",
+        guest_name=trip.client_name,
+        recipient_email=trip.client_email,
+        content=(
+            f"KAI SANCTUARY — 30-DAY PACKING & MICROCLIMATE PREPARATION\n"
+            f"To: {trip.client_name} <{trip.client_email}>\n"
+            f"Subject: Preparing for {trip.title} — Curated Packing & Arrival Guidance\n\n"
+            f"Dear {trip.client_name},\n\n"
+            f"We are looking forward to welcoming you to {trip.title} ({trip.dates}). "
+            f"To ensure ease and comfort in the coastal microclimate, our team has prepared your personal packing checklist "
+            f"and arrival run-sheet.\n\n"
+            f"Key Inclusions:\n"
+            f" • Breathable organic yoga attire and swimwear\n"
+            f" • Reef-safe mineral sunscreen and wide-brim sun hat\n"
+            f" • Evening linen layers for coastal ocean breezes\n\n"
+            f"Our Grand Travel & Cruise concierge will confirm your private chauffeur wave 7 days prior to departure.\n\n"
+            f"Warmly,\nKAI Concierge Desk"
+        ),
+        status="pending_review",
+    )
+    db.add(packing_draft)
+
+    # Sequence 3: 45-Day Final Balance Settlement Notice Draft
+    balance_draft = ActionDraft(
+        type="final_balance_settlement_notice",
+        guest_name=trip.client_name,
+        recipient_email=trip.client_email,
+        content=(
+            f"KAI SANCTUARY — 70% FINAL BALANCE SCHEDULE REMINDER\n"
+            f"To: {trip.client_name} <{trip.client_email}>\n"
+            f"Subject: Scheduled Final Balance Settlement Notice — {trip.title}\n\n"
+            f"Dear {trip.client_name},\n\n"
+            f"This is a courtesy reminder regarding your scheduled 70% final balance (${trip.final_balance:,.2f} {trip.currency}) "
+            f"for your upcoming retreat: {trip.title}.\n\n"
+            f"Per your authorized deposit agreement ({auth_ref}), this scheduled balance will settle 45 days prior to arrival. "
+            f"If you wish to settle via corporate wire or update your preferred card, please contact concierge@kaiwellnessretreats.com.\n\n"
+            f"Warmly,\nGrand Travel & Cruise Treasury Desk"
+        ),
+        status="pending_review",
+    )
+    db.add(balance_draft)
 
     token_result = generate_guest_magic_token(
         intake_id=trip.id,

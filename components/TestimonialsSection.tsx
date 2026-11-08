@@ -20,7 +20,7 @@ const TESTIMONIALS: Testimonial[] = [
   },
   {
     quote:
-      "Having 12 people instead of 40 made all the difference. Kareena holds space with medical authority and radiant warmth. There was no spiritual bypassing or forced awkward sharing—just pure, anatomically grounded rest, exquisite organic food, and effortless travel logistics.",
+      "The intimate group dynamic made all the difference. Kareena holds space with medical authority and radiant warmth. There was no spiritual bypassing or forced awkward sharing—just pure, anatomically grounded rest, exquisite organic food, and effortless travel logistics.",
     author: "Elena Rostova",
     role: "Managing Director, Global Strategy",
     location: "New York, NY",
@@ -28,7 +28,7 @@ const TESTIMONIALS: Testimonial[] = [
   },
   {
     quote:
-      "Kareena Islam has created something genuinely rare: an intersection of deep anatomical precision and sacred luxury. From the seamless VIP airport pickup arranged by Grand Travel to the quiet sunrise breathwork, every single minute felt curated for restoration.",
+      "Kareena Islam has created something genuinely rare: an intersection of deep anatomical precision and sacred luxury. From the effortless VIP airport pickup arranged by Grand Travel to the quiet sunrise breathwork, every single minute felt designed for real restoration.",
     author: "Marcus Vance",
     role: "Architect & Spatial Designer",
     location: "Chicago, IL",

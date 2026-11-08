@@ -23,7 +23,7 @@ FREQUENCIES_DATA: List[Dict[str, Any]] = [
         "frequencyHz": 639,
         "name": "Relational Coherence",
         "subtitle": "Heart Field & Social Engagement",
-        "clinicalIndication": "Promotes vagal brake softening, fostering empathetic connection, psychological safety, and somatic ease within intimate cohort dynamics.",
+        "clinicalIndication": "Promotes vagal brake softening, supporting empathetic connection, psychological safety, and somatic ease within intimate cohort dynamics.",
         "targetBrainwave": "Theta/Alpha Border",
         "binauralDifferenceHz": 1.8,
         "recommendedDurationMinutes": 15

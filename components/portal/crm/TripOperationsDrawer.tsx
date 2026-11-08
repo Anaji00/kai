@@ -8,6 +8,11 @@ import {
   ShieldCheck,
   Navigation,
   Gauge,
+  History,
+  CheckCircle2,
+  Clock,
+  ExternalLink,
+  Sparkles,
 } from "lucide-react";
 import {
   CRMTripItem,
@@ -31,8 +36,8 @@ export default function TripOperationsDrawer({
   onNotify,
 }: TripOperationsDrawerProps) {
   const [activeTool, setActiveTool] = useState<
-    "delay" | "divert" | "charter" | "luggage" | "upgrade" | "passport"
-  >("delay");
+    "timeline" | "delay" | "divert" | "charter" | "luggage" | "upgrade" | "passport"
+  >("timeline");
   const [busy, setBusy] = useState(false);
 
   // 1. Flight Delay state
@@ -208,6 +213,19 @@ export default function TripOperationsDrawer({
       <div className="flex flex-wrap items-center gap-1.5">
         <button
           type="button"
+          onClick={() => setActiveTool("timeline")}
+          className={`px-2.5 py-1 rounded text-[11px] font-semibold flex items-center space-x-1 cursor-pointer ${
+            activeTool === "timeline"
+              ? "bg-[#2D3E35] text-white"
+              : "bg-white text-[#2D3E35] border border-[#E5DDD0]"
+          }`}
+        >
+          <History className="w-3 h-3 text-[#C07D63]" />
+          <span>Living Timeline &amp; Audit ({trip.activity_timeline?.length || 0})</span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTool("delay")}
           className={`px-2.5 py-1 rounded text-[11px] font-semibold flex items-center space-x-1 cursor-pointer ${
             activeTool === "delay"
@@ -284,6 +302,76 @@ export default function TripOperationsDrawer({
           <span>Passport 180d Gate</span>
         </button>
       </div>
+
+      {/* Tool 0: Living Timeline & Audit */}
+      {activeTool === "timeline" && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <History className="w-4 h-4 text-[#C07D63]" />
+              <span className="text-xs font-semibold text-[#2D3E35]">
+                Trip Master Lifecycle &amp; Guest Milestones
+              </span>
+            </div>
+            <a
+              href={`/my-retreat?ref=${trip.crm_trip_id || trip.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-emerald-800 hover:text-emerald-900 font-medium flex items-center gap-1 hover:underline"
+            >
+              <span>View Guest Companion</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+
+          {trip.activity_timeline && trip.activity_timeline.length > 0 ? (
+            <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              {trip.activity_timeline.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="p-2.5 rounded-lg bg-white border border-[#E5DDD0] flex items-start gap-2.5 shadow-2xs"
+                >
+                  <div className="w-6 h-6 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center shrink-0 mt-0.5">
+                    {item.event === "DEPOSIT_AUTHORIZED" ? (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    ) : item.event === "PROPOSAL_VIEWED" ? (
+                      <Clock className="w-3.5 h-3.5" />
+                    ) : (
+                      <Sparkles className="w-3.5 h-3.5" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-[#2D3E35] truncate">{item.title}</p>
+                      <span className="text-[10px] font-mono text-[#5C6B5E] shrink-0">
+                        {item.timestamp ? new Date(item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ""}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#5C6B5E] mt-0.5 leading-relaxed">{item.description}</p>
+                    <div className="flex items-center gap-2 mt-1.5">
+                      {item.badge && (
+                        <span className="text-[9px] uppercase tracking-wider font-semibold px-1.5 py-0.2 bg-[#FAF7F2] border border-[#D9D0C2] rounded text-[#2D3E35]">
+                          {item.badge}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-[#8A9489]">
+                        Actor: {item.actor || "SYSTEM"} &middot; {item.timestamp ? new Date(item.timestamp).toLocaleDateString() : ""}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] text-center space-y-1.5">
+              <p className="text-xs font-semibold text-[#2D3E35]">Proposal Staged &middot; Awaiting Initial Guest Action</p>
+              <p className="text-[11px] text-[#5C6B5E] leading-relaxed max-w-md mx-auto">
+                Created on {new Date(trip.created_at).toLocaleDateString()}. Milestones like proposal opens, suite upgrades, 30% deposit e-signatures, and Cirium flight updates will appear here automatically.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tool 1: Flight Delay */}
       {activeTool === "delay" && (

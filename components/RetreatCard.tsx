@@ -265,7 +265,7 @@ export default function RetreatCard({ retreat, priority = false, isExpanded, ano
         <div className={`relative w-full overflow-hidden bg-sand ${isExpanded ? "h-64 sm:h-80 lg:h-full" : "h-72"}`}>
           <Image
             src={retreat.heroImage}
-            alt=""
+            alt={retreat.title || "KAI Wellness Retreat Sanctuary"}
             fill
             priority={priority}
             // One size for both states, so opening a card never reloads a blank image.

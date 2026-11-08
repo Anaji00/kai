@@ -18,7 +18,10 @@ import {
   ExternalLink,
   ShieldCheck,
   BadgePercent,
+  Sparkles,
 } from "lucide-react";
+import SomaticActivityBlockLibrary, { CuratedActivityBlock } from "./SomaticActivityBlockLibrary";
+import SupplierConfirmationParserModal, { ParsedSupplierData } from "./SupplierConfirmationParserModal";
 import {
   CRMTripItem,
   CRMClientItem,
@@ -143,6 +146,39 @@ export default function TripBuilderModal({
   // Itinerary blocks
   const [itineraryBlocks, setItineraryBlocks] = useState<ItineraryBlockItem[]>(DEFAULT_BLOCKS);
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
+  const [isBlockLibraryOpen, setIsBlockLibraryOpen] = useState<boolean>(false);
+  const [isParserOpen, setIsParserOpen] = useState<boolean>(false);
+
+  const handleInsertCuratedBlock = (curated: CuratedActivityBlock) => {
+    const nextDay = itineraryBlocks.length + 1;
+    setItineraryBlocks((prev) => [
+      ...prev,
+      {
+        day: nextDay,
+        time: curated.time,
+        title: curated.title,
+        description: curated.description,
+        activity_type: curated.activity_type,
+      },
+    ]);
+  };
+
+  const handleApplyParsedSupplierData = (data: ParsedSupplierData) => {
+    if (data.airline) setAirline(data.airline);
+    if (data.flight_number) setFlightNumber(data.flight_number);
+    if (data.arrival_airport) setArrivalAirport(data.arrival_airport);
+    if (data.cabin_class) setIsLieFlat(data.cabin_class.toLowerCase().includes("lie-flat") || data.cabin_class.toLowerCase().includes("first"));
+    if (data.room_tier) setRoomTier(data.room_tier);
+    if (data.generated_blocks && data.generated_blocks.length > 0) {
+      setItineraryBlocks((prev) => [
+        ...prev,
+        ...data.generated_blocks.map((b, idx) => ({
+          ...b,
+          day: prev.length + idx + 1,
+        })),
+      ]);
+    }
+  };
 
   const [saving, setSaving] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -676,14 +712,34 @@ export default function TripBuilderModal({
                 <FileText className="w-4 h-4 text-emerald-700" />
                 <span>Day-by-Day Itinerary Blocks ({itineraryBlocks.length} Days)</span>
               </div>
-              <button
-                type="button"
-                onClick={handleAddBlock}
-                className="inline-flex items-center space-x-1 px-3 py-1 text-xs font-bold text-[#2D3E35] bg-[#FAF7F2] hover:bg-[#F2ECE4] border border-[#E5DDD0] rounded-lg transition-colors cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Add Day Block</span>
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsParserOpen(true)}
+                  className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold text-[#2D3E35] bg-[#FAF7F2] hover:bg-[#F2ECE4] border border-[#D9D0C2] rounded-lg transition-colors cursor-pointer"
+                  title="Paste raw airline confirmation email or villa voucher to auto-generate day blocks"
+                >
+                  <FileText className="w-3.5 h-3.5 text-[#C07D63]" />
+                  <span>Paste Confirmation</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsBlockLibraryOpen(true)}
+                  className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg transition-colors cursor-pointer"
+                  title="Open Tern-style Reusable Activity Block Library"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>Curated Library</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAddBlock}
+                  className="inline-flex items-center space-x-1 px-3 py-1 text-xs font-bold text-[#2D3E35] bg-[#FAF7F2] hover:bg-[#F2ECE4] border border-[#E5DDD0] rounded-lg transition-colors cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Add Day Block</span>
+                </button>
+              </div>
             </div>
 
             <div className="space-y-3">
@@ -839,6 +895,18 @@ export default function TripBuilderModal({
           </div>
         </form>
       </div>
+
+      <SomaticActivityBlockLibrary
+        isOpen={isBlockLibraryOpen}
+        onClose={() => setIsBlockLibraryOpen(false)}
+        onSelectBlock={handleInsertCuratedBlock}
+      />
+
+      <SupplierConfirmationParserModal
+        isOpen={isParserOpen}
+        onClose={() => setIsParserOpen(false)}
+        onApplyParsedData={handleApplyParsedSupplierData}
+      />
     </div>
   );
 }

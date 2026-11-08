@@ -984,7 +984,7 @@ class ClinicalCopilotAgent:
             if rag_results:
                 parts.append(f"Based on KAI Sanctuary somatic guidelines and operations:\n\n{rag_results[0].get('content', '')}")
             else:
-                parts.append(f"KAI Wellness Retreats ({target_sanctuary.title()}) operates under strict 12–14 guest maximum cohorts to ensure complete parasympathetic restoration. All operations are coordinated in partnership with Grand Travel & Cruise (Funjet 500 Club volume contracts) and KAI Sanctuary CRM for seamless, zero-autonomous payment security.")
+                parts.append(f"KAI Wellness Retreats ({target_sanctuary.title()}) operates under strict 12–14 guest maximum cohorts to ensure complete parasympathetic restoration. All operations are coordinated in partnership with Grand Travel & Cruise (Funjet 500 Club volume contracts) and KAI Sanctuary CRM for secure, founder-approved payment processing.")
 
         return "\n\n".join(parts)
 
@@ -1657,8 +1657,14 @@ CONTEXT:
 {rag_context_str}
 {domain_context_str}
 
+VOICE & NATURAL HUMAN CADENCE (STRICT ANTI-AI TELLS):
+* NEVER use robotic AI filler: "Certainly!", "I would be happy to help", "Here is a breakdown", "Great question", or "I hope this email finds you well".
+* NEVER use overused AI buzzwords: "delve", "tapestry", "embark", "testament", "beacon", "plethora", "nestled", "seamlessly", "elevate", "foster", "in today's fast-paced world", "look no further", "meticulously", "holistic journey".
+* NEVER include patronizing sycophantic closing paragraphs (e.g. "This truly reflects your dedication...").
+* Speak in natural, grounded plain English like an experienced luxury travel director and clinical colleague speaking directly to Kareena.
+* Start directly with the substance—no introductory fluff.
+
 FORMATTING:
-* NEVER start with a greeting card or self-introduction. Dive into the answer.
 * For dining: use '### Nourishing Dining'. For weather: use 'Sanctuary Microclimate & Breathwork Window'.
 * For finance: present exact numbers, deposit (30%), balance (70%), and margins.
 * For travel/radar: provide chauffeur wave breakdown and WhatsApp dispatch text.

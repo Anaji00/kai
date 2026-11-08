@@ -24,12 +24,6 @@ const FAQS: FAQItem[] = [
       "Not at all. With Kareena’s clinical nursing background and RYT certifications, movement practices prioritize orthopedic safety, anatomical modifications, and restorative myofascial release. Every session meets your body exactly where it is, whether you are an experienced practitioner or have never stepped on a yoga mat.",
   },
   {
-    category: "Philosophy",
-    question: "Why are retreat groups strictly limited to 12–14 participants?",
-    answer:
-      "True nervous system relaxation and deep restoration require psychological safety and genuine intimacy. Small retreat groups allow Kareena to provide individualized somatic attention, ensure tranquil sanctuary grounds, and preserve the sacred stillness needed for profound rest.",
-  },
-  {
     category: "Travel & Logistics",
     question: "How does Grand Travel & Cruise secure the best rates and private estate access?",
     answer:
@@ -46,12 +40,6 @@ const FAQS: FAQItem[] = [
     question: "How does travel booking and flight coordination work?",
     answer:
       "Through our direct backing by Grand Travel & Cruise (25+ years of host agency mastery), our dedicated travel desk manages every detail: optimal flight routing, schedule change protections, luggage handling, and private chauffeured VIP transfers directly to sanctuary gates. We eliminate travel friction entirely so your body unwinds and settles into ease the moment you leave home.",
-  },
-  {
-    category: "Travel & Logistics",
-    question: "What are the accommodation options?",
-    answer:
-      "Each sanctuary features private luxury suites with private en-suite baths, organic bedding, and serene views. For friends or couples traveling together, select dual-occupancy luxury suites are available at tailored investment rates.",
   },
   {
     category: "Experience",
@@ -79,7 +67,7 @@ export default function FAQSection() {
           Frequently Asked Questions
         </h2>
         <p className="text-xs sm:text-sm text-sage/80 leading-relaxed font-light">
-          Everything you need to know about our nurse-led sanctuaries, small groups, and travel planning.
+          Everything you need to know about our retreats, restorative movement, cultural immersions, and travel planning powered by Grand Travel.
         </p>
       </div>
 

@@ -116,6 +116,11 @@ def _init_db_schema():
         "staging_intakes": [
             ("wellness_profile", f"{_ddl(JSON())} DEFAULT '{{}}'"),
             ("clinical_screening_enabled", f"{_ddl(Boolean())} DEFAULT FALSE"),
+            ("crm_trip_id", _ddl(String(64))),
+            ("crm_contact_id", _ddl(String(64))),
+            ("sub_trip_id", _ddl(String(64))),
+            ("group_cohort_id", _ddl(String(64))),
+            ("synced_at", _ddl(DateTime())),
         ],
         "action_drafts": [
             ("scheduled_for", _ddl(DateTime())),
@@ -138,6 +143,9 @@ def _init_db_schema():
         "ground_transfer_records": [
             ("chauffeur_notes", _ddl(Text())),
         ],
+        "crm_trips": [
+            ("activity_timeline", f"{_ddl(JSON())} DEFAULT '[]'"),
+        ],
     }
 
     inspector = inspect(engine)
@@ -155,6 +163,48 @@ def _init_db_schema():
                 logger.info(f"Migrated schema: Added {col_name} column to {table}")
             except Exception as e:
                 logger.error(f"Schema migration failed for {table}.{col_name}: {e}")
+
+    # Dynamic column reconciler: ensures any model column defined in SQLAlchemy is safely added to existing tables
+    for table_name, table_obj in Base.metadata.tables.items():
+        if table_name not in tables:
+            continue
+        existing_cols = {c["name"] for c in inspector.get_columns(table_name)}
+        for column in table_obj.columns:
+            if column.name in existing_cols:
+                continue
+            try:
+                col_type = column.type.compile(dialect=engine.dialect)
+                default_clause = ""
+                if column.server_default is not None:
+                    default_clause = f" DEFAULT {column.server_default.arg}"
+                elif column.default is not None and hasattr(column.default, "arg") and isinstance(column.default.arg, (int, float, str, bool)):
+                    val = column.default.arg
+                    if isinstance(val, bool):
+                        val_str = "TRUE" if val else "FALSE"
+                    elif isinstance(val, (int, float)):
+                        val_str = str(val)
+                    else:
+                        val_str = f"'{val}'"
+                    default_clause = f" DEFAULT {val_str}"
+                
+                with engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE {table_name} ADD COLUMN {column.name} {col_type}{default_clause}"))
+                logger.info(f"Auto-migrated missing column: {table_name}.{column.name}")
+            except Exception as e:
+                logger.warning(f"Auto-migration column notice for {table_name}.{column.name}: {e}")
+
+    # 3b. Ensure critical unique and search indexes exist
+    pending_indexes = [
+        ("ix_webhook_event_logs_provider_event_id", "webhook_event_logs", "provider_event_id", True),
+    ]
+    for idx_name, tbl, col, is_unique in pending_indexes:
+        if tbl in tables:
+            try:
+                unique_clause = "UNIQUE " if is_unique else ""
+                with engine.begin() as conn:
+                    conn.execute(text(f"CREATE {unique_clause}INDEX IF NOT EXISTS {idx_name} ON {tbl} ({col})"))
+            except Exception as e:
+                logger.warning(f"Index creation notice for {idx_name}: {e}")
 
     # 4. Auto-seed sanctuary cohorts from retreats catalog if empty
     try:

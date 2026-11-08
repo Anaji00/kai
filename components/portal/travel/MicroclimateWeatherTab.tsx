@@ -271,7 +271,7 @@ export default function MicroclimateWeatherTab({
         wp?.whatToWear.eveningDining ||
         "Elevated resort linen trousers or maxi dress with a light knit layer for open-air coastal dining.",
       somaticNote:
-        "Kareena & Armaan: Mild evening coastal temperatures (66°F–70°F) transition seamlessly into deep delta-wave sleep without heavy air-conditioning.",
+        "Kareena & Armaan: Mild evening coastal temperatures (66°F–70°F) support deep, restorative delta-wave sleep without heavy air-conditioning.",
     },
   };
 

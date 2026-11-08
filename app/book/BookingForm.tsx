@@ -197,7 +197,7 @@ export default function BookingForm() {
               </span>
             </div>
             <span className="rounded-full bg-sand px-2.5 py-0.5 text-[10px] font-medium text-olive border border-sand-border">
-              Funjet 500 Club
+              Premier Host Agency
             </span>
           </div>
           <p className="text-[11px] leading-relaxed text-sage/80">

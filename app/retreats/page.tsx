@@ -25,39 +25,33 @@ export default function RetreatsPage() {
         <h1 className="font-serif text-4xl sm:text-6xl text-sage font-light tracking-tight">
           2026 – 2027 Retreat Calendar
         </h1>
-        <p className="text-sm sm:text-base text-sage/80 font-light leading-relaxed">
-          Every sanctuary is capped at 12 to 14 participants. Intentionally small, medically informed, and harmoniously paced to ensure true physiological restoration.
-        </p>
 
         {/* Filter Pills */}
         <div className="pt-4 flex flex-wrap items-center justify-center gap-2">
           <button
             onClick={() => setFilter("all")}
-            className={`whitespace-nowrap rounded-full px-4 sm:px-5 py-2 text-xs uppercase tracking-wider transition-all font-medium ${
-              filter === "all"
+            className={`whitespace-nowrap rounded-full px-4 sm:px-5 py-2 text-xs uppercase tracking-wider transition-all font-medium ${filter === "all"
                 ? "bg-sage text-linen shadow-sm"
                 : "bg-sand text-sage hover:bg-sand-muted border border-sand-border"
-            }`}
+              }`}
           >
             All Sanctuaries ({RETREATS.length})
           </button>
           <button
             onClick={() => setFilter("2027")}
-            className={`whitespace-nowrap rounded-full px-4 sm:px-5 py-2 text-xs uppercase tracking-wider transition-all font-medium ${
-              filter === "2027"
+            className={`whitespace-nowrap rounded-full px-4 sm:px-5 py-2 text-xs uppercase tracking-wider transition-all font-medium ${filter === "2027"
                 ? "bg-sage text-linen shadow-sm"
                 : "bg-sand text-sage hover:bg-sand-muted border border-sand-border"
-            }`}
+              }`}
           >
             2027 Flagship ({RETREATS.filter((r) => r.year === 2027).length})
           </button>
           <button
             onClick={() => setFilter("2026")}
-            className={`whitespace-nowrap rounded-full px-4 sm:px-5 py-2 text-xs uppercase tracking-wider transition-all font-medium ${
-              filter === "2026"
+            className={`whitespace-nowrap rounded-full px-4 sm:px-5 py-2 text-xs uppercase tracking-wider transition-all font-medium ${filter === "2026"
                 ? "bg-sage text-linen shadow-sm"
                 : "bg-sand text-sage hover:bg-sand-muted border border-sand-border"
-            }`}
+              }`}
           >
             2026 ({RETREATS.filter((r) => r.year === 2026).length})
           </button>

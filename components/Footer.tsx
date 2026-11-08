@@ -25,8 +25,12 @@ export default function Footer() {
           {/* Brand Col */}
           <div className="md:col-span-4 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-linen border border-sand-border">
-                <span className="font-serif text-lg font-light text-sage">界</span>
+              <div className="flex h-11 w-11 items-center justify-center rounded-full overflow-hidden shadow-2xs">
+                <img
+                  src="/kai-logo.png"
+                  alt="KAI Wellness Retreats"
+                  className="h-full w-full object-contain"
+                />
               </div>
               <div>
                 <span className="font-serif text-2xl tracking-[0.2em] uppercase font-light">
@@ -43,7 +47,7 @@ export default function Footer() {
             </p>
 
             <p className="text-xs leading-relaxed text-sage/75">
-              Small wellness retreats led by Kareena Islam, BSN, RN, and Armaan Islam, with yoga, sound baths, cultural experiences, and travel support from Grand Travel & Cruise.
+              Restorative wellness retreats curated by Kareena Islam and Armaan Islam, with mindful movement, sound baths, cultural immersion, and travel planning powered by Grand Travel & Cruise.
             </p>
 
             {/* Social & Partner Badges */}
@@ -200,15 +204,33 @@ export default function Footer() {
             )}
 
             {/* Travel Partner Badge */}
-            <div className="rounded-2xl border border-sand-border bg-linen/70 p-3.5 text-xs text-sage/80 flex items-start gap-3">
-              <Compass className="h-5 w-5 text-terracotta shrink-0 mt-0.5" />
-              <div>
-                <span className="font-medium text-sage block">
-                  Planned with Grand Travel & Cruise
-                </span>
-                <span className="text-[11px] text-sage/70">
-                  25+ years of luxury travel mastery. <em>Future Leaders in Travel</em> Honoree.
-                </span>
+            <div className="rounded-2xl border border-sand-border bg-linen/70 p-4 text-xs text-sage/80 space-y-3">
+              <div className="flex items-start gap-3">
+                <Compass className="h-5 w-5 text-terracotta shrink-0 mt-0.5" />
+                <div>
+                  <span className="font-medium text-sage block">
+                    Powered by Grand Travel & Cruise
+                  </span>
+                  <span className="text-[11px] text-sage/70">
+                    25+ years of luxury travel mastery. <em>Future Leaders in Travel</em> Honoree.
+                  </span>
+                </div>
+              </div>
+
+              {/* Grand Travel Logo */}
+              <div className="pt-2 border-t border-sand-border/60">
+                <a
+                  href="https://grandtravelcruise.com/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block group"
+                >
+                  <img
+                    src="/grand-travel-logo.png"
+                    alt="Grand Travel & Cruise — Vacations, Weddings, Honeymoons"
+                    className="h-14 sm:h-16 w-auto object-contain transition-transform group-hover:scale-[1.02]"
+                  />
+                </a>
               </div>
             </div>
           </div>
@@ -224,16 +246,10 @@ export default function Footer() {
           <div className="flex flex-col sm:flex-row items-center gap-4 text-center md:text-right shrink-0">
             <span>© {new Date().getFullYear()} KAI Wellness Retreats. All rights reserved.</span>
             <span>#LivingBIG • Be In Gratitude</span>
-            <a
-              href="/api/v1/health"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 hover:text-olive transition-colors text-[10px] text-sage/75"
-              title="FastAPI Backend Health & OpenAPI Documentation"
-            >
+            <span className="inline-flex items-center gap-1.5 text-[10px] text-sage/75">
               <span className="h-1.5 w-1.5 rounded-full bg-olive animate-pulse" />
-              <span>API Engine: Active</span>
-            </a>
+              <span>Sanctuary Concierge Online</span>
+            </span>
           </div>
         </div>
       </div>

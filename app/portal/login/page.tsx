@@ -152,9 +152,16 @@ function LoginForm() {
   return (
     <div className="-mt-20 min-h-screen bg-white lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)]">
       <aside className="hidden lg:flex flex-col justify-between bg-[#2D3E35] text-[#FAF7F2] p-12">
-        <div>
-          <p className="font-serif text-2xl">KAI Wellness Retreats</p>
-          <p className="text-sm text-[#C9D2CA] mt-1">Staff CRM</p>
+        <div className="flex items-center space-x-3.5">
+          <img
+            src="/kai-logo.png"
+            alt="KAI Wellness Retreats"
+            className="w-10 h-10 rounded-full object-contain"
+          />
+          <div>
+            <p className="font-serif text-2xl">KAI Wellness Retreats</p>
+            <p className="text-sm text-[#C9D2CA] mt-0.5">Staff CRM</p>
+          </div>
         </div>
 
         <div>
@@ -177,9 +184,16 @@ function LoginForm() {
 
       <main className="min-h-screen flex items-center justify-center px-4 sm:px-6 py-12">
         <div className="w-full max-w-sm">
-          <div className="lg:hidden mb-8">
-            <p className="font-serif text-2xl text-[#2D3E35]">KAI Wellness Retreats</p>
-            <p className="text-sm text-[#5C6B5E]">Staff CRM</p>
+          <div className="lg:hidden mb-8 flex items-center space-x-3">
+            <img
+              src="/kai-logo.png"
+              alt="KAI Wellness Retreats"
+              className="w-10 h-10 rounded-full object-contain"
+            />
+            <div>
+              <p className="font-serif text-2xl text-[#2D3E35]">KAI Wellness Retreats</p>
+              <p className="text-sm text-[#5C6B5E]">Staff CRM</p>
+            </div>
           </div>
 
           <h1 className="font-serif text-3xl text-[#2D3E35]">Sign in</h1>

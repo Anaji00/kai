@@ -219,7 +219,7 @@ export function printCohortManifest(data: CohortPrintData): void {
   const body = `
     <div class="header">
       <div class="logo-seal">
-        <div class="seal-icon">界</div>
+        <img src="/kai-logo.png" style="width: 38px; height: 38px; border-radius: 50%; object-fit: contain;" alt="KAI Logo" />
         <div>
           <h1 class="brand-title">KAI Wellness Retreats</h1>
           <p class="brand-subtitle">Sanctuary Cohort Manifest & Transit Slip</p>
@@ -283,7 +283,7 @@ export function printBillingFolio(data: BillingFolioPrintData): void {
   const body = `
     <div class="header">
       <div class="logo-seal">
-        <div class="seal-icon">界</div>
+        <img src="/kai-logo.png" style="width: 38px; height: 38px; border-radius: 50%; object-fit: contain;" alt="KAI Logo" />
         <div>
           <h1 class="brand-title">KAI Wellness Retreats</h1>
           <p class="brand-subtitle">Itemized Billing Folio & Wire Settlement Voucher</p>
@@ -355,7 +355,7 @@ export function printGuestClinicalDossier(data: ClinicalDossierPrintData): void 
   const body = `
     <div class="header">
       <div class="logo-seal">
-        <div class="seal-icon">界</div>
+        <img src="/kai-logo.png" style="width: 38px; height: 38px; border-radius: 50%; object-fit: contain;" alt="KAI Logo" />
         <div>
           <h1 class="brand-title">KAI Wellness Retreats</h1>
           <p class="brand-subtitle">Clinical Safety Protocol & Grounding Dossier</p>
@@ -403,4 +403,140 @@ export function printGuestClinicalDossier(data: ClinicalDossierPrintData): void 
 
   openPrintWindow(`Clinical_Dossier_${data.client_name.replace(/\s+/g, "_")}`, body);
 }
+
+export interface ChargebackAuditData {
+  trip_id: string;
+  client_name: string;
+  client_email?: string;
+  billing_address?: string;
+  sanctuary_name: string;
+  dates: string;
+  room_tier: string;
+  total_investment: number;
+  deposit_authorized: number;
+  balance_scheduled: number;
+  card_brand: string;
+  card_last4: string;
+  auth_reference: string;
+  signed_timestamp: string;
+  e_signature: string;
+  itinerary_highlights?: string[];
+}
+
+export function printChargebackDefenseBundle(data: ChargebackAuditData): void {
+  const highlights = (data.itinerary_highlights || [
+    "Dedicated Private SUV Gateway Airport Transfer & VIP Tarmac Escort",
+    "All-Inclusive Sanctuary Accommodations & Private Somatic Soaking Suite",
+    "Clinical 432Hz Sound Decompression & Autonomic Vagal Realignment",
+    "Daily Organic Seed-Oil-Free Blue Zone Gastronomy by Private Executive Chef",
+  ])
+    .map((item) => `<li style="margin-bottom: 4px;">${item}</li>`)
+    .join("");
+
+  const body = `
+    <div class="header">
+      <div class="logo-seal">
+        <div class="seal-icon">🛡️</div>
+        <div>
+          <h1 class="brand-title">KAI Wellness Retreats &amp; Grand Travel</h1>
+          <p class="brand-subtitle">Merchant Chargeback Dispute Defense &amp; Evidence Bundle</p>
+        </div>
+      </div>
+      <div style="text-align: right;">
+        <span class="badge badge-success">LEGALLY BINDING E-SIGNATURE</span>
+        <p style="font-size: 10px; margin-top: 4px; color: #5C6B5E;">Ref: <code>${data.auth_reference}</code></p>
+      </div>
+    </div>
+
+    <div class="summary-card" style="border-left: 4px solid #C07D63; background: #FAF7F2;">
+      <h3 style="font-size: 13px; font-weight: bold; margin-bottom: 4px; color: #2D3E35;">
+        DISPUTE CASE EXHIBIT A: TRANSACTION AUTHENTICITY &amp; AUTHORIZATION
+      </h3>
+      <p style="font-size: 11px; line-height: 1.6; color: #5C6B5E;">
+        This document serves as definitive proof that the cardholder, <strong>${data.client_name}</strong>,
+        voluntarily entered into an all-inclusive luxury sanctuary reservation agreement, acknowledged the non-refundable deposit terms,
+        and legally authorized host agency <strong>Grand Travel &amp; Cruise</strong> to vault and charge their card.
+      </p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0;">
+      <div class="summary-card">
+        <h4 style="font-size: 11px; text-transform: uppercase; color: #5C6B5E; margin-bottom: 8px;">Cardholder &amp; Payment Provenance</h4>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Cardholder Name:</strong> ${data.client_name}</p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Billing Location / ZIP:</strong> ${data.billing_address || "On File"}</p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Card Network &amp; Account:</strong> ${data.card_brand} ending in <code>*${data.card_last4}</code></p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Transaction Auth Token:</strong> <code>${data.auth_reference}</code></p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Authorization Signed At:</strong> ${data.signed_timestamp}</p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Digital Signature Record:</strong> <span style="font-family: serif; font-style: italic; color: #C07D63;">${data.e_signature || data.client_name}</span></p>
+      </div>
+
+      <div class="summary-card">
+        <h4 style="font-size: 11px; text-transform: uppercase; color: #5C6B5E; margin-bottom: 8px;">Itinerary Binding &amp; Suite Allocation</h4>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Sanctuary Cohort:</strong> ${data.sanctuary_name}</p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Reserved Cohort Dates:</strong> ${data.dates}</p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Allocated Room Tier:</strong> ${data.room_tier}</p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Total Stay Investment:</strong> $${data.total_investment.toLocaleString()} USD</p>
+        <p style="font-size: 11px; margin: 3px 0; color: #237804;"><strong>30% Authorized Deposit:</strong> $${data.deposit_authorized.toLocaleString()} USD</p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>70% Scheduled Final Balance:</strong> $${data.balance_scheduled.toLocaleString()} USD</p>
+      </div>
+    </div>
+
+    <h4 style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #2D3E35; margin: 16px 0 8px;">
+      EXHIBIT B: INCLUSIONS &amp; RESERVED BESPOKE VALUE DELIVERED
+    </h4>
+    <div class="summary-card" style="padding: 12px 16px;">
+      <ul style="font-size: 11px; color: #5C6B5E; line-height: 1.6; padding-left: 20px;">
+        ${highlights}
+      </ul>
+    </div>
+
+    <h4 style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #2D3E35; margin: 16px 0 8px;">
+      EXHIBIT C: AGREED 3-TIER CANCELLATION SCHEDULE &amp; NO-CHARGEBACK WAIVER
+    </h4>
+    <table>
+      <thead>
+        <tr>
+          <th>Cancellation Window</th>
+          <th>Cash Refund</th>
+          <th>Concierge Sanctuary Credit</th>
+          <th>Non-Refundable Forfeiture</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>&gt; 60 Days Prior to Arrival</strong></td>
+          <td>70% of Total Investment</td>
+          <td>30% (Full Deposit Retained as 12-Mo Credit)</td>
+          <td>0% Penalty</td>
+        </tr>
+        <tr>
+          <td><strong>30 – 60 Days Prior to Arrival</strong></td>
+          <td>0% Cash Refund</td>
+          <td>50% Concierge Re-booking Credit</td>
+          <td>50% Retained for Villa &amp; Private Chef Commitments</td>
+        </tr>
+        <tr>
+          <td><strong>&lt; 30 Days Prior to Arrival</strong></td>
+          <td>0% Cash Refund</td>
+          <td>0% Credit (100% Operational Forfeiture)</td>
+          <td>100% Forfeiture (Non-refundable / Non-transferable)</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="summary-card" style="margin-top: 16px; font-size: 10px; line-height: 1.6; color: #5C6B5E; border: 1px dashed #E5DDD0;">
+      <p>
+        <strong>MERCHANT LEGAL REPRESENTATION:</strong>
+        The cardholder explicitly certified at the moment of authorization:
+        <em>"I hereby authorize KAI Wellness Retreats and host agency Grand Travel &amp; Cruise to charge the non-refundable 30% sanctuary deposit to the card above.
+        I acknowledge that the remaining 70% balance will be automatically scheduled in accordance with the luxury cancellation schedule.
+        I agree not to initiate a chargeback or dispute for voluntary cancellations covered under this policy."</em>
+        This agreement complies fully with Visa Core Rules, Mastercard Dispute Resolution, and American Express Merchant Regulations.
+      </p>
+    </div>
+  `;
+
+  openPrintWindow(`Chargeback_Defense_Bundle_${data.client_name.replace(/\s+/g, "_")}`, body);
+}
+
 

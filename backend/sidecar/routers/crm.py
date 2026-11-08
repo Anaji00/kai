@@ -483,6 +483,7 @@ def list_crm_trips(
             "deposit_status": t.deposit_status,
             "final_balance": t.final_balance,
             "activities_count": len(t.itinerary_blocks or []),
+            "activity_timeline": t.activity_timeline or [],
             "smart_flight": t.smart_flight,
             "deep_link": t.deep_link,
             "created_at": t.created_at.isoformat(),
@@ -528,6 +529,7 @@ def get_crm_trip_detail(trip_id: str, db: Session = Depends(get_db)):
             "clinical_thesis": trip.clinical_thesis,
             "suggested_plan": trip.suggested_plan,
             "itinerary_blocks": trip.itinerary_blocks or [],
+            "activity_timeline": trip.activity_timeline or [],
             "deep_link": trip.deep_link,
             "proposal_url": trip.proposal_url,
             "created_by": trip.created_by,
@@ -2182,12 +2184,12 @@ def resolve_room_allocation_conflict(
         client_b.tags = tags
 
     content = (
-        f"KAI SANCTUARY - VIP COMPLIMENTARY SUITE ELEVATION & WELCOME NOTICE\n"
+        f"KAI SANCTUARY - VIP COMPLIMENTARY SUITE UPGRADE & WELCOME NOTICE\n"
         f"Guest: {secondary_trip.client_name} ({secondary_trip.client_email})\n"
         f"Sanctuary: {norm_slug.upper()} | Coordinated by Founder: {payload.operator_name}\n\n"
         f"Dear {secondary_trip.client_name},\n\n"
-        f"To provide you with unparalleled seclusion and panoramic tranquility during your upcoming retreat, "
-        f"our founders have personally elevated your accommodation to our premier {payload.upgrade_room_tier} "
+        f"To ensure you have extra space and quiet privacy during your upcoming retreat, "
+        f"our founders have upgraded your accommodation to our premier {payload.upgrade_room_tier} "
         f"with our compliments (Value: +$4,350.00 complimentary upgrade).\n\n"
         f"In addition, we have credited ${payload.complimentary_spa_credit:,.2f} USD to your personal sanctuary folio "
         f"for restorative bodywork and private hydrotherapy sessions.\n\n"
@@ -2243,7 +2245,7 @@ def pivot_cohort_weather_itinerary(
 ):
     """
     Microclimate Weather Anomaly & Dynamic Somatic Itinerary Pivot:
-    Detects sudden precipitation and squalls, seamlessly adapts daily retreat
+    Detects sudden precipitation and squalls, dynamically adapts daily retreat
     blocks from outdoor elements to indoor Geodesic Sanctuary Domes,
     and auto-stages guest reassurance and tea lounge announcements.
     """
@@ -2291,9 +2293,9 @@ def pivot_cohort_weather_itinerary(
         f"Sanctuary: {norm_slug.upper()} | Date: {payload.affected_date}\n"
         f"Telemetry Notice: {payload.weather_event} (Precipitation: {payload.precipitation_probability}%, Gusts: {payload.wind_gust_kmh} km/h)\n"
         f"Guidance by Founders: {payload.operator_name}\n\n"
-        f"Dear Honored Guests,\n\n"
-        f"Due to morning coastal squalls across the bay, our schedule has seamlessly shifted to our "
-        f"indoor climate-controlled Geodesic Sanctuary Dome and heated Magnesium Flotation Suites.\n\n"
+        f"Dear Guests,\n\n"
+        f"Due to morning coastal squalls across the bay, we have moved our morning sessions inside to our "
+        f"climate-controlled Geodesic Sanctuary Dome and heated Magnesium Flotation Suites.\n\n"
         f"REVISED DAILY FLOW:\n"
         f" • 07:30 AM — Geodesic Sanctuary Dome Breathwork & 432Hz Crystal Sound Immersion\n"
         f" • 10:30 AM — Thermal Magnesium Hydrotherapy & Infrared Sauna\n"

@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "About Kareena Islam, RN | KAI Wellness Retreats",
     description:
-      "Clinical high-acuity nursing meets 432Hz crystal sound healing and quiet luxury travel.",
+      "Evidence-based clinical nursing meets 432Hz crystal sound healing and quiet luxury travel.",
     images: [
       "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1200&q=80",
     ],
@@ -65,24 +65,36 @@ export default function AboutLayout({
     url: "https://kaiwellnessretreats.com/about",
     description:
       "Biography, clinical background, and travel lineage of founders Kareena Islam, BSN, RN and Armaan Islam.",
-    mainEntity: {
-      "@type": "Person",
-      name: "Kareena Islam",
-      jobTitle: "Founder, Registered Nurse & Somatic Director",
-      alumniOf: {
-        "@type": "EducationalOrganization",
-        name: "BSN Nursing Program",
+    mainEntity: [
+      {
+        "@type": "Person",
+        name: "Kareena Islam",
+        jobTitle: "Founder, Registered Nurse & Somatic Director",
+        alumniOf: {
+          "@type": "EducationalOrganization",
+          name: "BSN Nursing Program",
+        },
+        knowsAbout: [
+          "Evidence-Based Clinical Nursing",
+          "Autonomic Nervous System Regulation",
+          "432Hz Crystal Sound Healing",
+          "Anatomical Alignment Yoga",
+        ],
+        sameAs: [
+          "https://www.instagram.com/kareenatravelrn/",
+        ],
       },
-      knowsAbout: [
-        "High-Acuity Clinical Nursing",
-        "Autonomic Nervous System Regulation",
-        "432Hz Crystal Sound Healing",
-        "Anatomical Alignment Yoga",
-      ],
-      sameAs: [
-        "https://www.instagram.com/kareenatravelrn/",
-      ],
-    },
+      {
+        "@type": "Person",
+        name: "Armaan Islam",
+        jobTitle: "Co-Founder & Strategic Director",
+        knowsAbout: [
+          "Ironman Triathlon & Endurance Recovery",
+          "Metabolic Conditioning",
+          "Luxury Travel Operations",
+        ],
+      },
+    ],
   };
 
   return (

@@ -23,6 +23,8 @@ export default function robots(): MetadataRoute.Robots {
           "/*.ico",
         ],
         disallow: [
+          "/portal",
+          "/portal/*",
           "/api/",
           "/api/*",
           "/my-retreat",

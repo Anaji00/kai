@@ -212,7 +212,7 @@ def seed_default_dining_if_empty(db: Session) -> None:
                 cuisine_type="Ancient Mayan Plant Medicine & Organic Hearth",
                 dietary_tags=["Gluten-Free", "Dairy-Free", "Organic", "Anti-Inflammatory"],
                 distance_from_villa_km=3.8,
-                description="Nestled in the lush jungle canopy of Tulum, crafting wood-fired dishes infused with medicinal chaya leaves, avocado leaf infusions, and stone-ground cacao.",
+                description="Set within the coastal jungle canopy of Tulum, crafting wood-fired dishes infused with medicinal chaya leaves, avocado leaf infusions, and stone-ground cacao.",
                 nurse_notes="Chaya is revered for high iron, calcium, and chlorophyll content, replenishing vital energy reserves drained by executive fatigue.",
                 price_tier="$$$",
                 reservation_required="CONCIERGE_HANDLED",

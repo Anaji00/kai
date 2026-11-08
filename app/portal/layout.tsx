@@ -220,7 +220,12 @@ function AuthenticatedPortalShell({ children }: { children: React.ReactNode }) {
           <div className="flex items-center justify-between h-16">
             {/* Left: Branding & Governance Badge */}
             <div className="flex items-center space-x-3">
-              <Link href="/portal" className="group flex items-center space-x-2">
+              <Link href="/portal" className="group flex items-center space-x-2.5">
+                <img
+                  src="/kai-logo.png"
+                  alt="KAI Wellness Retreats"
+                  className="w-8 h-8 rounded-full object-contain"
+                />
                 <span className="font-serif text-2xl font-bold tracking-tight text-[#2D3E35] group-hover:text-[#C07D63] transition-colors">
                   KAI
                 </span>
@@ -380,23 +385,31 @@ function AuthenticatedPortalShell({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Floating AI Copilot Trigger */}
-      <div className="fixed bottom-6 right-6 z-40">
-        <button
-          onClick={() => setIsCopilotOpen(true)}
-          className="flex items-center gap-2.5 px-4 py-3 rounded-full bg-stone-900 hover:bg-stone-800 text-amber-400 border border-amber-500/40 shadow-xl hover:shadow-2xl transition-all group scale-100 hover:scale-105 active:scale-95"
-          title="Open AI Clinical Somatic Copilot (KAI Brain)"
-        >
-          <div className="p-1 rounded-full bg-amber-500/20 text-amber-300">
-            <Sparkles className="w-4 h-4 animate-pulse" />
-          </div>
-          <span className="text-xs font-semibold text-stone-100 font-serif">
-            AI Copilot
-          </span>
-          <span className="text-[10px] font-sans px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium">
-            KAI Brain
-          </span>
-        </button>
-      </div>
+      {!isCopilotOpen && (
+        <div className="fixed bottom-6 right-6 z-40">
+          <button
+            onClick={() => setIsCopilotOpen(true)}
+            className="flex items-center gap-2.5 px-4 py-3 rounded-full bg-[#121110]/95 hover:bg-stone-900 text-stone-100 border border-amber-500/40 shadow-2xl shadow-black/80 hover:shadow-amber-500/20 backdrop-blur-xl transition-all group scale-100 hover:scale-105 active:scale-95 cursor-pointer"
+            title="Open KAI AI Assistant (ChatGPT Experience & Voice Mode)"
+          >
+            <div className="relative">
+              <div className="p-1.5 rounded-full bg-gradient-to-tr from-amber-600/40 to-amber-400/20 text-amber-300 border border-amber-500/40">
+                <Sparkles className="w-4 h-4 text-amber-400 animate-pulse" />
+              </div>
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-stone-950 animate-ping" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-stone-950" />
+            </div>
+            <div className="text-left leading-tight pr-1">
+              <span className="text-xs font-semibold text-stone-100 font-serif block">
+                Ask KAI Assistant
+              </span>
+              <span className="text-[10px] text-amber-300 font-mono">
+                Live Voice &amp; Actions
+              </span>
+            </div>
+          </button>
+        </div>
+      )}
 
       {/* Footer Audit Signature */}
       <footer className="bg-[#FAF7F2] border-t border-[#E5DDD0] py-4 text-center text-xs text-[#5C6B5E]">

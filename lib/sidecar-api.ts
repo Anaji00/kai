@@ -2701,6 +2701,14 @@ export interface CRMTripItem {
   dietary_notes?: string;
   clinical_flags?: string[];
   deep_link?: string;
+  activity_timeline?: Array<{
+    event: string;
+    title: string;
+    description: string;
+    timestamp: string;
+    badge?: string;
+    actor?: string;
+  }>;
   created_at: string;
 }
 

@@ -34,7 +34,7 @@ export default function AboutPage() {
           </h1>
 
           <p className="text-sm sm:text-base text-sage/85 leading-relaxed font-light max-w-3xl mx-auto">
-            Co-founded by <strong>Kareena Islam, BSN, RN</strong> and <strong>Armaan Islam</strong>, KAI unites high-acuity clinical nursing science, 432Hz somatic sound restoration, Ironman endurance discipline, and strategic business execution—all anchored by 25+ years of global luxury travel mastery at <strong>Grand Travel & Cruise</strong> and deep cultural integrations.
+            Co-founded by <strong>Kareena Islam, BSN, RN</strong> and <strong>Armaan Islam</strong>, KAI unites evidence-based clinical nursing science, 432Hz somatic sound restoration, Ironman endurance discipline, and strategic business execution—all anchored by 25+ years of global luxury travel mastery at <strong>Grand Travel & Cruise</strong> and deep cultural integrations.
           </p>
 
           {/* Direct Founder Inquiry Routing Pill */}
@@ -95,11 +95,11 @@ export default function AboutPage() {
 
               <div className="p-6 sm:p-8 space-y-6">
                 <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
-                  <strong>Kareena Islam</strong> created KAI Wellness Retreats out of a clinical and personal imperative: people are burning out, and a typical vacation rarely gives them the rest they need. A proud graduate of <strong>Texas A&amp;M University (BSN, RN)</strong> with intensive clinical experience in acute surgical and hospital care across premier Texas medical centers (including <strong>Memorial Hermann</strong> and <strong>HCA Healthcare</strong>), Kareena spent years caring for patients at their most vulnerable—observing firsthand how chronic sympathetic stress, broken circadian sleep, and unexpressed somatic tension erode cardiovascular and immune health.
+                  <strong>Kareena Islam</strong> created KAI Wellness Retreats from a clear conviction formed over years in acute hospital care: modern work schedules are burning people out, and a typical vacation rarely gives their nervous system the physiological rest it needs. A proud graduate of <strong>Texas A&amp;M University (BSN, RN)</strong> with intensive clinical experience in acute surgical and hospital care across premier Texas medical centers (including <strong>Memorial Hermann</strong> and <strong>HCA Healthcare</strong>), Kareena spent years caring for patients at their most vulnerable—observing firsthand how chronic sympathetic stress, broken circadian sleep, and unexpressed somatic tension erode cardiovascular and immune health.
                 </p>
 
                 <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
-                  Raised inside <strong>Grand Travel &amp; Cruise</strong>—a 25+ year luxury host agency powerhouse founded alongside Jay Islam (Funjet 500 Club)—and hand-selected nationally as a <strong><em>Future Leaders in Travel</em> Honoree</strong>, Kareena bridges evidence-based clinical restoration with anatomical yoga, crystal singing bowl sound baths, and authentic cultural reverence.
+                  Raised inside <strong>Grand Travel &amp; Cruise</strong>—a 25+ year premier host agency founded alongside Jay Islam—and hand-selected nationally as a <strong><em>Future Leaders in Travel</em> Honoree</strong>, Kareena bridges evidence-based clinical restoration with anatomical yoga, crystal singing bowl sound baths, and authentic cultural reverence through her signature <strong>Triad of Care</strong> and interdisciplinary synergy.
                 </p>
 
                 {/* Dense Credential Matrix */}
@@ -201,7 +201,7 @@ export default function AboutPage() {
                 </p>
 
                 <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
-                  Leading business strategy, commercial partnerships, and executive retreat operations across KAI and <strong>Grand Travel &amp; Cruise</strong>, Armaan bridges the gap between high-stakes business leadership and physical longevity. He co-architects KAI’s endurance recovery tracks, metabolic conditioning protocols, resort contract negotiations (including our flagship 2027 launch at <strong>Marival Harmony in Puerto Vallarta</strong>), and bespoke concierge workflows.
+                  Leading business strategy, commercial partnerships, and executive retreat operations across KAI and <strong>Grand Travel &amp; Cruise</strong>, Armaan bridges the gap between high-stakes business leadership and physical longevity. He co-architects KAI’s endurance recovery tracks, metabolic conditioning protocols, resort contract negotiations (including our flagship 2027 launch at <strong>Marival Harmony in Puerto Vallarta</strong>), and personalized concierge itineraries.
                 </p>
 
                 {/* Dense Credential Matrix */}
@@ -237,7 +237,7 @@ export default function AboutPage() {
                     <span className="text-[10px] uppercase tracking-wider font-semibold text-olive flex items-center gap-1">
                       <ShieldCheck className="h-3.5 w-3.5 text-terracotta" /> White-Glove Hospitality
                     </span>
-                    <p className="text-xs text-sage font-medium">Seamless Guest Logistics</p>
+                    <p className="text-xs text-sage font-medium">Door-to-Door Chauffeur &amp; Flight Logistics</p>
                     <p className="text-[11px] text-sage/75">
                       End-to-end itinerary coordination, private ground transfers, and dedicated founder attention.
                     </p>
@@ -266,6 +266,138 @@ export default function AboutPage() {
               </div>
             </div>
           </article>
+        </div>
+
+        {/* FOUNDERS' INTERDISCIPLINARY SYNERGY & THE TRIAD OF CARE */}
+        <div id="triad-of-care" className="rounded-3xl border border-sand-border bg-sand/40 p-8 sm:p-14 space-y-10">
+          <div className="max-w-3xl space-y-4">
+            <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.25em] text-olive font-semibold">
+              <Sparkles className="h-4 w-4 text-terracotta" />
+              Founder Philosophy • Kareena Islam
+            </span>
+            <h2 className="font-serif text-3xl sm:text-5xl text-sage font-light">
+              Founders’ Interdisciplinary Synergy &amp; The Triad of Care
+            </h2>
+            <p className="text-sm sm:text-base text-sage/85 leading-relaxed font-light">
+              Most retreats force you to choose between sterile clinical wellness clinics and ungrounded esoteric getaways. Through Kareena Islam, KAI unifies three distinct disciplines into one cohesive philosophy: clinical knowledge to safeguard your health, somatic practices to release physical tension, and world-class travel infrastructure powered by Grand Travel to remove every friction of travel.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Pillar 1: Clinical Knowledge & Restorative Science */}
+            <div className="rounded-2xl border border-sand-border bg-linen p-8 shadow-sm flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-olive-soft text-olive border border-olive/20">
+                  <Activity className="h-6 w-6" />
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase tracking-widest text-olive font-semibold">
+                    Pillar 01
+                  </span>
+                  <h3 className="font-serif text-2xl text-sage font-normal mt-1">
+                    Clinical Knowledge
+                  </h3>
+                  <p className="text-xs text-olive font-medium mt-0.5">
+                    Restorative Science &amp; Health Triage
+                  </p>
+                </div>
+                <p className="text-xs leading-relaxed text-sage/80">
+                  Drawing from acute and surgical nursing across Texas medical centers (Memorial Hermann, HCA Healthcare, Texas A&amp;M BSN, RN), Kareena understands human physiology under stress. Retreat schedules, pacing, circadian daylight exposure, and anti-inflammatory meals are designed to help lower stress, ease tension, and restore restorative sleep.
+                </p>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-sand-border/70 text-xs text-sage/75 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-olive" />
+                  <span>Autonomic nervous system recovery</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-olive" />
+                  <span>Circadian rhythm sleep support</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-olive" />
+                  <span>Personalized health considerations</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Pillar 2: Somatic Movement & Crystal Sound */}
+            <div className="rounded-2xl border border-sand-border bg-linen p-8 shadow-sm flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-terracotta-soft text-terracotta border border-terracotta/20">
+                  <Sparkles className="h-6 w-6" />
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase tracking-widest text-terracotta font-semibold">
+                    Pillar 02
+                  </span>
+                  <h3 className="font-serif text-2xl text-sage font-normal mt-1">
+                    Movement &amp; Sound
+                  </h3>
+                  <p className="text-xs text-terracotta font-medium mt-0.5">
+                    Anatomical Yoga &amp; 432Hz Sound Baths
+                  </p>
+                </div>
+                <p className="text-xs leading-relaxed text-sage/80">
+                  Certified in yoga and somatic breathwork, Kareena applies anatomical alignment to gentle Vinyasa and restorative Yin. Evenings culminate in 432Hz acoustic crystal singing bowl sound baths, which quiet mental chatter, release somatic holding patterns, and guide the body into deep stillness.
+                </p>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-sand-border/70 text-xs text-sage/75 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-terracotta" />
+                  <span>Anatomically safe yoga for every body</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-terracotta" />
+                  <span>Acoustic crystal singing bowl baths</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-terracotta" />
+                  <span>Myofascial tension de-escalation</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Pillar 3: Luxury Travel Powered by Grand Travel */}
+            <div className="rounded-2xl border border-sand-border bg-linen p-8 shadow-sm flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sand text-sage border border-sand-border">
+                  <Compass className="h-6 w-6 text-sage" />
+                </div>
+                <div>
+                  <span className="text-[10px] uppercase tracking-widest text-olive font-semibold">
+                    Pillar 03
+                  </span>
+                  <h3 className="font-serif text-2xl text-sage font-normal mt-1">
+                    Travel Mastery
+                  </h3>
+                  <p className="text-xs text-sage font-medium mt-0.5">
+                    Powered by Grand Travel &amp; Cruise
+                  </p>
+                </div>
+                <p className="text-xs leading-relaxed text-sage/80">
+                  Backed by 25+ years of host agency excellence and recognized nationally as a <em>Future Leaders in Travel</em> Honoree, Kareena leverages premier industry buying power to secure private estate buyouts, preferred air contracts, door-to-door flight and chauffeur logistics, and authentic access to sacred local customs.
+                </p>
+              </div>
+
+              <div className="mt-6 pt-4 border-t border-sand-border/70 text-xs text-sage/75 space-y-1.5">
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-sage" />
+                  <span>Private estate buyouts &amp; preferred rates</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-sage" />
+                  <span>Direct cultural access &amp; local customs</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-sage" />
+                  <span>Frictionless VIP air &amp; chauffeur transit</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -347,7 +479,7 @@ export default function AboutPage() {
               Connect With KAI Wellness Retreats &amp; Grand Travel &amp; Cruise
             </h2>
             <p className="text-xs sm:text-sm text-sage/80 leading-relaxed">
-              Backed by 25+ years of host agency excellence founded with <strong>Jay Islam</strong> (Funjet 500 Club), <strong>Grand Travel &amp; Cruise</strong> powers all air, resort, and private transfer logistics for KAI Wellness Retreats. Follow our official channels for live retreat dispatches, cultural previews from Puerto Vallarta, and luxury travel insights.
+              Backed by 25+ years of host agency excellence founded with <strong>Jay Islam</strong>, <strong>Grand Travel &amp; Cruise</strong> powers all air, resort, and private transfer logistics for KAI Wellness Retreats. Follow our official channels for live retreat dispatches, cultural previews from Puerto Vallarta, and luxury travel insights.
             </p>
           </div>
 

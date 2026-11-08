@@ -22,12 +22,17 @@ const jakarta = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   metadataBase: new URL("https://kaiwellnessretreats.com"),
   manifest: "/manifest.webmanifest",
+  icons: {
+    icon: "/kai-logo.png",
+    shortcut: "/kai-logo.png",
+    apple: "/kai-logo-192.png",
+  },
   title: {
-    default: "KAI Sanctuary & Wellness Retreats | Small, Nurse-Led Luxury Wellness Travel",
+    default: "KAI Wellness Retreats | A Journey of Movement, Culture & Connection",
     template: "%s | KAI Wellness Retreats",
   },
   description:
-    "Founded by Kareena Islam, BSN, RN. Intimate, quiet luxury wellness retreats with yoga, crystal singing bowl sound baths, cultural experiences, and travel planning by Grand Travel & Cruise.",
+    "KAI Wellness Retreats: A Journey of Movement, Culture & Connection. Restorative wellness retreats with yoga, crystal singing bowl sound baths, and authentic cultural experiences, powered by Grand Travel.",
   keywords: [
     "KAI Wellness Retreats",
     "Kareena Islam",
@@ -84,9 +89,9 @@ export const metadata: Metadata = {
     },
   },
   openGraph: {
-    title: "KAI Wellness Retreats | Where Clinical Science Meets Somatic Restoration",
+    title: "KAI Wellness Retreats | A Journey of Movement, Culture & Connection",
     description:
-      "Led by Kareena Islam, BSN, RN. Intimate, quiet luxury wellness sanctuaries in Puerto Vallarta, Nosara, Amalfi Coast, Bali, and Sedona.",
+      "A Journey of Movement, Culture & Connection. Restorative wellness retreats in Puerto Vallarta, Nosara, Amalfi Coast, and Bali, powered by Grand Travel.",
     url: "https://kaiwellnessretreats.com",
     siteName: "KAI Wellness Retreats",
     locale: "en_US",
@@ -102,9 +107,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "KAI Wellness Retreats | Clinical Science & Somatic Restoration",
+    title: "KAI Wellness Retreats | A Journey of Movement, Culture & Connection",
     description:
-      "Nurse-led luxury sanctuaries in Puerto Vallarta, Costa Rica, Amalfi Coast, Bali, and Riviera Maya.",
+      "A Journey of Movement, Culture & Connection. Restorative wellness retreats in Puerto Vallarta, Costa Rica, Amalfi Coast, and Bali, powered by Grand Travel.",
     images: [
       "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80",
     ],
@@ -117,7 +122,7 @@ const organizationJsonLd = {
   name: "KAI Wellness Retreats",
   alternateName: ["KAI Sanctuaries", "KAI Sanctuary Travel", "KAI Wellness"],
   url: "https://kaiwellnessretreats.com",
-  logo: "https://kaiwellnessretreats.com/icon.png",
+  logo: "https://kaiwellnessretreats.com/kai-logo.png",
   image: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80",
   email: "concierge@kaiwellnessretreats.com",
   priceRange: "$$$$",
@@ -190,7 +195,7 @@ const faqJsonLd = {
       name: "How does Grand Travel & Cruise secure the best rates and private estate access?",
       acceptedAnswer: {
         "@type": "Answer",
-        text: "With over 25 years as a host agency powerhouse and elite Funjet 500 Club recognition under Jay Islam, Grand Travel & Cruise commands high-volume global purchasing power, negotiating full private estate buyouts, preferred group air contracts, and exclusive industry rates.",
+        text: "With over 25 years as a premier host agency under Jay Islam, Grand Travel & Cruise commands high-volume global purchasing power, negotiating full private estate buyouts, preferred group air contracts, and exclusive industry rates.",
       },
     },
     {

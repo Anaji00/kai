@@ -49,14 +49,14 @@ Log in to the staff operations portal at **`http://localhost:3536/portal`**. All
 │ 2. Drafts Queue │ 1-Click approval center for staged emails, texts, & updates.     │
 │ 3. Sovereign CRM│ 7-Tab hub with Monday.com-style spreadsheet, folios, & profiles.│
 │ 4. Calendar     │ Visual cohort schedule with 14-guest capacity meters & flights. │
-│ 5. Logistics    │ Chauffeur routes, high-clearance 4WD vehicles, & clinic maps.   │
+│ 5. Logistics    │ Interactive map view, chauffeur routes, 4WD vehicles, & clinics.│
 │ 6. Vendors      │ Luxury chauffeurs, private chefs, sound healers, & rate cards.  │
 │ 7. Partners     │ Outreach list for vetted medical spas and yoga studios.         │
 │ 8. Broadcasts   │ Staged mass SMS announcements to retreat alumni.                │
 │ 9. Audit & Room │ Compare room vouchers against guest rosters to prevent errors.  │
 │ 10. Inbox       │ Shared travel desk email organizer.                             │
 │ 11. Connections │ Live system connections for flight radar and text gateways.     │
-│ 12. Copilot     │ Slide-out clinical & operations assistant with "Explain This".  │
+│ 12. Copilot     │ Floating voice-enabled clinical & operations ChatGPT-style AI.  │
 └─────────────────┴─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -95,8 +95,30 @@ Located at **`/portal/crm`** under the **Attendee Spreadsheet** tab, this intera
 
 Staff can generate branded, high-resolution printable documents formatted with dedicated `@media print` CSS:
 1. **Rooming & Guest Manifest**: Complete villa room allocations, airport chauffeur waves, flight arrival times, and kitchen dietary protocols.
-2. **Itemized Billing Folios**: Multi-currency wire settlement receipts, deposit breakdowns, and zero-cent balance reconciliation.
+2. **Itemized Billing Folios**: Multi-currency wire settlement receipts, deposit breakdowns, host agency 90/10 commission splits, and zero-cent balance reconciliation.
 3. **Guest Clinical & Dietary Dossiers**: Personalized medical clearance summaries, safe alternative modalities, and dietary guidelines.
+4. **1-Click Chargeback Defense Audit Bundle ("Chargeback Shield")**: Direct itinerary-linked card authorizations, merchant representations, Exhibit B value inclusions, and signed no-chargeback waivers formatted into an official card-issuer dispute package.
+
+---
+
+## 🏛️ Tern CRM Sovereign Parity & Custom Enhancements
+
+Drawing from deep analysis of luxury travel agency workflows (Tern CRM, TravelJoy, Axus), KAI has native, sovereign implementations built directly into its portal without third-party subscription fees or SaaS vendor lock-in:
+
+* **1-Click Chargeback Shield Generator (`components/portal/crm/BillingFolioTab.tsx`)**: Binds signed guest authorizations directly to timestamped itinerary versions, cancellation policies, and merchant proofs to definitively close merchant dispute loops.
+* **Self-Service Dynamic Room Block Suite Selection (`app/my-retreat/page.tsx`)**: Guests on `/my-retreat` can interactively toggle suite upgrades (*Oceanfront King Suite*, *Private Cliffside Plunge Villa* +$3,200, *Master Penthouse Sanctuary* +$5,500) with instant, real-time recalculation of the 30% deposit and 70% balance terms prior to e-signing.
+* **Curated Somatic Activity Block Library (`components/portal/crm/SomaticActivityBlockLibrary.tsx`)**: Directly integrated into the Itinerary Builder (`TripBuilderModal.tsx`), giving coordinators 12+ pre-vetted somatic, biochemical, and restorative activity templates with 1-click insertion.
+* **Host Agency Commission Engine (`components/portal/crm/BillingFolioTab.tsx`)**: Native 90/10 commission split tracking, gross-to-net supplier wire reconciliations, and host agency remittance summaries tailored for Grand Travel & Cruise.
+
+---
+
+## 🎙️ Floating Sanctuary AI Copilot & Voice Assistant
+
+Accessible from any screen in the Operations Portal via the bottom-right floating trigger:
+* **ChatGPT-Style Minimalist Floating Interface**: Modern, distraction-free floating conversational window with fluid slide and pulse animations.
+* **Voice-Enabled Hands-Free Operations**: Full hands-free two-way voice mode leveraging the browser Web Speech API for voice dictation and serene clinical audio responses.
+* **Omnipresent System Action Calling**: Can execute any operational or clinical action on command—drafting personalized guest outreach, approving held bookings, retrieving contraindication clearances, recalculating folios, and looking up flight statuses.
+* **Zero Autonomous Writes Preserved**: All mutations suggested by the Copilot continue to adhere to the strict Human-in-the-Loop review queue invariant.
 
 ---
 
@@ -230,10 +252,13 @@ docker compose up --build
 # 1. Frontend TypeScript type checking (must exit with 0 errors)
 npx tsc --noEmit
 
-# 2. Backend unit tests (deterministic clinical gate, prompt spotlighting, OCC)
+# 2. Comprehensive 33-point edge case & system hardening test suite
+python backend/sidecar/test_expanded_edge_cases.py
+
+# 3. Core backend hardening suite (deterministic clinical gate, prompt spotlighting, OCC)
 python -m pytest backend/sidecar/test_system_hardening.py -v
 
-# 3. Test transactional email pipeline via CLI
+# 4. Test transactional email pipeline via CLI
 python scripts/send_test_email.py --to your-email@gmail.com --pipeline
 ```
 

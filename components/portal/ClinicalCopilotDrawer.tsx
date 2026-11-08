@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Sparkles,
   X,
@@ -31,27 +32,24 @@ import {
   Table,
   Printer,
   Phone,
-  CloudSun,
-  MapPin,
-  HelpCircle,
-  FileText
+  Maximize2,
+  Minimize2,
+  Minus,
+  Volume2,
+  VolumeX,
+  ExternalLink,
+  Bot,
+  User,
+  Radio,
+  SlidersHorizontal,
+  ChevronDown
 } from "lucide-react";
 import {
   chatWithCopilot,
   chatWithCopilotStream,
-  CopilotChatResponse,
   uploadGuestDocument,
-  UploadedDocument
 } from "@/lib/sidecar-api";
 import { dispatchFormFill, FormFillProposal } from "@/lib/portal-form-bus";
-
-interface ClinicalCopilotDrawerProps {
-  isOpen: boolean;
-  onClose: () => void;
-  guestContext?: Record<string, unknown>;
-  initialQuery?: string;
-  initialMode?: CopilotMode;
-}
 
 export type CopilotMode =
   | "omniscient"
@@ -68,6 +66,113 @@ export type CopilotMode =
   | "consult_prep"
   | "travel_concierge";
 
+interface ClinicalCopilotDrawerProps {
+  isOpen: boolean;
+  onClose: () => void;
+  guestContext?: Record<string, unknown>;
+  initialQuery?: string;
+  initialMode?: CopilotMode;
+}
+
+interface MessageItem {
+  sender: "user" | "copilot";
+  text: string;
+  safety_level?: string;
+  safety_screened?: boolean;
+  citations?: string[];
+  suggested_followups?: string[];
+  isDocument?: boolean;
+  form_fill_proposal?: FormFillProposal;
+  proposal_authorized?: boolean;
+  latency_ms?: number;
+  model_used?: string;
+  sanctuary_slug?: string;
+  system_action_hints?: Array<{ label: string; url: string; icon: string }>;
+}
+
+const PILLAR_MODES: Array<{
+  id: CopilotMode;
+  label: string;
+  icon: React.ElementType;
+  badge: string;
+}> = [
+  { id: "omniscient", label: "✨ All-in-One", icon: Sparkles, badge: "All Areas" },
+  { id: "executive_finance", label: "💰 Finance & Buyouts", icon: DollarSign, badge: "Payments" },
+  { id: "travel_logistics", label: "✈️ Flights & Rides", icon: Plane, badge: "Drivers & Radar" },
+  { id: "chef_hospitality", label: "🍽️ Private Chef", icon: Utensils, badge: "Allergies & Menus" },
+  { id: "b2b_sales", label: "🤝 Partner Studios", icon: Briefcase, badge: "Commissions" },
+  { id: "clinical_safety", label: "🩺 Health Safety", icon: HeartPulse, badge: "Nurse Care" },
+  { id: "spreadsheet_crm", label: "👥 Guest CRM", icon: Table, badge: "Spreadsheet" },
+  { id: "studio_ops", label: "🌿 Sanctuary Ops", icon: Building, badge: "Capacities" },
+];
+
+const QUICK_COMMAND_CHIPS = [
+  { label: "/finance", hint: "Villa buyouts & 30/70 payment schedules", icon: DollarSign },
+  { label: "/radar", hint: "Flight tracking & chauffeur schedules", icon: Plane },
+  { label: "/chef", hint: "Allergy charts & healthy menus", icon: Utensils },
+  { label: "/b2b", hint: "Studio proposals & 15% commissions", icon: Briefcase },
+  { label: "/clinical", hint: "Health check & gentle care tips", icon: HeartPulse },
+  { label: "/attendee", hint: "Add guest to spreadsheet", icon: Table },
+  { label: "/book", hint: "Check room prices & dates", icon: Sparkles },
+  { label: "/crm", hint: "Open sovereign travel CRM", icon: Table },
+  { label: "/draft", hint: "Warm welcome email to guest", icon: Mail },
+];
+
+const QUICK_PROMPTS: Record<string, string[]> = {
+  omniscient: [
+    "💰 Calculate villa buyout and payment breakdown for 14 guests at Nosara",
+    "✈️ Group delayed airport arrivals into luxury van pickups (<=35 min wait)",
+    "🍽️ Create Private Chef allergy-safe menu (Celiac, Onion/Garlic-free, Seed-Oil-Free)",
+    "🤝 Draft partnership agreement for luxury Pilates studio (15% thank-you commission)",
+    "🩺 Check guest health notes for heart rate & nut allergies (Nurse recommendations)",
+    "👥 Add a new guest row for Sarah Jenkins in retreat spreadsheet",
+    "📊 Calculate 30% deposit and 70% final balance on $11,500 villa stay",
+    "📋 Check room availability and pricing for upcoming 7-day retreat"
+  ],
+  executive_finance: [
+    "Calculate villa buyout and payment breakdown for 14 guests at Nosara",
+    "Calculate 30% deposit and 70% balance payment schedule for $11,500 stay",
+    "Reconcile international bank wires vs credit card processing fees",
+    "Generate profit margins report across all 4 retreats"
+  ],
+  travel_logistics: [
+    "Group delayed airport arrivals into luxury van pickups (<=35 min wait)",
+    "Check private jet luggage weight & pilot duty hours",
+    "Create 1-click WhatsApp driver schedule for Nosara arrivals",
+    "Plan 4WD mountain route around river during seasonal rain"
+  ],
+  chef_hospitality: [
+    "Create Private Chef allergy-safe menu (Celiac, Onion/Garlic-free, Seed-Oil-Free)",
+    "Plan 7-day farm-to-table regenerative culinary plan for Nosara",
+    "Check all guest food allergies for upcoming Amalfi cohort",
+    "Design 432Hz evening herbal elixir tea menu for sleep renewal"
+  ],
+  b2b_sales: [
+    "Draft partnership agreement for luxury Pilates studio (15% thank-you commission)",
+    "Draft B2B concierge email to Manhattan wellness director",
+    "Calculate 15% reciprocal commission on $42,000 group buyout",
+    "Create private co-branded retreat invitation for luxury studio"
+  ],
+  clinical_safety: [
+    "Check guest health notes for heart rate & nut allergies (Nurse recommendations)",
+    "Review contraindicated modalities for guest with hypertension",
+    "Verify cold plunge and sauna safety guidelines for pregnant guest",
+    "Generate clinical triage intake checklist for Nurse Kareena"
+  ],
+  spreadsheet_crm: [
+    "Add a new guest row for Sarah Jenkins in retreat spreadsheet",
+    "List all booked guests with balance due for Nosara",
+    "Find guest dossier by email: alexander@vancefamily.com",
+    "Update room assignment to Ocean Villa Suite"
+  ],
+  studio_ops: [
+    "Show remaining spots across Nosara, Amalfi, Bali, and Puerto Vallarta",
+    "Explain how founder review keeps all communications safe",
+    "What is the booking status for our upcoming 12–14 guest groups?",
+    "Check weather microclimate for Nosara arrival day"
+  ]
+};
+
 export default function ClinicalCopilotDrawer({
   isOpen,
   onClose,
@@ -81,48 +186,51 @@ export default function ClinicalCopilotDrawer({
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+
+  // Layout View States: Docked Floating Widget vs Maximized Command Center
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // ChatGPT-style Voice Mode States
+  const [isVoiceMode, setIsVoiceMode] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [voiceVolumeEnabled, setVoiceVolumeEnabled] = useState(true);
+  const [liveVoiceTranscript, setLiveVoiceTranscript] = useState("");
   const [speechSupported, setSpeechSupported] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const recognitionRef = useRef<unknown>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const recognitionRef = useRef<any>(null);
   const executedInitialRef = useRef<string | null>(null);
 
-  const [messages, setMessages] = useState<
-    Array<{
-      sender: "user" | "copilot";
-      text: string;
-      safety_level?: string;
-      safety_screened?: boolean;
-      citations?: string[];
-      suggested_followups?: string[];
-      isDocument?: boolean;
-      form_fill_proposal?: FormFillProposal;
-      proposal_authorized?: boolean;
-      latency_ms?: number;
-      model_used?: string;
-      sanctuary_slug?: string;
-    }>
-  >([
+  const [messages, setMessages] = useState<MessageItem[]>([
     {
       sender: "copilot",
-      text: "**Welcome, Kareena & Sanctuary Team!** I am your Retreat Operations Assistant.\n\nI am here to help you run all aspects of our sanctuaries with ease:\n• **Billing & Invoices**: Villa buyout calculations, 30% deposit & 70% balance payment schedules, and currency conversions.\n• **Flights & Airport Rides**: Live flight tracking, driver pickup schedules, and mountain road updates.\n• **Partner Studios**: Pilates & yoga studio referrals, 15% partner thank-you commissions, and group proposals.\n• **Private Chef & Dining**: Healthy seed-oil-free meal plans, allergy safety charts, and farm-to-table menus.\n• **Guest Care & Health Safety**: Daily morning wellness checks, gentle breathing exercises, and health safety reviews.\n• **Retreat Guest Spreadsheet**: Easy-to-use spreadsheet rows, guest statuses, and room assignments.\n\nNothing is ever sent to a guest or partner without your review and approval. You are always in full control."
+      text: "**Welcome, Kareena & Sanctuary Team!** I am your Retreat Operations Assistant.\n\nI am connected to every system across KAI to help you take action in seconds:\n• **Billing & Invoices**: Villa buyout calculations, 30% deposit & 70% balance schedules, and currency conversions.\n• **Flights & Airport Rides**: Live flight tracking, WhatsApp driver pickup schedules, and mountain road routes.\n• **Partner Studios**: Pilates & yoga studio referrals, 15% partner thank-you commissions, and group proposals.\n• **Private Chef & Dining**: Healthy seed-oil-free meal plans, allergy safety charts, and farm-to-table menus.\n• **Guest Care & Health Safety**: Daily morning wellness checks, gentle breathing exercises, and health safety reviews.\n• **Retreat Guest Spreadsheet**: Instant guest additions, CRM room assignments, and reservation statuses.\n\nNothing is ever sent to a guest or partner without your review and approval. You are always in full control."
     }
   ]);
 
   // Check speech recognition capability
   useEffect(() => {
     if (typeof window !== "undefined") {
-      const win = window as unknown as {
-        SpeechRecognition?: unknown;
-        webkitSpeechRecognition?: unknown;
-      };
+      const win = window as any;
       if (win.SpeechRecognition || win.webkitSpeechRecognition) {
         setSpeechSupported(true);
       }
     }
   }, []);
 
+  // Auto-scroll messages to bottom
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, []);
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, loading, scrollToBottom]);
+
+  // Handle Initial Query from shortcuts (Cmd+K or props)
   useEffect(() => {
     if (isOpen && initialQuery && executedInitialRef.current !== initialQuery) {
       executedInitialRef.current = initialQuery;
@@ -138,15 +246,142 @@ export default function ClinicalCopilotDrawer({
     }
   }, [isOpen, initialQuery, initialMode]);
 
-  if (!isOpen) return null;
+  // Adjust textarea height dynamically
+  const adjustTextareaHeight = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
+    }
+  };
 
+  // Text-To-Speech helper for ChatGPT-style spoken responses
+  const speakResponse = useCallback((text: string) => {
+    if (!voiceVolumeEnabled || typeof window === "undefined" || !("speechSynthesis" in window)) {
+      return;
+    }
+    try {
+      window.speechSynthesis.cancel();
+      // Clean markdown tags for natural speech
+      const cleanText = text
+        .replace(/[*#_`~>]/g, "")
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+        .replace(/\n+/g, " ")
+        .trim();
+
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.rate = 1.05;
+      utterance.pitch = 1.0;
+
+      const voices = window.speechSynthesis.getVoices();
+      const preferred = voices.find(
+        (v) =>
+          v.lang.startsWith("en") &&
+          (v.name.includes("Natural") ||
+            v.name.includes("Samantha") ||
+            v.name.includes("Karen") ||
+            v.name.includes("Google") ||
+            v.name.includes("Victoria"))
+      );
+      if (preferred) utterance.voice = preferred;
+
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => setIsSpeaking(false);
+      utterance.onerror = () => setIsSpeaking(false);
+
+      window.speechSynthesis.speak(utterance);
+    } catch (err) {
+      console.warn("Speech synthesis error:", err);
+      setIsSpeaking(false);
+    }
+  }, [voiceVolumeEnabled]);
+
+  const stopSpeaking = () => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
+    setIsSpeaking(false);
+  };
+
+  // Speech Recognition (Voice Input)
+  const startListening = () => {
+    if (typeof window === "undefined") return;
+    const win = window as any;
+    const SpeechRecClass = win.SpeechRecognition || win.webkitSpeechRecognition;
+    if (!SpeechRecClass) {
+      alert("Voice speech recognition is not supported in this browser.");
+      return;
+    }
+
+    stopSpeaking();
+
+    try {
+      const recognition = new SpeechRecClass();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+
+      recognition.onstart = () => {
+        setIsListening(true);
+        setLiveVoiceTranscript("");
+      };
+
+      recognition.onresult = (e: any) => {
+        const transcript = Array.from(e.results)
+          .map((result: any) => result[0].transcript)
+          .join("");
+        setLiveVoiceTranscript(transcript);
+        setInputMessage(transcript);
+      };
+
+      recognition.onerror = () => {
+        setIsListening(false);
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        if (isVoiceMode && liveVoiceTranscript.trim()) {
+          handleSend(liveVoiceTranscript);
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error("Speech recognition start error:", err);
+      setIsListening(false);
+    }
+  };
+
+  const stopListening = () => {
+    if (recognitionRef.current && typeof recognitionRef.current.stop === "function") {
+      recognitionRef.current.stop();
+    }
+    setIsListening(false);
+  };
+
+  const toggleVoiceListening = () => {
+    if (isListening) {
+      stopListening();
+    } else {
+      startListening();
+    }
+  };
+
+  // Send Message Handler (Streaming & Agentic Superpowers)
   const handleSend = async (textToSend?: string) => {
     const query = textToSend || inputMessage;
     if (!query.trim() || loading) return;
 
-    const userMsg = { sender: "user" as const, text: query };
+    stopSpeaking();
+    stopListening();
+
+    const userMsg: MessageItem = { sender: "user", text: query };
     setMessages((prev) => [...prev, userMsg]);
     setInputMessage("");
+    setLiveVoiceTranscript("");
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
     setLoading(true);
 
     const convHistory = messages
@@ -154,10 +389,9 @@ export default function ClinicalCopilotDrawer({
         if (!m.text || m.isDocument) return false;
         const lower = m.text.trim().toLowerCase();
         if (lower.startsWith("welcome") || lower.startsWith("**welcome")) return false;
-        if (lower.includes("retreat operations assistant") || lower.includes("chief of staff") || lower.includes("clinical somatic assistant") || lower.includes("i am here to support you")) return false;
         return true;
       })
-      .slice(-2)
+      .slice(-3)
       .map((m) => ({
         role: m.sender === "user" ? "user" : "assistant",
         content: m.text
@@ -223,12 +457,15 @@ export default function ClinicalCopilotDrawer({
           },
           onDone: () => {
             setLoading(false);
+            if (isVoiceMode && accumulatedText) {
+              speakResponse(accumulatedText);
+            }
           },
           onError: async (err) => {
-            console.warn("Live stream paused, using direct assistant response:", err);
+            console.warn("Live stream paused, falling back to direct response:", err);
             if (!accumulatedText) {
               try {
-                const res: CopilotChatResponse = await chatWithCopilot(
+                const directResp = await chatWithCopilot(
                   query,
                   activeMode,
                   guestContext,
@@ -242,29 +479,28 @@ export default function ClinicalCopilotDrawer({
                   const copy = [...prev];
                   copy[lastIdx] = {
                     sender: "copilot",
-                    text: res.response_text,
-                    safety_level: res.safety_level,
-                    safety_screened: res.safety_screened,
-                    citations: res.citations,
-                    suggested_followups: res.suggested_followups,
-                    form_fill_proposal: res.form_fill_proposal,
-                    proposal_authorized: false,
-                    latency_ms: res.latency_ms,
-                    model_used: res.model_used,
-                    sanctuary_slug: res.sanctuary_slug
+                    text: directResp.response_text || "I have received your request and logged it for review.",
+                    safety_level: directResp.safety_level,
+                    safety_screened: directResp.safety_screened,
+                    citations: directResp.citations,
+                    suggested_followups: directResp.suggested_followups,
+                    form_fill_proposal: directResp.form_fill_proposal,
+                    sanctuary_slug: directResp.sanctuary_slug
                   };
                   return copy;
                 });
+                if (isVoiceMode && directResp.response_text) {
+                  speakResponse(directResp.response_text);
+                }
               } catch (fallbackErr) {
-                console.error("Fallback assistant failed:", fallbackErr);
                 setMessages((prev) => {
                   const lastIdx = prev.length - 1;
                   if (lastIdx < 0) return prev;
                   const copy = [...prev];
                   copy[lastIdx] = {
                     sender: "copilot",
-                    text: "I encountered a momentary connection pause. Please ensure the KAI API service is running.",
-                    safety_screened: false
+                    text: `⚠️ **Notice**: Could not complete query: *${fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)}*. Please try again.`,
+                    safety_level: "CLEAR"
                   };
                   return copy;
                 });
@@ -275,82 +511,43 @@ export default function ClinicalCopilotDrawer({
         }
       );
     } catch (err) {
-      console.error(err);
-      if (!accumulatedText) {
-        setMessages((prev) => {
-          const lastIdx = prev.length - 1;
-          const copy = [...prev];
-          copy[lastIdx] = {
-            sender: "copilot",
-            text: "I encountered a momentary connection pause. Please ensure the KAI API service is running.",
-            safety_screened: false
-          };
-          return copy;
-        });
-      }
+      console.error("Chat invocation failed:", err);
       setLoading(false);
     }
   };
 
-  const handleApproveProposal = (proposal: FormFillProposal, msgIdx: number) => {
-    setMessages((prev) =>
-      prev.map((m, i) => (i === msgIdx ? { ...m, proposal_authorized: true } : m))
-    );
-    dispatchFormFill(proposal);
-    if (typeof window !== "undefined") {
-      if (proposal.target_url) {
-        const targetBase = proposal.target_url.split("?")[0];
-        if (window.location.pathname !== targetBase) {
-          window.location.href = proposal.target_url;
-        }
-      } else if (proposal.target_tab === "vendors") {
-        if (!window.location.pathname.includes("/portal/vendors")) {
-          window.location.href = "/portal/vendors";
-        }
-      }
-    }
-  };
-
+  // Document Upload Handler
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setUploading(true);
     const fileName = file.name;
-    setMessages((prev) => [
-      ...prev,
-      {
-        sender: "user",
-        text: `📎 Attached Document for Guest Intake: ${fileName}`,
-        isDocument: true
-      }
-    ]);
+    setUploading(true);
 
     try {
-      const parsed: UploadedDocument | null = await uploadGuestDocument(file);
-      if (!parsed) throw new Error("No response data from server");
-
-      let safetyLevel = "CLEAR";
-      if (
-        parsed.safety_clearance_status === "ATTENTION_NEEDED" ||
-        (parsed.clinical_notes_found && parsed.clinical_notes_found.length > 0)
-      ) {
-        safetyLevel = "CONTRAINDICATION_ALERT";
+      const parsed = await uploadGuestDocument(file);
+      if (!parsed) {
+        throw new Error("Unable to parse document payload.");
       }
 
-      let responseText = `**Document Read & Organized:** \`${parsed.filename}\`\n\n`;
-      responseText += `**Quick Summary:**\n${parsed.extracted_summary}\n\n`;
+      const safetyLevel =
+        parsed.safety_clearance_status === "ATTENTION_NEEDED"
+          ? "CONTRAINDICATION_ALERT"
+          : "CLEAR";
 
+      let responseText = `📄 **Document Read**: \`${fileName}\`\n\n`;
       if (parsed.associated_guest_name) {
         responseText += `• **Guest Name:** ${parsed.associated_guest_name}\n`;
       }
+      if (parsed.extracted_summary) {
+        responseText += `• **Summary:** ${parsed.extracted_summary}\n`;
+      }
       if (parsed.clinical_notes_found && parsed.clinical_notes_found.length > 0) {
-        responseText += `• ⚠️ **Health Notes Found:**\n${parsed.clinical_notes_found.map((n: string) => `  - ${n}`).join("\n")}\n`;
+        responseText += `• **Health & Dietary Notes:**\n${parsed.clinical_notes_found.map((d: string) => `  - ${d}`).join("\n")}\n`;
       }
       if (parsed.travel_details_found && parsed.travel_details_found.length > 0) {
         responseText += `• **Travel & Flight Notes:**\n${parsed.travel_details_found.map((t: string) => `  - ${t}`).join("\n")}\n`;
       }
-
       responseText += `\n*Screened according to Nurse Kareena Islam's clinical safety guidelines.*`;
 
       setMessages((prev) => [
@@ -362,7 +559,7 @@ export default function ClinicalCopilotDrawer({
           citations: ["Guest Care Guidelines", "Nervous System Safety Standards"],
           suggested_followups: [
             `Create gentle schedule for ${parsed.associated_guest_name || "this guest"}`,
-            "Draft friendly email to guest regarding medical history",
+            "Draft friendly email to guest regarding health history",
             "Check cold plunge and breathwork comfort"
           ]
         }
@@ -385,75 +582,7 @@ export default function ClinicalCopilotDrawer({
     }
   };
 
-  const toggleVoiceRecognition = () => {
-    if (typeof window === "undefined") return;
-
-    const win = window as unknown as {
-      SpeechRecognition?: new () => {
-        continuous: boolean;
-        interimResults: boolean;
-        lang: string;
-        onresult: (e: { results: Array<Array<{ transcript: string }>> }) => void;
-        onerror: (e: unknown) => void;
-        onend: () => void;
-        start: () => void;
-        stop: () => void;
-      };
-      webkitSpeechRecognition?: new () => {
-        continuous: boolean;
-        interimResults: boolean;
-        lang: string;
-        onresult: (e: { results: Array<Array<{ transcript: string }>> }) => void;
-        onerror: (e: unknown) => void;
-        onend: () => void;
-        start: () => void;
-        stop: () => void;
-      };
-    };
-
-    const SpeechRecClass = win.SpeechRecognition || win.webkitSpeechRecognition;
-    if (!SpeechRecClass) {
-      alert("Voice speech recognition is not supported in this browser.");
-      return;
-    }
-
-    if (isListening) {
-      const currentRec = recognitionRef.current as { stop?: () => void } | null;
-      if (currentRec && typeof currentRec.stop === "function") {
-        currentRec.stop();
-      }
-      setIsListening(false);
-      return;
-    }
-
-    try {
-      const recognition = new SpeechRecClass();
-      recognition.continuous = false;
-      recognition.interimResults = false;
-      recognition.lang = "en-US";
-
-      recognition.onresult = (e: { results: Array<Array<{ transcript: string }>> }) => {
-        const transcript = e.results[0][0].transcript;
-        setInputMessage((prev) => (prev ? `${prev} ${transcript}` : transcript));
-      };
-
-      recognition.onerror = () => {
-        setIsListening(false);
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
-      setIsListening(true);
-    } catch (err) {
-      console.error("Speech recognition error:", err);
-      setIsListening(false);
-    }
-  };
-
+  // Clipboard & Share actions
   const copyToClipboard = (text: string, idx: number) => {
     navigator.clipboard.writeText(text);
     setCopiedIdx(idx);
@@ -476,570 +605,659 @@ export default function ClinicalCopilotDrawer({
     }
   };
 
-  const QUICK_PROMPTS: Record<string, string[]> = {
-    omniscient: [
-      "💰 Calculate villa buyout and payment breakdown for 14 guests at Nosara",
-      "✈️ Group delayed airport arrivals into luxury van pickups (<=35 min wait)",
-      "🍽️ Create Private Chef allergy-safe menu (Celiac, Onion/Garlic-free, Seed-Oil-Free)",
-      "🤝 Draft partnership agreement for luxury Pilates studio (15% thank-you commission)",
-      "🩺 Check guest health notes for heart rate & nut allergies (Nurse recommendations)",
-      "👥 Add a new guest row for Sarah Jenkins in retreat spreadsheet",
-      "📊 Calculate 30% deposit and 70% final balance on $11,500 villa stay",
-      "📋 Check room availability and pricing for upcoming 7-day retreat"
-    ],
-    executive_finance: [
-      "Calculate villa buyout and payment breakdown for 14 guests at Nosara",
-      "Calculate 30% deposit and 70% balance payment schedule for $11,500 stay",
-      "Reconcile international bank wires vs credit card processing fees",
-      "Generate profit margins report across all 4 retreats"
-    ],
-    travel_logistics: [
-      "Group delayed airport arrivals into luxury van pickups (<=35 min wait)",
-      "Check private jet luggage weight & pilot duty hours",
-      "Create 1-click WhatsApp driver schedule for Nosara arrivals",
-      "Plan 4WD mountain route around river during seasonal rain"
-    ],
-    b2b_sales: [
-      "Draft partnership agreement for luxury Manhattan Pilates studio",
-      "Calculate 15% partner thank-you commission for functional medicine clinic",
-      "Draft executive wellness retreat proposal for 12 corporate leaders",
-      "Write outreach email to Beverly Hills integrative cardiology practice"
-    ],
-    chef_hospitality: [
-      "Create Private Chef allergy chart (Celiac, Onion/Garlic-free, Vegan, Seed-Oil-Free)",
-      "Plan 7-day seed-oil-free healthy menu for Nosara retreat",
-      "Draft local organic farm shopping list for retreat chef",
-      "Create evening relaxing herbal tea and elixir pairing"
-    ],
-    clinical_safety: [
-      "Check guest health notes for heart rate & nut allergies (Nurse recommendations)",
-      "Check morning guest wellness score (Sleep 2/10, Energy 2/10)",
-      "Cold plunge safety protocol: gentle warming if guest feels dizzy",
-      "Emergency medical freeze and hospital handover steps"
-    ],
-    wellness_safety: [
-      "Check guest health notes for heart rate & nut allergies (Nurse recommendations)",
-      "Check morning guest wellness score (Sleep 2/10, Energy 2/10)",
-      "Cold plunge safety protocol: gentle warming if guest feels dizzy",
-      "Emergency medical freeze and hospital handover steps"
-    ],
-    spreadsheet_crm: [
-      "Add a new guest row for Sarah Jenkins in retreat spreadsheet",
-      "Add new partner lead for Align Pilates NYC with 15% commission",
-      "Show all guests arriving in the next 14 days",
-      "Export retreat spreadsheet to Excel / CSV for arrival team"
-    ],
-    itinerary_curation: [
-      "Group delayed airport arrivals into luxury van pickups (<=35 min wait)",
-      "Check private jet luggage weight & pilot duty hours",
-      "Move outdoor beach session to indoor Sound Dome if rain forecast > 90%",
-      "Check 6-month passport validity for international guests"
-    ],
-    travel_concierge: [
-      "Group delayed airport arrivals into luxury van pickups (<=35 min wait)",
-      "Check private jet luggage weight & pilot duty hours",
-      "Move outdoor beach session to indoor Sound Dome if rain forecast > 90%",
-      "Provide emergency organic clothing set if airline loses luggage"
-    ],
-    concierge_prep: [
-      "Draft warm welcome email for Sarah Jenkins (Nosara retreat)",
-      "Review guest intentions and rest goals for Eleanor Vance",
-      "What are the top 3 talking points for executives who need deep rest?",
-      "Explain the intimate 12–14 guest restorative experience"
-    ],
-    consult_prep: [
-      "Draft consultation email for Sarah Jenkins (Nosara retreat)",
-      "Draft consultation follow-up for Eleanor Vance (Executive Burnout)",
-      "What are the top 3 talking points for hesitant executives?",
-      "Explain the intimate 12–14 guest restorative experience"
-    ],
-    studio_ops: [
-      "Show our trusted local suppliers in Nosara",
-      "Add a new supplier: Pacific Alchemy sound bowls in Nosara, 15% commission",
-      "Explain KAI Vendor & Supplier Directory",
-      "Explain how founder review keeps all communications safe",
-      "What is the booking status for our upcoming 12–14 guest groups?"
-    ]
+  // Form Fill Proposal Approval
+  const handleApproveProposal = (proposal: FormFillProposal, idx: number) => {
+    dispatchFormFill(proposal);
+    setMessages((prev) => {
+      const copy = [...prev];
+      if (copy[idx]) {
+        copy[idx] = { ...copy[idx], proposal_authorized: true };
+      }
+      return copy;
+    });
+    if (proposal.target_url) {
+      window.location.assign(proposal.target_url);
+    }
   };
 
-  const PILLAR_MODES: Array<{
-    id: CopilotMode;
-    label: string;
-    icon: React.ElementType;
-    badge: string;
-  }> = [
-    { id: "omniscient", label: "✨ All-in-One (All Areas)", icon: Sparkles, badge: "All Areas Active" },
-    { id: "executive_finance", label: "💰 Billing & Invoices", icon: DollarSign, badge: "Buyouts & Payments" },
-    { id: "travel_logistics", label: "✈️ Flights & Airport Rides", icon: Plane, badge: "Flights & Drivers" },
-    { id: "chef_hospitality", label: "🍽️ Private Chef & Meals", icon: Utensils, badge: "Allergies & Menus" },
-    { id: "b2b_sales", label: "🤝 Partner Studios", icon: Briefcase, badge: "15% Commissions" },
-    { id: "clinical_safety", label: "🩺 Guest Health Safety", icon: HeartPulse, badge: "Nurse Care" },
-    { id: "spreadsheet_crm", label: "👥 Guest Spreadsheet", icon: Table, badge: "Guest Rows" },
-    { id: "studio_ops", label: "🌿 Sanctuary Operations", icon: Building, badge: "Retreat Capacities" },
-  ];
+  // System Navigation Helper
+  const navigateToPortal = (url: string) => {
+    if (typeof window !== "undefined") {
+      window.location.assign(url);
+    }
+  };
 
-  const QUICK_COMMAND_CHIPS = [
-    { label: "/finance", hint: "Villa buyouts & payment schedules", icon: DollarSign },
-    { label: "/radar", hint: "Flight tracking & driver schedules", icon: Plane },
-    { label: "/chef", hint: "Allergy charts & healthy menus", icon: Utensils },
-    { label: "/b2b", hint: "Studio partnership proposals & 15% commissions", icon: Briefcase },
-    { label: "/clinical", hint: "Health check & gentle care tips", icon: HeartPulse },
-    { label: "/attendee", hint: "Add guest to spreadsheet", icon: Table },
-    { label: "/book", hint: "Check room prices & dates", icon: Sparkles },
-    { label: "/vendor", hint: "Trusted local suppliers", icon: Building },
-    { label: "/draft", hint: "Warm welcome email to guest", icon: Mail },
-  ];
+  if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden bg-black/50 backdrop-blur-xs flex justify-end animate-in fade-in duration-200">
-      <div className="relative w-full max-w-xl h-full bg-stone-900 border-l border-stone-800 shadow-2xl flex flex-col text-stone-200">
-        {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-stone-800 bg-stone-950/80 backdrop-blur flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
-              <Sparkles className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-serif text-stone-100 flex items-center gap-2">
-                Retreat Operations Assistant
-                <span className="text-[10px] font-sans px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 font-medium">
-                  All-in-One Helper
-                </span>
-              </h2>
-              <p className="text-xs text-stone-400">
-                Billing · Flights & Rides · Partner Studios · Private Chef · Guest Health Safety
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-stone-400 hover:text-stone-100 hover:bg-stone-800 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <AnimatePresence>
+      <div className="fixed inset-0 z-50 pointer-events-none flex flex-col justify-end items-end p-0 sm:p-6">
+        {/* Backdrop for Maximized Mode */}
+        {isExpanded && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsExpanded(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm pointer-events-auto z-40 transition-opacity"
+          />
+        )}
 
-        {/* Fluid Business Pillar Ribbon */}
-        <div className="flex items-center gap-1.5 p-2 bg-stone-950/90 border-b border-stone-800/80 text-[11px] font-medium overflow-x-auto no-scrollbar">
-          {PILLAR_MODES.map((pm) => {
-            const Icon = pm.icon;
-            const isMatch =
-              activeMode === pm.id ||
-              (pm.id === "clinical_safety" && activeMode === "wellness_safety") ||
-              (pm.id === "travel_logistics" && (activeMode === "itinerary_curation" || activeMode === "travel_concierge")) ||
-              (pm.id === "concierge_prep" && activeMode === "consult_prep");
-
-            return (
-              <button
-                key={pm.id}
-                onClick={() => setActiveMode(pm.id)}
-                className={`py-1.5 px-2.5 rounded-lg whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 ${
-                  isMatch
-                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 font-semibold shadow-xs"
-                    : "text-stone-400 hover:text-stone-200 hover:bg-stone-900 border border-transparent"
-                }`}
-              >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{pm.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Quick Suggestion Chips */}
-        <div className="p-3 bg-stone-950/40 border-b border-stone-800/60 overflow-x-auto flex items-center gap-2 no-scrollbar">
-          <span className="text-[10px] text-stone-500 uppercase tracking-wider font-semibold shrink-0">
-            {activeMode === "omniscient" ? "Popular Requests:" : "Helpful Prompts:"}
-          </span>
-          {(QUICK_PROMPTS[activeMode] || QUICK_PROMPTS.omniscient).map((prompt, idx) => (
-            <button
-              key={idx}
-              onClick={() => handleSend(prompt)}
-              className="text-xs px-2.5 py-1 rounded-md bg-stone-800/80 hover:bg-amber-500/20 hover:text-amber-200 border border-stone-700/60 text-stone-300 transition-colors shrink-0 flex items-center gap-1"
-            >
-              <span>{prompt}</span>
-              <ArrowRight className="w-3 h-3 text-stone-500" />
-            </button>
-          ))}
-        </div>
-
-        {/* Messages Stream */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {messages.map((m, idx) => (
-            <div
-              key={idx}
-              className={`flex flex-col ${m.sender === "user" ? "items-end" : "items-start"
-                }`}
-            >
-              <div
-                className={`max-w-[92%] rounded-2xl p-4 text-xs leading-relaxed ${m.sender === "user"
-                    ? "bg-amber-600/90 text-stone-50 rounded-br-none"
-                    : "bg-stone-950/80 border border-stone-800 text-stone-200 rounded-bl-none shadow-sm"
-                  }`}
-              >
-                {/* Health Safety & System Response Header */}
-                {m.sender === "copilot" && (
-                  <div className="mb-2.5 flex items-center justify-between gap-2 flex-wrap">
-                    {m.safety_level === "CONTRAINDICATION_ALERT" ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 border border-rose-500/40 text-rose-400">
-                        <AlertTriangle className="w-3 h-3" />
-                        Health Note · Review with Nurse Kareena Before Confirming
-                      </span>
-                    ) : m.safety_level === "MODERATE_REVIEW" ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 border border-amber-500/40 text-amber-300">
-                        <AlertTriangle className="w-3 h-3" />
-                        Gentle Adjustment Suggested for Guest Comfort
-                      </span>
-                    ) : m.safety_level === "CLEAR" && m.safety_screened ? (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
-                        <ShieldCheck className="w-3 h-3" />
-                        Health Safety Check Passed
-                      </span>
-                    ) : <span />}
-
-                    {m.latency_ms !== undefined && (
-                      <span className="text-[9px] font-mono text-stone-400 bg-stone-900 border border-stone-800 px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <Clock className="w-2.5 h-2.5 text-amber-400" />
-                        Ready in {(m.latency_ms / 1000).toFixed(1)}s
-                      </span>
-                    )}
-                  </div>
-                )}
-
-                {/* Message Body */}
-                <div className="whitespace-pre-wrap font-sans space-y-2">
-                  {m.text}
+        {/* Floating / Expanded ChatGPT-Style Card */}
+        <motion.div
+          layout
+          initial={{ opacity: 0, scale: 0.92, y: 24 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.92, y: 24 }}
+          transition={{ type: "spring", damping: 28, stiffness: 340 }}
+          className={`pointer-events-auto bg-[#121110]/95 backdrop-blur-2xl border border-stone-800/90 text-stone-100 flex flex-col shadow-2xl shadow-black/90 overflow-hidden z-50 ${
+            isExpanded
+              ? "fixed inset-3 sm:inset-6 md:inset-10 max-w-6xl max-h-[92vh] m-auto rounded-3xl"
+              : "relative w-full sm:w-[460px] h-[680px] max-h-[90vh] rounded-t-3xl sm:rounded-3xl border-b-0 sm:border-b"
+          }`}
+        >
+          {/* Top Bar: ChatGPT-Inspired Minimalist Navigation */}
+          <div className="px-4 py-3 border-b border-stone-800/80 bg-stone-950/80 flex items-center justify-between gap-3 shrink-0">
+            {/* Left: Identity & Status Indicator */}
+            <div className="flex items-center gap-2.5">
+              <div className="relative">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-600/30 to-amber-400/20 border border-amber-500/40 flex items-center justify-center text-amber-300 shadow-sm">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
                 </div>
-
-                {/* Founder Approval Card (100% Founder-Approved) */}
-                {m.form_fill_proposal && (
-                  <div className="mt-3.5 p-3.5 rounded-xl bg-amber-950/40 border border-amber-500/40 text-stone-200 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-300 uppercase tracking-wide">
-                        <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                        <span>Review &amp; Approval Required</span>
-                      </div>
-                      <span className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-200">
-                        {m.proposal_authorized ? "Approved by You" : "Ready for Review"}
-                      </span>
-                    </div>
-
-                    <div className="text-xs font-serif font-semibold text-stone-100">
-                      {m.form_fill_proposal.form_title || m.form_fill_proposal.action_title}
-                    </div>
-
-                    <p className="text-[11px] text-stone-300 leading-relaxed">
-                      {m.form_fill_proposal.summary}
-                    </p>
-
-                    <div className="pt-2 flex items-center gap-2">
-                      <button
-                        onClick={() => handleApproveProposal(m.form_fill_proposal!, idx)}
-                        disabled={m.proposal_authorized}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
-                          m.proposal_authorized
-                            ? "bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 cursor-default"
-                            : "bg-amber-500 hover:bg-amber-400 text-stone-950 font-semibold shadow-xs cursor-pointer"
-                        }`}
-                      >
-                        {m.proposal_authorized ? (
-                          <>
-                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                            <span>Approved by You</span>
-                          </>
-                        ) : (
-                          <>
-                            <Sparkles className="w-3.5 h-3.5" />
-                            <span>Review &amp; Approve This Update</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {/* Citations & Evidence */}
-                {m.citations && m.citations.length > 0 && (
-                  <div className="mt-3 pt-2.5 border-t border-stone-800/80 flex items-center gap-1.5 text-[10px] text-stone-400">
-                    <BookOpen className="w-3 h-3 text-amber-400" />
-                    <span>Based on: {m.citations.join(" · ")}</span>
-                  </div>
-                )}
-
-                {/* Specialized Reactive In-Message Action Buttons */}
-                {m.sender === "copilot" && (
-                  <div className="mt-3 pt-2.5 border-t border-stone-800/80 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      {/* Buyout / Installment / Margins */}
-                      {(m.text.includes("Buyout") || m.text.includes("Deposit") || m.text.includes("Installment") || m.text.includes("Folio")) && (
-                        <button
-                          onClick={() => copyToClipboard(m.text, idx)}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-[11px] font-medium transition-colors"
-                        >
-                          <DollarSign className="w-3 h-3" />
-                          <span>Copy Billing Summary</span>
-                        </button>
-                      )}
-
-                      {/* WhatsApp / Chauffeur Run-Sheet */}
-                      {(m.text.includes("Chauffeur") || m.text.includes("WhatsApp") || m.text.includes("Wave") || m.text.includes("Flight") || m.text.includes("Driver")) && (
-                        <button
-                          onClick={() => {
-                            copyToClipboard(m.text, idx);
-                            if (typeof window !== "undefined") {
-                              const encoded = encodeURIComponent(m.text);
-                              window.open(`https://wa.me/?text=${encoded}`, "_blank");
-                            }
-                          }}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-[11px] font-medium transition-colors"
-                        >
-                          <Phone className="w-3 h-3" />
-                          <span>Copy Driver Schedule for WhatsApp</span>
-                        </button>
-                      )}
-
-                      {/* Dietary Matrix / Allergens */}
-                      {(m.text.includes("Dietary") || m.text.includes("Allergen") || m.text.includes("Banquet Matrix") || m.text.includes("Seed-Oil-Free") || m.text.includes("Menu")) && (
-                        <button
-                          onClick={() => {
-                            const printWin = window.open("", "_blank");
-                            if (printWin) {
-                              printWin.document.write(`<html><head><title>KAI Private Chef Dietary & Allergy Chart</title><style>body{font-family:sans-serif;padding:24px;line-height:1.5;color:#1c1917;}table{border-collapse:collapse;width:100%;margin-top:16px;}th,td{border:1px solid #d6d3d1;padding:8px;text-align:left;}th{background:#f5f5f4;}</style></head><body><h1>KAI Sanctuary · Private Chef Dietary & Allergy Chart</h1><pre style="white-space:pre-wrap;font-family:inherit;">${m.text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre></body></html>`);
-                              printWin.document.close();
-                              printWin.print();
-                            }
-                          }}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/30 text-teal-300 text-[11px] font-medium transition-colors"
-                        >
-                          <Printer className="w-3 h-3" />
-                          <span>Print Dietary &amp; Allergy Chart</span>
-                        </button>
-                      )}
-
-                      {/* B2B Syndicate */}
-                      {(m.text.includes("Syndicate") || m.text.includes("Commission") || m.text.includes("B2B") || m.text.includes("Partner")) && (
-                        <button
-                          onClick={() => copyToClipboard(m.text, idx)}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded bg-purple-500/15 hover:bg-purple-500/25 border border-purple-500/30 text-purple-300 text-[11px] font-medium transition-colors"
-                        >
-                          <Briefcase className="w-3 h-3" />
-                          <span>Copy Partnership Proposal</span>
-                        </button>
-                      )}
-
-                      {/* Clinical Safety / Contraindication */}
-                      {(m.safety_screened || m.text.includes("Clinical") || m.text.includes("Contraindication") || m.text.includes("Health")) && (
-                        <button
-                          onClick={() => copyToClipboard(m.text, idx)}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-rose-300 text-[11px] font-medium transition-colors"
-                        >
-                          <HeartPulse className="w-3 h-3" />
-                          <span>Copy Health Care Note</span>
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="flex items-center gap-1.5 ml-auto">
-                      <button
-                        onClick={() => copyToClipboard(m.text, idx)}
-                        className="flex items-center gap-1 px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-stone-300 text-[11px] transition-colors"
-                      >
-                        {copiedIdx === idx ? (
-                          <Check className="w-3 h-3 text-emerald-400" />
-                        ) : (
-                          <Copy className="w-3 h-3" />
-                        )}
-                        <span>{copiedIdx === idx ? "Copied" : "Copy"}</span>
-                      </button>
-
-                      <button
-                        onClick={() => shareContent(m.text)}
-                        className="flex items-center gap-1 px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-stone-300 text-[11px] transition-colors"
-                      >
-                        <Share2 className="w-3 h-3" />
-                        <span>Share</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
+                <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-stone-950 animate-pulse" />
               </div>
-
-              {/* Suggested Followups */}
-              {m.suggested_followups && m.suggested_followups.length > 0 && (
-                <div className="mt-2 pl-2 flex flex-wrap gap-1.5">
-                  {m.suggested_followups.map((f, fIdx) => (
-                    <button
-                      key={fIdx}
-                      onClick={() => handleSend(f)}
-                      className="text-[10px] px-2 py-0.5 rounded-full bg-stone-900 border border-stone-700 hover:border-amber-500/40 text-stone-400 hover:text-amber-300 transition-colors"
-                    >
-                      ↳ {f}
-                    </button>
-                  ))}
+              <div className="leading-tight">
+                <div className="flex items-center gap-2">
+                  <span className="font-serif text-sm font-semibold tracking-tight text-stone-100">
+                    KAI Assistant
+                  </span>
+                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 font-medium">
+                    Brain 4.0
+                  </span>
                 </div>
-              )}
+                <p className="text-[11px] text-stone-400 font-sans">
+                  Connected to CRM, Flights, Dining &amp; Health
+                </p>
+              </div>
             </div>
-          ))}
 
-          {loading && (
-            <div className="flex items-center gap-2 text-xs text-amber-400/80 py-2">
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              <span>Calculating exact pricing, flight schedules, and retreat details...</span>
-            </div>
-          )}
-
-          {uploading && (
-            <div className="flex items-center gap-2 text-xs text-amber-400/80 py-2">
-              <Upload className="w-4 h-4 animate-bounce" />
-              <span>Reading your document for guest notes, dietary requests, and flight times...</span>
-            </div>
-          )}
-        </div>
-
-        {/* Quick Slash-Command Action Bar */}
-        <div className="px-4 py-2 bg-stone-950/80 border-t border-stone-800/80 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-          <span className="text-[10px] font-mono text-amber-400/80 uppercase font-semibold shrink-0 mr-1 flex items-center gap-1">
-            <Command className="w-3 h-3 text-amber-400" />
-            <span>Shortcuts:</span>
-          </span>
-          {QUICK_COMMAND_CHIPS.map((chip) => {
-            const Icon = chip.icon;
-            return (
+            {/* Right: Controls (Voice Mode, Expand, Minimize, Close) */}
+            <div className="flex items-center gap-1">
+              {/* Voice Mode Toggle Button */}
               <button
-                key={chip.label}
                 type="button"
                 onClick={() => {
-                  setInputMessage(`${chip.label} `);
-                  setSelectedTool(chip.label);
+                  const nextVoice = !isVoiceMode;
+                  setIsVoiceMode(nextVoice);
+                  if (nextVoice) {
+                    startListening();
+                  } else {
+                    stopListening();
+                    stopSpeaking();
+                  }
                 }}
-                className="px-2 py-1 rounded-md bg-stone-900 hover:bg-amber-500/20 hover:text-amber-300 border border-stone-800 hover:border-amber-500/40 text-[11px] font-mono text-stone-300 flex items-center gap-1 transition-colors shrink-0"
-                title={chip.hint}
+                className={`p-1.5 rounded-lg text-xs flex items-center gap-1.5 transition-all cursor-pointer ${
+                  isVoiceMode
+                    ? "bg-amber-500/25 text-amber-300 border border-amber-500/50 shadow-xs"
+                    : "text-stone-400 hover:text-amber-300 hover:bg-stone-800/80"
+                }`}
+                title="Toggle Live Voice Mode (ChatGPT Experience)"
               >
-                <Icon className="w-3 h-3 text-amber-400/70" />
-                <span>{chip.label}</span>
+                <Radio className={`w-3.5 h-3.5 ${isVoiceMode ? "animate-pulse text-amber-400" : ""}`} />
+                <span className="text-[11px] font-medium hidden sm:inline">
+                  {isVoiceMode ? "Voice On" : "Voice"}
+                </span>
               </button>
-            );
-          })}
-        </div>
 
-        {/* Input Bar with Voice, Tools & File Attachment */}
-        <div className="p-4 border-t border-stone-800 bg-stone-950">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSend();
-            }}
-            className="flex items-center gap-2"
-          >
-            {/* Hidden File Input for PDF / CSV / Image */}
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileUpload}
-              accept=".pdf,.png,.jpg,.jpeg,.txt,.csv"
-              className="hidden"
-            />
-
-            {/* Paperclip Button */}
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={uploading || loading}
-              title="Upload guest intake PDF, doctor note, voucher, or CSV spreadsheet"
-              className="p-2.5 rounded-xl bg-stone-900 hover:bg-stone-800 border border-stone-700/80 text-stone-400 hover:text-amber-300 transition-colors disabled:opacity-50"
-            >
-              <Paperclip className="w-4 h-4" />
-            </button>
-
-            {/* Microphone Button (Speech Recognition) */}
-            {speechSupported && (
+              {/* Expand / Restore Button */}
               <button
                 type="button"
-                onClick={toggleVoiceRecognition}
-                title={isListening ? "Listening... click to stop" : "Click to speak"}
-                className={`p-2.5 rounded-xl border transition-colors ${isListening
-                    ? "bg-rose-500/20 border-rose-500/40 text-rose-400 animate-pulse"
-                    : "bg-stone-900 hover:bg-stone-800 border-stone-700/80 text-stone-400 hover:text-amber-300"
-                  }`}
+                onClick={() => setIsExpanded((prev) => !prev)}
+                className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800/80 transition-colors cursor-pointer"
+                title={isExpanded ? "Collapse to Widget" : "Expand to Fullscreen"}
               >
-                {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
               </button>
-            )}
 
-            {/* Agentic Tools Dropdown */}
-            <select
-              value={selectedTool}
-              onChange={(e) => {
-                const tool = e.target.value;
-                setSelectedTool(tool);
-                if (tool !== "chat") {
-                  const msgWithoutCmd = inputMessage.replace(/^\/\w+\s*/, "");
-                  setInputMessage(`${tool} ${msgWithoutCmd}`);
-                } else {
-                  setInputMessage(inputMessage.replace(/^\/\w+\s*/, ""));
-                }
-              }}
-              className="pl-3 pr-8 py-2.5 text-xs bg-stone-900 border border-stone-700/80 rounded-xl text-stone-200 focus:outline-none focus:border-amber-500/50 appearance-none cursor-pointer shrink-0"
-              style={{ backgroundImage: 'url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23a8a29e%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px top 50%', backgroundSize: '8px auto' }}
-            >
-              <option value="chat">💬 Chat with Assistant</option>
-              <option value="/finance">💰 /finance · Villa Buyouts &amp; Payments</option>
-              <option value="/radar">✈️ /radar · Flights &amp; Driver Pickups</option>
-              <option value="/chef">🍽️ /chef · Allergy Charts &amp; Chef Menus</option>
-              <option value="/b2b">🤝 /b2b · Partner Studios &amp; Commissions</option>
-              <option value="/clinical">🩺 /clinical · Nurse Health Check &amp; Safety</option>
-              <option value="/book">📋 /book · Room Prices &amp; Dates</option>
-              <option value="/attendee">👥 /attendee · Add Guest to Spreadsheet</option>
-              <option value="/vendor">🏬 /vendor · Trusted Local Suppliers</option>
-              <option value="/draft">📝 /draft · Warm Welcome Email</option>
-              <option value="/route">🗺️ /route · Scenic Driving Routes</option>
-              <option value="/weather">🌤️ /weather · Local Weather Forecast</option>
-            </select>
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={() => {
+                  stopListening();
+                  stopSpeaking();
+                  setIsVoiceMode(false);
+                  onClose();
+                }}
+                className="p-1.5 rounded-lg text-stone-400 hover:text-stone-200 hover:bg-stone-800/80 transition-colors cursor-pointer"
+                title="Close Assistant"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
 
-            {/* Text Input */}
-            <input
-              type="text"
-              value={inputMessage}
-              onChange={(e) => {
-                setInputMessage(e.target.value);
-                if (!e.target.value.startsWith("/") && selectedTool !== "chat") {
-                  setSelectedTool("chat");
-                }
-              }}
-              placeholder={
-                activeMode === "executive_finance"
-                  ? "Calculate villa buyout, 30% deposit, or payment plan..."
-                  : activeMode === "travel_logistics"
-                    ? "Check flight arrivals, airport drivers, or scenic driving routes..."
-                    : activeMode === "chef_hospitality"
-                      ? "Create allergy-safe menus, local produce lists, or tea elixirs..."
-                      : activeMode === "b2b_sales"
-                        ? "Draft partnership proposals, 15% commissions, or group rates..."
+          {/* Mode Selector Strip */}
+          <div className="flex items-center gap-1.5 px-3 py-2 bg-stone-950/60 border-b border-stone-800/70 overflow-x-auto no-scrollbar shrink-0 text-xs">
+            {PILLAR_MODES.map((pm) => {
+              const Icon = pm.icon;
+              const isMatch = activeMode === pm.id;
+              return (
+                <button
+                  key={pm.id}
+                  onClick={() => setActiveMode(pm.id)}
+                  className={`py-1 px-2.5 rounded-full whitespace-nowrap text-[11px] transition-all flex items-center gap-1.5 shrink-0 ${
+                    isMatch
+                      ? "bg-amber-500/20 text-amber-200 border border-amber-500/40 font-medium shadow-xs"
+                      : "text-stone-400 hover:text-stone-200 hover:bg-stone-800/60 border border-transparent"
+                  }`}
+                >
+                  <Icon className="w-3 h-3 text-amber-400/80" />
+                  <span>{pm.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* MAIN BODY: Voice Mode View OR Standard Chat View */}
+          {isVoiceMode ? (
+            /* ======================================================== */
+            /* CHATGPT-STYLE ANIMATED VOICE MODE VIEW                   */
+            /* ======================================================== */
+            <div className="flex-1 flex flex-col items-center justify-between p-6 sm:p-10 relative overflow-hidden bg-gradient-to-b from-stone-950 via-[#141210] to-stone-950">
+              {/* Voice State Header */}
+              <div className="text-center space-y-1 z-10">
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-stone-900 border border-stone-800 text-[11px] font-mono text-amber-300">
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      isSpeaking
+                        ? "bg-amber-400 animate-ping"
+                        : isListening
+                        ? "bg-emerald-400 animate-pulse"
+                        : "bg-stone-500"
+                    }`}
+                  />
+                  <span>
+                    {isSpeaking
+                      ? "KAI Speaking…"
+                      : isListening
+                      ? "Listening to your voice…"
+                      : "Tap orb to speak"}
+                  </span>
+                </div>
+                <h3 className="text-lg font-serif text-stone-100 font-semibold tracking-tight">
+                  KAI Ambient Voice
+                </h3>
+              </div>
+
+              {/* Pulsating Fluid Organic Orb */}
+              <div className="relative flex items-center justify-center my-auto cursor-pointer" onClick={toggleVoiceListening}>
+                {/* Outermost Concentric Glow Ring */}
+                <motion.div
+                  animate={{
+                    scale: isSpeaking ? [1, 1.45, 1.1, 1.3, 1] : isListening ? [1, 1.25, 1.05, 1.2, 1] : [1, 1.05, 1],
+                    opacity: isSpeaking ? [0.4, 0.8, 0.5, 0.7, 0.4] : isListening ? [0.3, 0.6, 0.3] : [0.15, 0.25, 0.15],
+                  }}
+                  transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+                  className="absolute w-56 h-56 rounded-full bg-gradient-to-tr from-amber-600/30 via-rose-500/20 to-amber-300/30 blur-2xl pointer-events-none"
+                />
+
+                {/* Secondary Ripple Ring */}
+                <motion.div
+                  animate={{
+                    scale: isSpeaking ? [1, 1.28, 1.05, 1.2, 1] : isListening ? [1, 1.15, 1] : [1, 1.03, 1],
+                    rotate: isSpeaking ? 360 : 0,
+                  }}
+                  transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
+                  className="absolute w-44 h-44 rounded-full border border-amber-500/30 border-dashed pointer-events-none"
+                />
+
+                {/* Central Glowing Orb Body */}
+                <motion.div
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  animate={{
+                    scale: isSpeaking ? [1, 1.12, 0.98, 1.08, 1] : isListening ? [1, 1.08, 1] : [1, 1.02, 1],
+                  }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
+                  className="relative w-32 h-32 rounded-full bg-gradient-to-br from-amber-400 via-amber-600 to-rose-700 shadow-2xl shadow-amber-500/40 flex items-center justify-center border-2 border-amber-200/40 overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.4),transparent_60%)]" />
+                  {isSpeaking ? (
+                    <Volume2 className="w-10 h-10 text-white drop-shadow-md animate-pulse" />
+                  ) : isListening ? (
+                    <Mic className="w-10 h-10 text-white drop-shadow-md animate-bounce" />
+                  ) : (
+                    <MicOff className="w-10 h-10 text-white/80 drop-shadow-md" />
+                  )}
+                </motion.div>
+              </div>
+
+              {/* Live Voice Caption & Subtitle Display */}
+              <div className="w-full max-w-lg text-center space-y-3 z-10">
+                <div className="min-h-14 flex items-center justify-center px-4 py-2 rounded-2xl bg-stone-900/80 border border-stone-800 text-xs leading-relaxed text-stone-200 shadow-inner">
+                  {liveVoiceTranscript ? (
+                    <p className="italic text-amber-200 font-sans">
+                      &ldquo;{liveVoiceTranscript}&rdquo;
+                    </p>
+                  ) : isSpeaking ? (
+                    <p className="text-stone-300 font-sans">
+                      Speaking response aloud…
+                    </p>
+                  ) : (
+                    <p className="text-stone-500 font-sans">
+                      Speak your question or instruction. Try &ldquo;Calculate villa buyout for 14 guests&rdquo; or &ldquo;Add guest to spreadsheet&rdquo;
+                    </p>
+                  )}
+                </div>
+
+                {/* Bottom Voice Controls */}
+                <div className="flex items-center justify-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setVoiceVolumeEnabled((prev) => !prev)}
+                    className="p-2.5 rounded-full bg-stone-900 hover:bg-stone-800 border border-stone-800 text-stone-300 transition-colors"
+                    title={voiceVolumeEnabled ? "Mute Spoken Audio" : "Enable Spoken Audio"}
+                  >
+                    {voiceVolumeEnabled ? <Volume2 className="w-4 h-4 text-amber-400" /> : <VolumeX className="w-4 h-4 text-stone-500" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={toggleVoiceListening}
+                    className={`px-5 py-2.5 rounded-full font-semibold text-xs flex items-center gap-2 transition-all cursor-pointer shadow-md ${
+                      isListening
+                        ? "bg-rose-500 hover:bg-rose-600 text-white animate-pulse"
+                        : "bg-amber-500 hover:bg-amber-400 text-stone-950 font-bold"
+                    }`}
+                  >
+                    {isListening ? (
+                      <>
+                        <MicOff className="w-4 h-4" />
+                        <span>Stop Listening</span>
+                      </>
+                    ) : (
+                      <>
+                        <Mic className="w-4 h-4" />
+                        <span>Tap to Speak</span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      stopListening();
+                      stopSpeaking();
+                      setIsVoiceMode(false);
+                    }}
+                    className="px-3.5 py-2.5 rounded-full bg-stone-900 hover:bg-stone-800 border border-stone-800 text-xs text-stone-300 transition-colors"
+                    title="Return to Text Chat"
+                  >
+                    Text Mode
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            /* ======================================================== */
+            /* STANDARD CHATGPT CHAT STREAM VIEW                        */
+            /* ======================================================== */
+            <>
+              {/* Quick Prompts Strip */}
+              <div className="px-4 py-2 bg-stone-950/40 border-b border-stone-800/60 overflow-x-auto flex items-center gap-1.5 no-scrollbar shrink-0">
+                <span className="text-[10px] text-stone-500 uppercase tracking-wider font-semibold shrink-0 mr-1">
+                  Suggestions:
+                </span>
+                {(QUICK_PROMPTS[activeMode] || QUICK_PROMPTS.omniscient).slice(0, 4).map((prompt, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleSend(prompt)}
+                    className="text-xs px-2.5 py-1 rounded-full bg-stone-900/80 hover:bg-amber-500/20 hover:text-amber-200 border border-stone-800 hover:border-amber-500/30 text-stone-300 transition-colors shrink-0 flex items-center gap-1 text-[11px]"
+                  >
+                    <span>{prompt.slice(0, 36)}…</span>
+                    <ArrowRight className="w-2.5 h-2.5 text-stone-500" />
+                  </button>
+                ))}
+              </div>
+
+              {/* Messages Stream */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+                {messages.map((m, idx) => (
+                  <div
+                    key={idx}
+                    className={`flex flex-col ${
+                      m.sender === "user" ? "items-end" : "items-start"
+                    }`}
+                  >
+                    <div
+                      className={`max-w-[94%] sm:max-w-[88%] rounded-2xl p-4 text-xs leading-relaxed transition-all ${
+                        m.sender === "user"
+                          ? "bg-amber-600/90 text-stone-50 rounded-br-sm shadow-md"
+                          : "bg-stone-900/90 border border-stone-800/90 text-stone-200 rounded-bl-sm shadow-md"
+                      }`}
+                    >
+                      {/* Clinical Safety & Speed Header */}
+                      {m.sender === "copilot" && (
+                        <div className="mb-2 flex items-center justify-between gap-2 flex-wrap">
+                          {m.safety_level === "CONTRAINDICATION_ALERT" ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/20 border border-rose-500/40 text-rose-300">
+                              <AlertTriangle className="w-3 h-3 text-rose-400" />
+                              Health Hold · Review with Nurse Kareena
+                            </span>
+                          ) : m.safety_level === "CLEAR" && m.safety_screened ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-300">
+                              <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                              Health Safety Check Cleared
+                            </span>
+                          ) : <span />}
+
+                          {m.latency_ms !== undefined && (
+                            <span className="text-[9px] font-mono text-stone-400 bg-stone-950/60 border border-stone-800 px-2 py-0.5 rounded-full flex items-center gap-1 ml-auto">
+                              <Clock className="w-2.5 h-2.5 text-amber-400" />
+                              {(m.latency_ms / 1000).toFixed(1)}s
+                            </span>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Message Content */}
+                      <div className="whitespace-pre-wrap font-sans text-xs sm:text-[13px] leading-relaxed space-y-2">
+                        {m.text}
+                      </div>
+
+                      {/* Interactive Founder Approval Card (Zero Autonomous Writes) */}
+                      {m.form_fill_proposal && (
+                        <div className="mt-3.5 p-3.5 rounded-xl bg-amber-950/50 border border-amber-500/40 text-stone-200 space-y-2.5">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5 text-[11px] font-bold text-amber-300 uppercase tracking-wide">
+                              <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                              <span>Founder Action Staged</span>
+                            </div>
+                            <span className="text-[9px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-amber-500/20 text-amber-200 border border-amber-500/30">
+                              {m.proposal_authorized ? "Approved & Dispatched" : "Requires Your 1-Click Approval"}
+                            </span>
+                          </div>
+
+                          <div className="text-xs font-serif font-semibold text-stone-100">
+                            {m.form_fill_proposal.form_title || m.form_fill_proposal.action_title}
+                          </div>
+
+                          <p className="text-[11px] text-stone-300 leading-relaxed">
+                            {m.form_fill_proposal.summary}
+                          </p>
+
+                          <div className="pt-1.5 flex items-center gap-2">
+                            <button
+                              onClick={() => handleApproveProposal(m.form_fill_proposal!, idx)}
+                              disabled={m.proposal_authorized}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition flex items-center gap-1.5 ${
+                                m.proposal_authorized
+                                  ? "bg-emerald-900/60 text-emerald-300 border border-emerald-500/40 cursor-default"
+                                  : "bg-amber-500 hover:bg-amber-400 text-stone-950 font-semibold shadow-xs cursor-pointer"
+                              }`}
+                            >
+                              {m.proposal_authorized ? (
+                                <>
+                                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                                  <span>Authorized by You</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="w-3.5 h-3.5" />
+                                  <span>Review &amp; Approve Action</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Citations & Evidence Pill */}
+                      {m.citations && m.citations.length > 0 && (
+                        <div className="mt-3 pt-2.5 border-t border-stone-800/80 flex items-center gap-1.5 text-[10px] text-stone-400">
+                          <BookOpen className="w-3 h-3 text-amber-400" />
+                          <span>Sources: {m.citations.join(" · ")}</span>
+                        </div>
+                      )}
+
+                      {/* Specialized Action Chips */}
+                      {m.sender === "copilot" && (
+                        <div className="mt-3 pt-2.5 border-t border-stone-800/80 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {/* Billing Summary Copy */}
+                            {(m.text.includes("Buyout") || m.text.includes("Deposit") || m.text.includes("Installment") || m.text.includes("Balance")) && (
+                              <button
+                                onClick={() => copyToClipboard(m.text, idx)}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-amber-300 text-[11px] font-medium transition-colors"
+                              >
+                                <DollarSign className="w-3 h-3" />
+                                <span>Copy Billing Breakdown</span>
+                              </button>
+                            )}
+
+                            {/* WhatsApp Driver Link */}
+                            {(m.text.includes("Chauffeur") || m.text.includes("WhatsApp") || m.text.includes("Flight") || m.text.includes("Driver")) && (
+                              <button
+                                onClick={() => {
+                                  copyToClipboard(m.text, idx);
+                                  if (typeof window !== "undefined") {
+                                    const encoded = encodeURIComponent(m.text);
+                                    window.open(`https://wa.me/?text=${encoded}`, "_blank");
+                                  }
+                                }}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-[11px] font-medium transition-colors"
+                              >
+                                <Phone className="w-3 h-3" />
+                                <span>Send WhatsApp to Driver</span>
+                              </button>
+                            )}
+
+                            {/* Print Chef Chart */}
+                            {(m.text.includes("Dietary") || m.text.includes("Allergen") || m.text.includes("Chef") || m.text.includes("Menu")) && (
+                              <button
+                                onClick={() => {
+                                  const printWin = window.open("", "_blank");
+                                  if (printWin) {
+                                    printWin.document.write(`<html><head><title>KAI Private Chef Dietary Chart</title><style>body{font-family:sans-serif;padding:24px;color:#1c1917;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #d6d3d1;padding:8px;}th{background:#f5f5f4;}</style></head><body><h1>KAI Sanctuary · Private Chef Dietary Chart</h1><pre style="white-space:pre-wrap;font-family:inherit;">${m.text.replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre></body></html>`);
+                                    printWin.document.close();
+                                    printWin.print();
+                                  }
+                                }}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/30 text-teal-300 text-[11px] font-medium transition-colors"
+                              >
+                                <Printer className="w-3 h-3" />
+                                <span>Print Chef Chart</span>
+                              </button>
+                            )}
+
+                            {/* Jump to CRM shortcut */}
+                            {(m.text.includes("CRM") || m.text.includes("Spreadsheet") || m.text.includes("Guest row")) && (
+                              <button
+                                onClick={() => navigateToPortal("/portal/crm")}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded bg-stone-800 hover:bg-stone-700 border border-stone-700 text-stone-200 text-[11px] font-medium transition-colors"
+                              >
+                                <Table className="w-3 h-3 text-amber-400" />
+                                <span>Open Travel CRM</span>
+                              </button>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1.5 ml-auto">
+                            <button
+                              onClick={() => copyToClipboard(m.text, idx)}
+                              className="flex items-center gap-1 px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-stone-300 text-[11px] transition-colors"
+                            >
+                              {copiedIdx === idx ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                              <span>{copiedIdx === idx ? "Copied" : "Copy"}</span>
+                            </button>
+
+                            <button
+                              onClick={() => shareContent(m.text)}
+                              className="flex items-center gap-1 px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-stone-300 text-[11px] transition-colors"
+                            >
+                              <Share2 className="w-3 h-3" />
+                              <span>Share</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Followup suggestion pills */}
+                    {m.suggested_followups && m.suggested_followups.length > 0 && (
+                      <div className="mt-2 pl-2 flex flex-wrap gap-1.5">
+                        {m.suggested_followups.map((f, fIdx) => (
+                          <button
+                            key={fIdx}
+                            onClick={() => handleSend(f)}
+                            className="text-[10px] px-2.5 py-0.5 rounded-full bg-stone-900 border border-stone-800 hover:border-amber-500/40 text-stone-400 hover:text-amber-300 transition-colors"
+                          >
+                            ↳ {f}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                {/* Loading / Thinking Indicator */}
+                {loading && (
+                  <div className="flex items-center gap-2.5 text-xs text-amber-300/80 py-2 px-3 rounded-xl bg-stone-900/60 border border-stone-800 w-fit">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-400" />
+                    <span className="font-sans">Formulating response and calculating logistics…</span>
+                  </div>
+                )}
+
+                {uploading && (
+                  <div className="flex items-center gap-2.5 text-xs text-amber-300/80 py-2 px-3 rounded-xl bg-stone-900/60 border border-stone-800 w-fit">
+                    <Upload className="w-3.5 h-3.5 animate-bounce text-amber-400" />
+                    <span className="font-sans">Parsing document for guest notes, dietary requests, and flights…</span>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Quick Slash Commands Ribbon */}
+              <div className="px-3 py-1.5 bg-stone-950/70 border-t border-stone-800/80 flex items-center gap-1.5 overflow-x-auto no-scrollbar shrink-0">
+                <span className="text-[10px] font-mono text-amber-400/80 uppercase font-semibold shrink-0 mr-1 flex items-center gap-1">
+                  <Command className="w-2.5 h-2.5 text-amber-400" />
+                  <span>Actions:</span>
+                </span>
+                {QUICK_COMMAND_CHIPS.map((chip) => {
+                  const Icon = chip.icon;
+                  return (
+                    <button
+                      key={chip.label}
+                      type="button"
+                      onClick={() => {
+                        setInputMessage(`${chip.label} `);
+                        setSelectedTool(chip.label);
+                        textareaRef.current?.focus();
+                      }}
+                      className="px-2 py-0.5 rounded-md bg-stone-900 hover:bg-amber-500/20 hover:text-amber-200 border border-stone-800 hover:border-amber-500/40 text-[10px] font-mono text-stone-400 flex items-center gap-1 transition-colors shrink-0"
+                      title={chip.hint}
+                    >
+                      <Icon className="w-2.5 h-2.5 text-amber-400/70" />
+                      <span>{chip.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Signature ChatGPT-Style Rounded Input Bar */}
+              <div className="p-3 sm:p-4 border-t border-stone-800/80 bg-stone-950 shrink-0">
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleSend();
+                  }}
+                  className="relative flex items-end gap-2 rounded-2xl bg-stone-900 border border-stone-800 focus-within:border-amber-500/50 focus-within:ring-2 focus-within:ring-amber-500/20 p-2 transition-all shadow-inner"
+                >
+                  {/* Hidden File Input */}
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileUpload}
+                    accept=".pdf,.png,.jpg,.jpeg,.txt,.csv"
+                    className="hidden"
+                  />
+
+                  {/* Attachment Button */}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading || loading}
+                    title="Upload guest intake PDF, doctor note, voucher, or CSV"
+                    className="p-2 rounded-xl text-stone-400 hover:text-amber-300 hover:bg-stone-800/80 transition-colors disabled:opacity-50 shrink-0 cursor-pointer"
+                  >
+                    <Paperclip className="w-4 h-4" />
+                  </button>
+
+                  {/* Multiline Expanding Textarea */}
+                  <textarea
+                    ref={textareaRef}
+                    rows={1}
+                    value={inputMessage}
+                    onChange={(e) => {
+                      setInputMessage(e.target.value);
+                      adjustTextareaHeight();
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
+                    placeholder={
+                      activeMode === "executive_finance"
+                        ? "Calculate villa buyout, 30% deposit, or balance schedule..."
+                        : activeMode === "travel_logistics"
+                        ? "Check flight arrivals, airport drivers, or driving routes..."
+                        : activeMode === "chef_hospitality"
+                        ? "Create allergy-safe menus, local produce lists, or herbal teas..."
                         : activeMode === "clinical_safety"
-                          ? "Check guest health considerations, medications, or gentle breathwork..."
-                          : activeMode === "spreadsheet_crm"
-                            ? "Add guest row, lookup reservation, or check room assignment..."
-                            : "Ask a question in plain English, or type a shortcut like /finance, /radar, /chef..."
-              }
-              className="flex-1 px-3.5 py-2.5 text-xs bg-stone-900 border border-stone-700/80 rounded-xl text-stone-200 placeholder-stone-500 focus:outline-none focus:border-amber-500/50"
-            />
+                        ? "Check guest health considerations, medications, or breathwork..."
+                        : "Ask anything, or type a shortcut like /finance, /radar, /chef..."
+                    }
+                    className="flex-1 bg-transparent text-xs text-stone-100 placeholder-stone-500 focus:outline-none resize-none py-1.5 px-1 max-h-28 overflow-y-auto font-sans leading-relaxed"
+                  />
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={loading || uploading || !inputMessage.trim()}
-              className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-stone-950 font-semibold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <span>Ask</span>
-              <Send className="w-3.5 h-3.5" />
-            </button>
-          </form>
+                  {/* Speech Dictation Mic Button */}
+                  {speechSupported && (
+                    <button
+                      type="button"
+                      onClick={toggleVoiceListening}
+                      title={isListening ? "Listening... click to stop" : "Click to speak"}
+                      className={`p-2 rounded-xl transition-colors shrink-0 cursor-pointer ${
+                        isListening
+                          ? "bg-rose-500/20 text-rose-400 animate-pulse"
+                          : "text-stone-400 hover:text-amber-300 hover:bg-stone-800/80"
+                      }`}
+                    >
+                      {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                    </button>
+                  )}
 
-          <p className="text-[10px] text-stone-500 text-center mt-2">
-            Protected by Review · Nothing is sent without your approval · 100% in your control
-          </p>
-        </div>
+                  {/* Circular ChatGPT-Style Send Button */}
+                  <button
+                    type="submit"
+                    disabled={loading || uploading || !inputMessage.trim()}
+                    className="p-2 rounded-xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:hover:bg-amber-500 text-stone-950 font-bold transition-all shadow-md shrink-0 cursor-pointer"
+                    title="Send message (Enter)"
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                  </button>
+                </form>
+
+                <p className="text-[10px] text-stone-500 text-center mt-2 font-sans">
+                  Founder Review Invariant Active · 100% Controlled by Kareena Islam, BSN, RN
+                </p>
+              </div>
+            </>
+          )}
+        </motion.div>
       </div>
-    </div>
+    </AnimatePresence>
   );
 }

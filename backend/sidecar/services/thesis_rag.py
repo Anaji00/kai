@@ -39,7 +39,7 @@ SANCTUARY_KNOWLEDGE_SEEDS = [
         "content": (
             "Grand Travel & Cruise (25+ years host agency legacy, Funjet 500 Club member) negotiates preferred transcontinental "
             "airfare, guaranteed lie-flat seating blocks, and coordinates private airport meet-and-greets directly on the tarmac. "
-            "Guests experience seamless luxury transfers with zero customs friction or ground logistics stress."
+            "Guests experience smooth, chauffeured transfers with expedited customs assistance and zero ground travel stress."
         ),
         "metadata_json": {"partner": "Grand Travel & Cruise", "agency_experience": 25, "tier": "Funjet 500 Club"}
     },
@@ -292,7 +292,7 @@ def generate_pre_call_thesis(
         },
         {
             "objection": "Private Villa vs Shared Ocean Pavilion",
-            "clinical_script": "Highlight nervous system safety: For high-stress recovery, a Private Villa guarantees unbroken delta sleep and solitude, while Shared Pavilions foster soulful connection with an intentional peer."
+            "clinical_script": "Highlight nervous system safety: For high-stress recovery, a Private Villa guarantees unbroken delta sleep and solitude, while Shared Pavilions offer quiet camaraderie with a like-minded companion."
         }
     ]
 
@@ -348,7 +348,7 @@ def generate_pre_call_thesis(
             "title": "Post-Integration Departure Transfer",
             "supplier_name": supplier_chauffeur,
             "supplier_category": "TRANSPORTATION_CHAUFFEUR",
-            "description": "Seamless private transfer coordinated with flight departure times, including nourishment travel package."
+            "description": "Private chauffeured transfer coordinated directly with flight departure times, including a curated travel nourishment package."
         }
     ]
 

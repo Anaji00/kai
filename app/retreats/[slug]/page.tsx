@@ -497,7 +497,7 @@ export default async function RetreatDetailPage({ params }: PageProps) {
                 Backed by 25+ Years of Host Agency Clout & Sacred Cultural Immersion
               </h3>
               <p className="text-xs sm:text-sm text-sage/80 leading-relaxed font-light">
-                This sanctuary is orchestrated through <strong>Grand Travel & Cruise</strong> (Funjet 500 Club) and co-led by <strong>Kareena Islam, BSN, RN, RYT</strong> (national <em>Future Leaders in Travel</em> Honoree) and <strong>Armaan Islam</strong> (Ironman Athlete & Chief Business Officer). Because of our 25+ year host agency volume, our guests enjoy privileged resort access at <strong>Marival Armony (Harmony)</strong> and global sanctuaries, plus zero-friction flight routing and chauffeured airport transit. All inquiries route directly to <strong>kareena@grandtravelcruise.com</strong> & <strong>armaan@grandtravelcruise.com</strong> for personal consultation.
+                This sanctuary is orchestrated through <strong>Grand Travel & Cruise</strong> and co-led by <strong>Kareena Islam, BSN, RN, RYT</strong> (national <em>Future Leaders in Travel</em> Honoree) and <strong>Armaan Islam</strong> (Ironman Athlete & Chief Business Officer). Because of our 25+ year host agency volume, our guests enjoy privileged resort access at <strong>Marival Armony (Harmony)</strong> and global sanctuaries, plus zero-friction flight routing and chauffeured airport transit. All inquiries route directly to <strong>kareena@grandtravelcruise.com</strong> & <strong>armaan@grandtravelcruise.com</strong> for personal consultation.
               </p>
             </section>
           </main>
@@ -580,7 +580,7 @@ export default async function RetreatDetailPage({ params }: PageProps) {
                 </div>
               </div>
               <p className="text-[11px] text-sage/75 leading-relaxed">
-                Backed by 25+ years of host agency excellence and Funjet 500 Club status, our travel desk negotiates the best industry rates and private estate access. Enjoy white-glove flight routing, VIP airport transfers, and authentic cultural immersion.
+                Backed by 25+ years of host agency excellence and premier partner status, our travel desk negotiates the best industry rates and private estate access. Enjoy white-glove flight routing, VIP airport transfers, and authentic cultural immersion.
               </p>
               <div className="pt-2 border-t border-sand-border/60 flex flex-wrap gap-1.5 text-[10px] text-sage/70">
                 <span className="rounded-full bg-linen px-2 py-0.5 border border-sand-border/60">Zero-Friction Transit</span>

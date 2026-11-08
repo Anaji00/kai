@@ -560,7 +560,7 @@ def seed_all_synthetic_data(db: Session, force_reset: bool = False) -> Dict[str,
         {
             "type": "guest_reflection",
             "guest_name": "Sofia Rossi",
-            "content": "Guest Somatic Reflection (5/5 Stars): 'The acoustic immersion and private cenote stillness restored my parasympathetic tone completely. The seamless tarmac transfer made arrival effortless.' Pending publication to Destination Journal.",
+            "content": "Guest Somatic Reflection (5/5 Stars): 'The acoustic immersion and private cenote stillness restored my parasympathetic tone completely. The private tarmac transfer made arrival effortless.' Pending publication to Destination Journal.",
             "status": "pending_review"
         },
         {

@@ -194,16 +194,16 @@ Extract the GUEST details (the guest being consulted, NOT the founder Kareena Is
         f"Dearest {client_name},\n\n"
         f"Thank you for taking the time to connect during our consultation call today. "
         f"It was an honor to hear your reflections on {primary_focus.lower()}.\n\n"
-        f"I have personally curated your reservation for the KAI {sanctuary_slug.replace('-', ' ').title()} Sanctuary "
+        f"I have prepared your reservation for the KAI {sanctuary_slug.replace('-', ' ').title()} Sanctuary "
         f"in our {room_tier}, ensuring complete quietude, circadian harmony, and unbroken sleep.\n\n"
         f"Our travel coordinators at Grand Travel & Cruise (Funjet 500 Club volume contract) are standing by "
         f"to manage your flight logistics from {departure_airport} "
-        f"{f'(Flight {flight_number})' if flight_number else ''} with seamless private tarmac transit.\n\n"
+        f"{f'(Flight {flight_number})' if flight_number else ''} with direct private tarmac transit.\n\n"
         f"Your reservation has been staged with the KAI Sanctuary Travel CRM. Once you review and authorize the itinerary, "
         f"your 30% deposit hold will be confirmed.\n\n"
         f"With warmth and restorative stillness,\n\n"
         f"Kareena Islam\n"
-        f"Founder & Restorative Curator | KAI Wellness Retreats"
+        f"Founder & Somatic Director | KAI Wellness Retreats"
     )
 
     return {

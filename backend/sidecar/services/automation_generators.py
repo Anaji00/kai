@@ -16,7 +16,7 @@ def generate_flight_chauffeur_draft(db: Session, guest_name: str, flight_details
     logger.info(f"Generated flight draft for {guest_name}")
 
 def generate_whatsapp_concierge_draft(db: Session, guest_name: str, intention: str):
-    content = f"Hi {guest_name},\n\nWe saw your intention for the retreat was '{intention}'. The Founder has prepared a specific 432Hz track for you tonight to help with this. Also, your Grand Travel private chauffeur has confirmed your seamless transfer for tomorrow morning's excursion. Let us know how you sleep!"
+    content = f"Hi {guest_name},\n\nWe saw your intention for the retreat was '{intention}'. The Founder has prepared a specific 432Hz track for you tonight to help with this. Also, your Grand Travel private chauffeur has confirmed your private pickup for tomorrow morning's excursion. Let us know how you sleep!"
     draft = ActionDraft(
         type="whatsapp_concierge",
         guest_name=guest_name,

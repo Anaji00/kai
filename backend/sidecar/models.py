@@ -9,6 +9,14 @@ def generate_uuid_str():
     return str(uuid.uuid4())
 
 
+def generate_contact_id_str():
+    return f"kai_cnt_{uuid.uuid4().hex[:12]}"
+
+
+def generate_trip_id_str():
+    return f"kai_trp_{uuid.uuid4().hex[:12]}"
+
+
 def _utc_now():
     return datetime.now(timezone.utc)
 
@@ -413,7 +421,7 @@ class CRMClient(Base):
     __tablename__ = "crm_clients"
 
     id = Column(String(36), primary_key=True, default=generate_uuid_str, index=True)
-    crm_contact_id = Column(String(64), unique=True, index=True, nullable=False)  # e.g. kai_cnt_...
+    crm_contact_id = Column(String(64), unique=True, index=True, default=generate_contact_id_str, nullable=False)  # e.g. kai_cnt_...
     full_name = Column(String(128), nullable=False, index=True)
     email = Column(String(128), unique=True, index=True, nullable=False)
     phone = Column(String(32), nullable=True)
@@ -446,13 +454,13 @@ class CRMTrip(Base):
     __tablename__ = "crm_trips"
 
     id = Column(String(36), primary_key=True, default=generate_uuid_str, index=True)
-    crm_trip_id = Column(String(64), unique=True, index=True, nullable=False)  # e.g. kai_trp_...
+    crm_trip_id = Column(String(64), unique=True, index=True, default=generate_trip_id_str, nullable=False)  # e.g. kai_trp_...
     client_id = Column(String(36), index=True, nullable=False)
     client_name = Column(String(128), nullable=False)
     client_email = Column(String(128), index=True, nullable=False)
     sanctuary_slug = Column(String(64), nullable=False, index=True)
     title = Column(String(256), nullable=False)
-    dates = Column(String(128), nullable=False)
+    dates = Column(String(128), default="Dates Flexible / TBA", nullable=False)
     room_tier = Column(String(128), default="Private Luxury Suite")
     status = Column(String(32), default="PROPOSED_ITINERARY", index=True, nullable=False)  # INQUIRY, PROPOSED_ITINERARY, DEPOSIT_PAID, CONFIRMED, COMPLETED
     total_investment = Column(Float, default=4850.0, nullable=False)
@@ -469,6 +477,7 @@ class CRMTrip(Base):
     clinical_thesis = Column(JSON, nullable=True)  # Full pre-call clinical talk tracks & RAG notes
     suggested_plan = Column(JSON, nullable=True)  # Somatic & endurance restoration itinerary
     itinerary_blocks = Column(JSON, nullable=False, default=list)  # Day-by-day scheduled activities
+    activity_timeline = Column(JSON, nullable=False, default=list)  # Chronological audit stream of guest & operator milestones
     proposal_url = Column(String(256), nullable=True)
     deep_link = Column(String(256), nullable=True)
     created_by = Column(String(64), default="Kareena Islam", nullable=False)

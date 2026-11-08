@@ -51,10 +51,12 @@ export default function Navbar() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between">
           {/* Brand Logo */}
           <Link href="/" className="group flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-sand border border-sand-border group-hover:border-olive transition-colors">
-              <span className="font-serif text-lg font-light text-sage tracking-wider">
-                界
-              </span>
+            <div className="flex h-10 w-10 items-center justify-center rounded-full overflow-hidden shadow-2xs group-hover:scale-105 transition-transform">
+              <img
+                src="/kai-logo.png"
+                alt="KAI Wellness Retreats"
+                className="h-full w-full object-contain"
+              />
             </div>
             <div className="flex flex-col">
               <span className="font-serif text-xl tracking-[0.2em] uppercase text-sage font-medium">
