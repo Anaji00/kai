@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "Guest Reviews & Journal | KAI Wellness Retreats",
   description:
-    "Read guest reflections and sound bath experiences from KAI sanctuaries in Puerto Vallarta, Costa Rica, and the Amalfi Coast.",
+    "Read guest reflections, sound bath experiences, and heartfelt stories from KAI sanctuaries in Puerto Vallarta and Riviera Maya.",
   alternates: {
     canonical: "https://kaiwellnessretreats.com/testimonials",
   },

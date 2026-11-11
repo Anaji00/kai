@@ -89,7 +89,7 @@ export default async function Image() {
               margin: 0,
             }}
           >
-            Nurse-led quiet luxury retreats led by Kareena Islam, BSN, RN • Puerto Vallarta • Nosara • Amalfi Coast • Bali
+            Thoughtfully curated luxury retreats created by Kareena & Armaan Islam • Puerto Vallarta • Riviera Maya
           </p>
         </div>
 

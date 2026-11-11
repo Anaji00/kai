@@ -6,14 +6,14 @@ import BookingForm from "./BookingForm";
 export const metadata: Metadata = {
   title: "Reserve Your Sanctuary | Intimate 12–14 Guest Retreats | KAI",
   description:
-    "Reserve your place in a 2026–2027 KAI Wellness Retreat in Puerto Vallarta, Costa Rica, Amalfi Coast, or Bali. Personally reviewed by founder Kareena Islam, BSN, RN.",
+    "Reserve your place in a KAI Wellness Retreat in Puerto Vallarta or inquire about private group sanctuaries. Thoughtfully curated by Kareena and Armaan Islam.",
   alternates: {
     canonical: "https://kaiwellnessretreats.com/book",
   },
   openGraph: {
     title: "Reserve Your Sanctuary Place | KAI Wellness Retreats",
     description:
-      "Intimate 12–14 guest sanctuaries. Begin your personalized consultation and somatic wellness intake with founder Kareena Islam, BSN, RN.",
+      "Intimate 12–14 guest sanctuaries. Begin your personalized consultation and wellness intake with Kareena and Armaan Islam.",
     url: "https://kaiwellnessretreats.com/book",
     siteName: "KAI Wellness Retreats",
     images: [

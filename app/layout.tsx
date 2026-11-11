@@ -46,10 +46,9 @@ export const metadata: Metadata = {
     "Nurse led retreat",
     "Somatic retreats",
     "Quiet luxury wellness retreats",
-    "Costa Rica wellness retreat",
-    "Amalfi Coast retreat",
-    "Bali somatic retreat",
     "Puerto Vallarta luxury retreat",
+    "Riviera Maya wellness retreat",
+    "Marival Armony retreat",
     "Crystal singing bowl sound bath",
         "Autonomic nervous system recovery",
     "Grand Travel and Cruise",
@@ -98,7 +97,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "KAI Wellness Retreats | A Journey of Movement, Culture & Connection",
     description:
-      "A Journey of Movement, Culture & Connection. Restorative wellness retreats in Puerto Vallarta, Nosara, Amalfi Coast, and Bali, powered by Grand Travel.",
+      "A Journey of Movement, Culture & Connection. Restorative wellness retreats in Puerto Vallarta and Riviera Maya, powered by Grand Travel.",
     url: "https://kaiwellnessretreats.com",
     siteName: "KAI Wellness Retreats",
     locale: "en_US",
@@ -116,7 +115,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "KAI Wellness Retreats | A Journey of Movement, Culture & Connection",
     description:
-      "A Journey of Movement, Culture & Connection. Restorative wellness retreats in Puerto Vallarta, Costa Rica, Amalfi Coast, and Bali, powered by Grand Travel.",
+      "A Journey of Movement, Culture & Connection. Restorative wellness retreats in Puerto Vallarta and Riviera Maya, powered by Grand Travel.",
     images: [
       "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1200&q=80",
     ],

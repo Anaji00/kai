@@ -392,7 +392,7 @@ export default function AboutPage() {
             Cultural Integrations • Core Philosophy
           </span>
           <h2 className="font-serif text-3xl sm:text-5xl text-sage font-light">
-            Where Your Peace Within Blends With The Pieces Around
+            More than a retreat, KAI is a community where everyone belongs.
           </h2>
           <p className="text-sm sm:text-base text-sage/85 leading-relaxed font-light max-w-2xl mx-auto">
             True renewal happens when we step outside the everyday resort walls. Kareena and Armaan thoughtfully design each KAI sanctuary to blend mindful movement and quiet rest with the genuine warmth, coastal beauty, and authentic culture of our host destinations.

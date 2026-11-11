@@ -82,32 +82,17 @@ export default function Footer() {
             <ul className="space-y-2 text-xs text-sage/80">
               <li>
                 <Link href="/retreats" className="hover:text-terracotta transition-colors">
-                  All 2026–2027 Retreats
+                  All Sanctuaries
                 </Link>
               </li>
               <li>
                 <Link href="/retreats/puerto-vallarta-mexico-2027" className="hover:text-terracotta transition-colors">
-                  Puerto Vallarta, Mexico (Jan 28–31, 2027)
+                  Marival Armony • Puerto Vallarta (Jan 28–31, 2027)
                 </Link>
               </li>
               <li>
-                <Link href="/book?retreat=nosara-2027" className="hover:text-terracotta transition-colors">
-                  Nosara, Costa Rica (Coming Soon)
-                </Link>
-              </li>
-              <li>
-                <Link href="/book?retreat=amalfi-2027" className="hover:text-terracotta transition-colors">
-                  Amalfi Coast, Italy (Coming Soon)
-                </Link>
-              </li>
-              <li>
-                <Link href="/book?retreat=bali-2027" className="hover:text-terracotta transition-colors">
-                  Ubud & Sidemen, Bali (Coming Soon)
-                </Link>
-              </li>
-              <li>
-                <Link href="/book?retreat=riviera-2026" className="hover:text-terracotta transition-colors">
-                  Riviera Maya, Mexico (Coming Soon)
+                <Link href="/testimonials" className="hover:text-terracotta transition-colors">
+                  El Dorado Seaside Palms • Riviera Maya (Completed)
                 </Link>
               </li>
               <li>

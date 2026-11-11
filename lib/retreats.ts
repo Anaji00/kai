@@ -126,6 +126,107 @@ export const RETREATS: Retreat[] = [
     status: "open"
   },
   {
+    id: "riviera-2026",
+    slug: "riviera-maya-mexico-2026",
+    title: "KAI Fall Retreat: Oceanfront Autonomic Reset",
+    destination: "Riviera Maya, Quintana Roo",
+    country: "Mexico",
+    locationDetails: "El Dorado Seaside Palms Adults-Only Sanctuary • Previously Completed Retreat",
+    dates: "Previously Completed Sanctuary",
+    startDate: "2024-10-01",
+    endDate: "2024-10-04",
+    year: 2024,
+    season: "Autumn",
+    duration: "4 Days / 3 Nights",
+    spotsTotal: 16,
+    spotsRemaining: 0,
+    investmentStarting: "$1,850",
+    tagline: "Adults-only oceanfront luxury, nervous system decompression, crystal sound healing, and turquoise calm.",
+    description: "Our completed Caribbean coast retreat at the secluded palms of El Dorado Seaside Palms. Held as an intimate restorative sanctuary blending Mayan coastal botanicals with clinical sound healing, morning vinyasa, and nervous system renewal.",
+    clinicalFocus: [
+      "Rapid acute nervous system reset before end-of-year burnout",
+      "Restoration of natural circadian sleep markers via oceanfront sunrise exposure",
+      "Beach time, saltwater, and guided breathing"
+    ],
+    somaticPractices: [
+      "Oceanfront sunrise vinyasa & alignment yoga",
+      "Signature 432Hz crystal singing bowl sound healing sessions",
+      "Pranayama & evening restorative Yin",
+      "Beachfront somatic meditation and journal inquiry"
+    ],
+    culturalIntegrations: [
+      "Yucatán Melipona honey & Mayan botanical culinary infusions",
+      "Caribbean sunrise gratitude & coastal sound resonance circle"
+    ],
+    weatherProfile: {
+      targetWindow: "Caribbean Coastal Window",
+      avgHighF: 85,
+      avgLowF: 74,
+      avgHighC: 29,
+      avgLowC: 23,
+      humidity: "75% (Warm Caribbean Trade Winds)",
+      oceanTempF: 82,
+      oceanTempC: 28,
+      rainDays: "5.0 days / month",
+      uvIndex: "9 (High)",
+      climateClassification: "Tropical Savanna (Aw)",
+      climateSummary: "Warm turquoise Caribbean waters (82°F), steady easterly trade breezes, and lush tropical warmth.",
+      historicalPattern: "Consistent coastal warmth with brief tropical passing showers that quickly clear to sunny skies.",
+      weatherModelNote: "Easterly trade winds keep the beachfront shala breezy.",
+      whatToWear: {
+        morningPractice: "Light moisture-wicking yoga tank and shorts.",
+        daytimeExcursion: "Swimwear, linen cover-up, and sun hat.",
+        eveningDining: "Tropical resort elegant — airy linen or cotton attire."
+      },
+      whatToPack: [
+        "Breathable yoga sets and swimwear",
+        "Biodegradable reef-safe sunscreen",
+        "Light linen evening wear and sandals"
+      ]
+    },
+    inclusions: [
+      "3 nights in a luxury oceanfront suite at adults-only El Dorado Seaside Palms (preferred host agency rates)",
+      "Gourmet culinary experiences and restorative botanicals crafted with local Mexican ingredients",
+      "Daily sunrise yoga, breathwork, and crystal singing bowl sessions led by Kareena Islam",
+      "Round-trip Cancun (CUN) airport private chauffeured transfers and flight monitoring by Grand Travel & Cruise",
+      "KAI travel wellness kit & personalized clinical grounding journal"
+    ],
+    accommodations: "Oceanfront luxury suites with private swim-up access or ocean-view balconies, hydro-massage tubs, and 24-hour room service.",
+    heroImage: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=85",
+    gallery: [
+      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=80",
+      "https://images.unsplash.com/photo-1512813195386-6cf811ad3542?auto=format&fit=crop&w=1000&q=80",
+      "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1000&q=80"
+    ],
+    schedule: [
+      {
+        day: "Day 1",
+        title: "Arrive & Exhale",
+        highlights: ["Cancun VIP airport pickup", "Oceanfront welcome & grounding mocktail reception", "Sunset restorative Yin to release travel stiffness", "Private oceanfront dinner"]
+      },
+      {
+        day: "Day 2",
+        title: "Sound Bath & Nervous System Reset",
+        highlights: ["Morning sunrise ocean yoga", "Talk with Kareena: How Rest Works", "Signature crystal singing bowl sound healing experience", "Free afternoon for beach lounging and spa hydrotherapy"]
+      },
+      {
+        day: "Day 3",
+        title: "Somatic Flow & Inner Harmony",
+        highlights: ["Dynamic alignment vinyasa", "Breathwork workshop for anxiety relief", "Evening beachfront sound journey under the palms", "Celebratory group dinner"]
+      },
+      {
+        day: "Day 4",
+        title: "Renewal & Return",
+        highlights: ["Closing gratitude circle on the sand", "Oceanfront breakfast", "Transfers to Cancun airport"]
+      }
+    ],
+    featured: true,
+    status: "completed"
+  }
+];
+
+export const ARCHIVED_RETREATS: Retreat[] = [
+  {
     id: "nosara-2027",
     slug: "nosara-costa-rica-2027",
     title: "Canopy & Ocean Somatic Alignment",
@@ -484,111 +585,19 @@ export const RETREATS: Retreat[] = [
     ],
     featured: false,
     status: "coming-soon"
-  },
-  {
-    id: "riviera-2026",
-    slug: "riviera-maya-mexico-2026",
-    title: "KAI Fall Retreat: Oceanfront Autonomic Reset",
-    destination: "Riviera Maya, Quintana Roo",
-    country: "Mexico",
-    locationDetails: "El Dorado Seaside Palms Adults-Only Sanctuary • Previously Completed Retreat",
-    dates: "Previously Completed Sanctuary",
-    startDate: "2024-10-01",
-    endDate: "2024-10-04",
-    year: 2024,
-    season: "Autumn",
-    duration: "4 Days / 3 Nights",
-    spotsTotal: 16,
-    spotsRemaining: 0,
-    investmentStarting: "$1,850",
-    tagline: "Adults-only oceanfront luxury, nervous system decompression, crystal sound healing, and turquoise calm.",
-    description: "Our completed Caribbean coast retreat at the secluded palms of El Dorado Seaside Palms. Held as an intimate restorative sanctuary blending Mayan coastal botanicals with clinical sound healing, morning vinyasa, and nervous system renewal.",
-    clinicalFocus: [
-      "Rapid acute nervous system reset before end-of-year burnout",
-      "Restoration of natural circadian sleep markers via oceanfront sunrise exposure",
-      "Beach time, saltwater, and guided breathing"
-    ],
-    somaticPractices: [
-      "Oceanfront sunrise vinyasa & alignment yoga",
-      "Signature 432Hz crystal singing bowl sound healing sessions",
-      "Pranayama & evening restorative Yin",
-      "Beachfront somatic meditation and journal inquiry"
-    ],
-    culturalIntegrations: [
-      "Yucatán Melipona honey & Mayan botanical culinary infusions",
-      "Caribbean sunrise gratitude & coastal sound resonance circle"
-    ],
-    weatherProfile: {
-      targetWindow: "Caribbean Coastal Window",
-      avgHighF: 85,
-      avgLowF: 74,
-      avgHighC: 29,
-      avgLowC: 23,
-      humidity: "75% (Warm Caribbean Trade Winds)",
-      oceanTempF: 82,
-      oceanTempC: 28,
-      rainDays: "5.0 days / month",
-      uvIndex: "9 (High)",
-      climateClassification: "Tropical Savanna (Aw)",
-      climateSummary: "Warm turquoise Caribbean waters (82°F), steady easterly trade breezes, and lush tropical warmth.",
-      historicalPattern: "Consistent coastal warmth with brief tropical passing showers that quickly clear to sunny skies.",
-      weatherModelNote: "Easterly trade winds keep the beachfront shala breezy.",
-      whatToWear: {
-        morningPractice: "Light moisture-wicking yoga tank and shorts.",
-        daytimeExcursion: "Swimwear, linen cover-up, and sun hat.",
-        eveningDining: "Tropical resort elegant — airy linen or cotton attire."
-      },
-      whatToPack: [
-        "Breathable yoga sets and swimwear",
-        "Biodegradable reef-safe sunscreen",
-        "Light linen evening wear and sandals"
-      ]
-    },
-    inclusions: [
-      "3 nights in a luxury oceanfront suite at adults-only El Dorado Seaside Palms (preferred host agency rates)",
-      "Gourmet culinary experiences and restorative botanicals crafted with local Mexican ingredients",
-      "Daily sunrise yoga, breathwork, and crystal singing bowl sessions led by Kareena Islam",
-      "Round-trip Cancun (CUN) airport private chauffeured transfers and flight monitoring by Grand Travel & Cruise",
-      "KAI travel wellness kit & personalized clinical grounding journal"
-    ],
-    accommodations: "Oceanfront luxury suites with private swim-up access or ocean-view balconies, hydro-massage tubs, and 24-hour room service.",
-    heroImage: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1600&q=85",
-    gallery: [
-      "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1000&q=80",
-      "https://images.unsplash.com/photo-1512813195386-6cf811ad3542?auto=format&fit=crop&w=1000&q=80",
-      "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1000&q=80"
-    ],
-    schedule: [
-      {
-        day: "Day 1",
-        title: "Arrive & Exhale",
-        highlights: ["Cancun VIP airport pickup", "Oceanfront welcome & grounding mocktail reception", "Sunset restorative Yin to release travel stiffness", "Private oceanfront dinner"]
-      },
-      {
-        day: "Day 2",
-        title: "Sound Bath & Nervous System Reset",
-        highlights: ["Morning sunrise ocean yoga", "Talk with Kareena: How Rest Works", "Signature crystal singing bowl sound healing experience", "Free afternoon for beach lounging and spa hydrotherapy"]
-      },
-      {
-        day: "Day 3",
-        title: "Somatic Flow & Inner Harmony",
-        highlights: ["Dynamic alignment vinyasa", "Breathwork workshop for anxiety relief", "Evening beachfront sound journey under the palms", "Celebratory group dinner"]
-      },
-      {
-        day: "Day 4",
-        title: "Renewal & Return",
-        highlights: ["Closing gratitude circle on the sand", "Oceanfront breakfast", "Transfers to Cancun airport"]
-      }
-    ],
-    featured: true,
-    status: "completed"
   }
 ];
 
 export function getRetreatById(id: string): Retreat | undefined {
-  return RETREATS.find((r) => r.id === id || r.slug === id);
+  return (
+    RETREATS.find((r) => r.id === id || r.slug === id) ||
+    ARCHIVED_RETREATS.find((r) => r.id === id || r.slug === id)
+  );
 }
 
 export function getRetreatBySlug(slug: string): Retreat | undefined {
-  return RETREATS.find((r) => r.slug === slug || r.id === slug);
+  return (
+    RETREATS.find((r) => r.slug === slug || r.id === slug) ||
+    ARCHIVED_RETREATS.find((r) => r.slug === slug || r.id === slug)
+  );
 }

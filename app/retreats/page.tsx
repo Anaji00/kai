@@ -7,11 +7,11 @@ import { RETREATS } from "@/lib/retreats";
 import RetreatGrid from "@/components/RetreatGrid";
 
 export default function RetreatsPage() {
-  const [filter, setFilter] = useState<"all" | "2027" | "2026">("all");
+  const [filter, setFilter] = useState<"all" | "upcoming" | "past">("all");
 
   const filteredRetreats = RETREATS.filter((retreat) => {
-    if (filter === "2027") return retreat.year === 2027;
-    if (filter === "2026") return retreat.year === 2026;
+    if (filter === "upcoming") return retreat.status !== "completed";
+    if (filter === "past") return retreat.status === "completed";
     return true;
   });
 
@@ -23,7 +23,7 @@ export default function RetreatsPage() {
           Intimate Global Sanctuaries
         </span>
         <h1 className="font-serif text-4xl sm:text-6xl text-sage font-light tracking-tight">
-          2026 – 2027 Retreat Calendar
+          KAI Sanctuary Calendar
         </h1>
 
         {/* Filter Pills */}
@@ -38,22 +38,22 @@ export default function RetreatsPage() {
             All Sanctuaries ({RETREATS.length})
           </button>
           <button
-            onClick={() => setFilter("2027")}
-            className={`whitespace-nowrap rounded-full px-4 sm:px-5 py-2 text-xs uppercase tracking-wider transition-all font-medium ${filter === "2027"
+            onClick={() => setFilter("upcoming")}
+            className={`whitespace-nowrap rounded-full px-4 sm:px-5 py-2 text-xs uppercase tracking-wider transition-all font-medium ${filter === "upcoming"
                 ? "bg-sage text-linen shadow-sm"
                 : "bg-sand text-sage hover:bg-sand-muted border border-sand-border"
               }`}
           >
-            2027 Flagship ({RETREATS.filter((r) => r.year === 2027).length})
+            Upcoming 2027 Flagship ({RETREATS.filter((r) => r.status !== "completed").length})
           </button>
           <button
-            onClick={() => setFilter("2026")}
-            className={`whitespace-nowrap rounded-full px-4 sm:px-5 py-2 text-xs uppercase tracking-wider transition-all font-medium ${filter === "2026"
+            onClick={() => setFilter("past")}
+            className={`whitespace-nowrap rounded-full px-4 sm:px-5 py-2 text-xs uppercase tracking-wider transition-all font-medium ${filter === "past"
                 ? "bg-sage text-linen shadow-sm"
                 : "bg-sand text-sage hover:bg-sand-muted border border-sand-border"
               }`}
           >
-            2026 ({RETREATS.filter((r) => r.year === 2026).length})
+            Previously Completed ({RETREATS.filter((r) => r.status === "completed").length})
           </button>
         </div>
       </div>
@@ -61,8 +61,8 @@ export default function RetreatsPage() {
       {/* Retreats Grid */}
       <RetreatGrid
         retreats={filteredRetreats}
-        priorityCount={3}
-        className="grid grid-flow-row-dense grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+        priorityCount={2}
+        className="grid grid-flow-row-dense grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto"
       />
 
       {/* Private Group & Custom Curation Section */}
@@ -76,7 +76,7 @@ export default function RetreatsPage() {
               Private Group & Executive Restorative Journeys
             </h2>
             <p className="text-sm leading-relaxed text-sage/80">
-              Seeking a private sanctuary for your family, wellness community, or executive leadership team? In partnership with Grand Travel & Cruise, Kareena designs fully customized restorative itineraries worldwide, complete with private villa buyouts, dedicated chefs, crystal singing bowl sound healing, and nurse-led wellness clinics.
+              Seeking a private sanctuary for your family, wellness community, or executive leadership team? In partnership with Grand Travel & Cruise, Kareena and Armaan design fully customized restorative itineraries worldwide, complete with private villa buyouts, dedicated chefs, crystal singing bowl sound healing, and mindful movement sessions.
             </p>
             <div className="flex flex-wrap gap-4 pt-2 text-xs text-sage/75">
               <span className="flex items-center gap-1.5">
@@ -124,7 +124,7 @@ export default function RetreatsPage() {
                 How are retreat groups put together?
               </h4>
               <p className="text-xs sm:text-sm text-sage/80 leading-relaxed">
-                Because KAI retreat groups are limited to 12 to 14 guests, Kareena personally reviews every inquiry. We ensure a harmonious dynamic where all participants share an intention for rest, respect, and nervous system restoration.
+                Because KAI retreat groups are limited to 12 to 14 guests, Kareena and Armaan personally review every inquiry. We ensure a harmonious dynamic where all participants share an intention for rest, respect, and nervous system restoration.
               </p>
             </div>
 
@@ -133,7 +133,7 @@ export default function RetreatsPage() {
                 Do I need advanced yoga experience?
               </h4>
               <p className="text-xs sm:text-sm text-sage/80 leading-relaxed">
-                Not at all. Grounded in anatomical safety and Kareena’s nursing background, every movement practice is designed for every body, every age, and every stage. Variations and restorative props are always provided.
+                Not at all. Grounded in anatomical safety, Kareena&apos;s nursing background, and Armaan&apos;s endurance recovery protocols, every movement practice is designed for every body, every age, and every stage. Variations and restorative props are always provided.
               </p>
             </div>
 

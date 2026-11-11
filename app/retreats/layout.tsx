@@ -2,16 +2,16 @@ import type { Metadata } from "next";
 import { RETREATS } from "@/lib/retreats";
 
 export const metadata: Metadata = {
-  title: "2026–2027 Luxury Wellness Sanctuaries & Retreat Calendar | KAI",
+  title: "Sanctuaries & Retreat Calendar | KAI Wellness Retreats",
   description:
-    "Discover our intimate 12–14 guest sanctuaries in Puerto Vallarta, Nosara, Amalfi Coast, Bali, and Sedona. Nurse-led autonomic restoration, 432Hz crystal sound baths, and bespoke luxury travel.",
+    "Discover our intimate 12–14 guest sanctuaries in Puerto Vallarta and Riviera Maya. Restorative wellness retreats combining mindful movement, crystal sound healing, and genuine cultural connection.",
   alternates: {
     canonical: "https://kaiwellnessretreats.com/retreats",
   },
   openGraph: {
-    title: "2026–2027 Global Retreat Calendar | KAI Wellness Retreats",
+    title: "Sanctuaries & Retreat Calendar | KAI Wellness Retreats",
     description:
-      "Explore intimate 12–14 guest sanctuaries personally planned by Kareena Islam, BSN, RN. Medically informed, restorative, and harmoniously paced.",
+      "Explore intimate 12–14 guest sanctuaries thoughtfully created by Kareena and Armaan Islam. Restorative, inspiring, and harmoniously paced.",
     url: "https://kaiwellnessretreats.com/retreats",
     siteName: "KAI Wellness Retreats",
     images: [
@@ -25,9 +25,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "2026–2027 Retreat Calendar | KAI Wellness Retreats",
+    title: "Sanctuaries & Retreat Calendar | KAI Wellness Retreats",
     description:
-      "Intimate global sanctuaries in Mexico, Costa Rica, Italy, and Bali. Nurse-led nervous system restoration.",
+      "Intimate sanctuaries combining mindful movement, crystal sound baths, and genuine cultural connection.",
     images: [
       "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=1200&q=80",
     ],
