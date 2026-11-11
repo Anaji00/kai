@@ -514,6 +514,7 @@ def get_guest_portal_data(token: Optional[str], db: Optional[Session] = None, gu
 
     return {
         "guest_name": session["client_name"],
+        "email": session.get("email"),
         "sanctuary": sanctuary,
         "room_tier": session.get("room_tier", "Private Villa Sanctuary"),
         "weather": weather,

@@ -32,7 +32,7 @@ export default function Navbar() {
 
   const navLinks = [
     { label: "Sanctuaries", href: "/retreats" },
-    { label: "Founder & Science", href: "/about" },
+    { label: "The Hearts Behind KAI", href: "/about" },
     { label: "Reserve", href: "/book" },
   ];
 

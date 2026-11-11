@@ -522,7 +522,14 @@ def _approve_and_dispatch(db: Session, draft: ActionDraft, operator: AdminPrinci
         record_audit(db, operator, "draft.dispatch_failed", "action_draft", draft.id, {"error": str(e)[:500]}, commit=False)
         db.commit()
         raise HTTPException(status_code=502, detail=f"Downstream dispatch failed: {str(e)}")
-    return dispatch_result
+    response = dict(dispatch_result) if isinstance(dispatch_result, dict) else {"details": dispatch_result}
+    response.update({
+        "status": draft.status,
+        "dispatched_by": draft.dispatched_by,
+        "dispatched_at": draft.dispatched_at.isoformat() if draft.dispatched_at else None,
+        "draft_id": draft.id,
+    })
+    return response
 
 
 @router.get("", response_model=List[Dict[str, Any]])
@@ -712,6 +719,8 @@ def approve_and_dispatch_draft(
         "draft_id": draft.id,
         "draft_type": draft.type,
         "guest_name": draft.guest_name,
+        "dispatched_by": draft.dispatched_by or operator.email or operator.full_name,
+        "dispatched_at": draft.dispatched_at.isoformat() if draft.dispatched_at else None,
         "dispatch_result": dispatch_result
     }
 

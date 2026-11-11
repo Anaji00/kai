@@ -33,11 +33,10 @@ interface AIAutomationStudioTabProps {
 
 const CATEGORIES = [
   { id: "ALL", label: "All 15 AI Playbooks", icon: Layers },
-  { id: "CLINICAL_RN_TRIAGE", label: "Clinical RN & Somatic", icon: HeartPulse },
-  { id: "COHORT_CRISIS", label: "Cohort Crisis & Weather", icon: ShieldCheck },
-  { id: "AVIATION_LOGISTICS", label: "Aviation & Border Gate", icon: Plane },
-  { id: "SANCTUARY_PAY_FX", label: "Sanctuary Pay & FX Folios", icon: CreditCard },
-  { id: "VIP_CONCIERGE", label: "VIP Concierge & Recovery", icon: Crown },
+  { id: "COHORT_CRISIS", label: "Cohort & Weather", icon: ShieldCheck },
+  { id: "AVIATION_LOGISTICS", label: "Aviation & Chauffeurs", icon: Plane },
+  { id: "SANCTUARY_PAY_FX", label: "Sanctuary Pay & Folios", icon: CreditCard },
+  { id: "VIP_CONCIERGE", label: "VIP Concierge & Dining", icon: Crown },
 ];
 
 export default function AIAutomationStudioTab({
@@ -169,10 +168,10 @@ export default function AIAutomationStudioTab({
   };
 
   const exampleAssistantPrompts = [
-    "Screen a guest with episodic SVT arrhythmia and severe tree-nut anaphylaxis for Puerto Vallarta",
-    "What is our protocol when a guest's morning Somatic Pulse shows Sleep 2/10 and Ease 2/10?",
-    "Draft a white-glove suite conflict upgrade note offering a Private Cliffside Plunge Villa + $500 spa credit",
-    "Explain how our Gulfstream G650ER weight & balance and FAA Part 135 14-hour crew duty gate works",
+    "Build the Private Chef dietary & allergy matrix for Nosara",
+    "Group delayed airport arrivals into luxury van pickups for Nosara",
+    "Draft a white-glove suite upgrade note offering a Private Cliffside Plunge Villa + $500 spa credit",
+    "Calculate villa buyout and 30/70 payment breakdown for 14 guests at Nosara",
   ];
 
   return (
@@ -194,7 +193,7 @@ export default function AIAutomationStudioTab({
                 </span>
               </div>
               <p className="text-xs text-stone-400 mt-1">
-                Equipped with 5 specialized Retreat Advisor Roles &amp; 15 One-Touch Workflows to draft guest schedules, coordinate flights, and prepare clinical safety reviews.
+                Equipped with 5 specialized Retreat Advisor Roles &amp; 15 One-Touch Workflows to draft guest schedules, coordinate flights, and manage dietary plans.
               </p>
             </div>
           </div>
@@ -220,7 +219,7 @@ export default function AIAutomationStudioTab({
               <span>
                 {runningCode === "BATCH_SHOWCASE"
                   ? "Running 5-Scenario Suite..."
-                  : "Run 5-Scenario Stress Showcase"}
+                  : "Run 5-Scenario Showcase"}
               </span>
             </button>
           </div>
@@ -281,7 +280,6 @@ export default function AIAutomationStudioTab({
             <div className="flex items-center gap-1.5 text-[11px]">
               {(
                 [
-                  { id: "clinical_safety", label: "RN Clinical Copilot" },
                   { id: "travel_concierge", label: "Aviation & Weather AI" },
                   { id: "consult_prep", label: "VIP Concierge Drafter" },
                   { id: "studio_ops", label: "Sanctuary CRM Ops Guide" },

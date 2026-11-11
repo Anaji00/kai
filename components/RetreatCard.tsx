@@ -215,6 +215,7 @@ function RetreatDetailTabs({ retreat }: { retreat: Retreat }) {
 }
 
 export default function RetreatCard({ retreat, priority = false, isExpanded, anotherCardOpen, onToggle }: RetreatCardProps) {
+  const isCompleted = retreat.status === "completed" || retreat.dates.toLowerCase().includes("completed");
   const isComingSoon = retreat.status === "coming-soon" || retreat.dates.toLowerCase().includes("coming soon");
   const reduceMotion = useReducedMotion();
   const panelId = useId();
@@ -223,8 +224,19 @@ export default function RetreatCard({ retreat, priority = false, isExpanded, ano
   const exploreButtonRef = useRef<HTMLButtonElement>(null);
   const wasExpanded = useRef(false);
 
-  const statusLabel = isComingSoon ? "Coming Soon" : `${retreat.spotsRemaining} spots left`;
-  const reserveLabel = isComingSoon ? "Join Waitlist" : "Reserve";
+  const statusLabel = isCompleted
+    ? "Completed Sanctuary"
+    : isComingSoon
+    ? "Coming Soon"
+    : `${retreat.spotsRemaining} spots left`;
+
+  const reserveLabel = isCompleted
+    ? "View Past Retreat"
+    : isComingSoon
+    ? "Join Waitlist"
+    : "Reserve";
+
+  const reserveHref = isCompleted ? "/testimonials" : `/book?retreat=${retreat.id}`;
 
   // The opened card moves to span its row, so bring it into view and hand keyboard focus to its content.
   // On close, focus returns to the control that opened it, unless the user has moved on to another card.
@@ -357,7 +369,7 @@ export default function RetreatCard({ retreat, priority = false, isExpanded, ano
                     Full Retreat Page
                   </Link>
                   <Link
-                    href={`/book?retreat=${retreat.id}`}
+                    href={reserveHref}
                     className="flex items-center gap-1.5 rounded-full bg-sage px-5 py-2.5 text-xs font-medium uppercase tracking-wider text-linen hover:bg-sage-dark transition-all shadow-sm"
                   >
                     <span>{reserveLabel}</span>
@@ -424,10 +436,10 @@ export default function RetreatCard({ retreat, priority = false, isExpanded, ano
                   <ChevronDown className="h-3.5 w-3.5 transition-transform group-hover:translate-y-0.5" aria-hidden="true" />
                 </button>
                 <Link
-                  href={`/book?retreat=${retreat.id}`}
+                  href={reserveHref}
                   className="flex items-center justify-center gap-1.5 rounded-full bg-sage px-3 py-2.5 text-xs font-medium uppercase tracking-wider text-linen hover:bg-sage-dark transition-all shadow-sm"
                 >
-                  <span>{isComingSoon ? "Waitlist" : "Reserve"}</span>
+                  <span>{isCompleted ? "Past Retreat" : isComingSoon ? "Waitlist" : "Reserve"}</span>
                   <ArrowRight className="h-3 w-3" aria-hidden="true" />
                 </Link>
               </div>

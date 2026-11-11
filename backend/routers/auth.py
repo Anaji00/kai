@@ -51,31 +51,41 @@ class OperatorLoginRequest(BaseModel):
     password: str = Field(..., min_length=1, max_length=512)
 
 
-def secure_cookies() -> bool:
-    return settings.ENVIRONMENT == "production"
+def secure_cookies(request: Optional[Request] = None) -> bool:
+    if settings.ENVIRONMENT != "production":
+        return False
+    if request is not None:
+        proto = (request.headers.get("x-forwarded-proto") or request.url.scheme or "").lower()
+        if proto == "http":
+            return False
+        host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").split(":")[0].lower()
+        if host in ("localhost", "127.0.0.1", "backend", "frontend"):
+            return False
+    return True
 
 
-def set_csrf_cookie(response: Response, csrf_token: str) -> None:
+def set_csrf_cookie(response: Response, csrf_token: str, request: Optional[Request] = None) -> None:
     # Readable by page scripts by design: that is what makes the double-submit check work.
     response.set_cookie(
         CSRF_COOKIE, csrf_token,
         max_age=settings.REFRESH_SESSION_EXPIRE_DAYS * 86400,
-        httponly=False, secure=secure_cookies(), samesite="lax", path="/",
+        httponly=False, secure=secure_cookies(request), samesite="lax", path="/",
     )
 
 
-def set_session_cookies(response: Response, tokens: IssuedTokens) -> None:
+def set_session_cookies(response: Response, tokens: IssuedTokens, request: Optional[Request] = None) -> None:
+    is_sec = secure_cookies(request)
     response.set_cookie(
         ACCESS_COOKIE, tokens.access_token,
         max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        httponly=True, secure=secure_cookies(), samesite="lax", path="/",
+        httponly=True, secure=is_sec, samesite="lax", path="/",
     )
     response.set_cookie(
         REFRESH_COOKIE, tokens.refresh_token,
         max_age=settings.REFRESH_SESSION_EXPIRE_DAYS * 86400,
-        httponly=True, secure=secure_cookies(), samesite="lax", path="/",
+        httponly=True, secure=is_sec, samesite="lax", path="/",
     )
-    set_csrf_cookie(response, tokens.csrf_token)
+    set_csrf_cookie(response, tokens.csrf_token, request)
 
 
 def clear_session_cookies(response: Response) -> None:
@@ -119,7 +129,7 @@ def operator_login(payload: OperatorLoginRequest, request: Request, response: Re
     register_successful_login(db, user, payload.password)
     clear_attempts(db, ip_key)
     tokens = create_operator_session(db, user, ip_address, request.headers.get("user-agent"))
-    set_session_cookies(response, tokens)
+    set_session_cookies(response, tokens, request)
     principal = principal_for(user, tokens.session.session_id)
     record_audit(db, principal, "operator.login", "portal_session", tokens.session.session_id, {"ip": ip_address})
     return _principal_payload(principal, tokens.csrf_token)
@@ -135,7 +145,7 @@ def operator_demo_login(request: Request, response: Response, db: Session = Depe
     if not user:
         raise HTTPException(status_code=404, detail="Not found.")
     tokens = create_operator_session(db, user, client_ip(request), request.headers.get("user-agent"))
-    set_session_cookies(response, tokens)
+    set_session_cookies(response, tokens, request)
     principal = principal_for(user, tokens.session.session_id)
     record_audit(db, principal, "operator.demo_login", "portal_session", tokens.session.session_id)
     return _principal_payload(principal, tokens.csrf_token)
@@ -157,7 +167,7 @@ def operator_refresh(request: Request, response: Response, db: Session = Depends
         error = JSONResponse(status_code=401, content={"detail": str(exc)})
         clear_session_cookies(error)
         return error
-    set_session_cookies(response, tokens)
+    set_session_cookies(response, tokens, request)
     user = db.query(OperatorUser).filter(OperatorUser.id == tokens.session.user_id).first()
     return _principal_payload(principal_for(user, tokens.session.session_id), tokens.csrf_token)
 
@@ -192,5 +202,5 @@ def get_me(request: Request, response: Response, principal: AdminPrincipal = Dep
     csrf_token = request.cookies.get(CSRF_COOKIE)
     if not csrf_token:
         csrf_token = generate_csrf_token(principal.session_id)
-        set_csrf_cookie(response, csrf_token)
+        set_csrf_cookie(response, csrf_token, request)
     return _principal_payload(principal, csrf_token)

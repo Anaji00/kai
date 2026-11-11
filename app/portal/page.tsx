@@ -350,131 +350,113 @@ export default function PortalDashboard() {
       {/* 1. Header & KPI Metrics Strip */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="font-serif text-3xl font-bold text-[#2D3E35] tracking-tight">
-            Staff Sanctuary Operations Studio
+          <h1 className="font-serif text-2xl sm:text-3xl font-bold text-[#2D3E35] tracking-tight">
+            Guest Inquiries
           </h1>
-          <p className="text-sm text-[#5C6B5E] mt-1">
-            Guest Inquiries &middot; Care Plan &amp; Conversation Guide &middot; Native Travel CRM &amp; Itinerary Planner
+          <p className="text-xs text-[#5C6B5E] mt-0.5">
+            Review inquiries, care plans &amp; sync confirmed guests to CRM
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 self-start md:self-auto">
+        <div className="flex items-center gap-2 self-start md:self-auto">
           <button
             onClick={() => setIsVoiceModalOpen(true)}
-            title="Transcribe Founder Voice Consultation to Staged Dossier"
-            className="inline-flex items-center space-x-2 px-3.5 py-2 text-xs font-semibold text-neutral-950 bg-gradient-to-r from-amber-200 via-amber-100 to-amber-200 hover:from-amber-300 hover:to-amber-200 border border-amber-300 rounded-md transition-all shadow-xs cursor-pointer"
+            title="Voice Memo to Guest Dossier"
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-neutral-950 bg-amber-100 hover:bg-amber-200 border border-amber-300 rounded-md transition-all cursor-pointer"
           >
             <Mic className="w-3.5 h-3.5 text-amber-900" />
-            <span>Dictate Voice Memo</span>
+            <span>Voice Memo</span>
           </button>
 
           {process.env.NODE_ENV !== "production" && (
           <button
             onClick={handleSeedSyntheticData}
             disabled={seedingData || loading}
-            title="Seed synthetic test bookings (Frank Lucas), suppliers, leads, and events"
-            className="inline-flex items-center space-x-2 px-3.5 py-2 text-xs font-semibold text-[#2D3E35] bg-amber-50 hover:bg-amber-100 border border-amber-300/80 rounded-md transition-all shadow-xs cursor-pointer"
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium text-[#2D3E35] bg-amber-50 hover:bg-amber-100 border border-amber-300/80 rounded-md transition-all cursor-pointer"
           >
             <Database className={`w-3.5 h-3.5 text-amber-700 ${seedingData ? "animate-spin" : ""}`} />
-            <span>{seedingData ? "Seeding Test Data..." : "Seed Test Data"}</span>
+            <span>{seedingData ? "Seeding..." : "Seed Demo"}</span>
           </button>
           )}
 
           <button
             onClick={loadData}
             disabled={loading}
-            className="inline-flex items-center space-x-2 px-3.5 py-2 text-xs font-semibold text-[#2D3E35] bg-[#F2ECE4] hover:bg-[#EBE3D8] border border-[#E5DDD0] rounded-md transition-all shadow-sm cursor-pointer"
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-[#2D3E35] bg-[#F2ECE4] hover:bg-[#EBE3D8] border border-[#E5DDD0] rounded-md transition-all cursor-pointer"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span>Refresh Studio</span>
+            <span>Refresh</span>
           </button>
         </div>
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] shadow-sm relative overflow-hidden">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="p-3.5 rounded-xl bg-white border border-[#E5DDD0] shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-[#5C6B5E] uppercase tracking-wider">
-              Pending Inquiries
+            <span className="text-[11px] font-medium text-[#5C6B5E] uppercase tracking-wider">
+              Pending
             </span>
-            <span className="p-2 rounded-lg bg-amber-50 text-amber-700">
-              <Clock className="w-4 h-4" />
-            </span>
+            <Clock className="w-4 h-4 text-amber-600" />
           </div>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-3xl font-serif font-bold text-[#2D3E35]">
+          <div className="mt-1 flex items-baseline space-x-2">
+            <span className="text-2xl font-serif font-bold text-[#2D3E35]">
               {pendingIntakesCount}
             </span>
-            <span className="text-xs text-amber-700 font-medium">Awaiting Founder Review</span>
+            <span className="text-xs text-amber-700">To Review</span>
           </div>
-          <div className="mt-2 text-[11px] text-[#5C6B5E]">Personalized founder approval active</div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] shadow-sm">
+        <div className="p-3.5 rounded-xl bg-white border border-[#E5DDD0] shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-[#5C6B5E] uppercase tracking-wider">
-              Confirmed in CRM
+            <span className="text-[11px] font-medium text-[#5C6B5E] uppercase tracking-wider">
+              Confirmed
             </span>
-            <span className="p-2 rounded-lg bg-emerald-50 text-emerald-700">
-              <CheckCircle2 className="w-4 h-4" />
-            </span>
+            <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           </div>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-3xl font-serif font-bold text-[#2D3E35]">
+          <div className="mt-1 flex items-baseline space-x-2">
+            <span className="text-2xl font-serif font-bold text-[#2D3E35]">
               {syncedIntakesCount}
             </span>
-            <span className="text-xs text-emerald-700 font-medium">Published Itineraries</span>
+            <span className="text-xs text-emerald-700">In CRM</span>
           </div>
-          <div className="mt-2 text-[11px] text-[#5C6B5E]">Stored natively in database (crm_clients & crm_trips)</div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] shadow-sm">
+        <div className="p-3.5 rounded-xl bg-white border border-[#E5DDD0] shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-[#5C6B5E] uppercase tracking-wider">
-              Partner Studios
+            <span className="text-[11px] font-medium text-[#5C6B5E] uppercase tracking-wider">
+              Partners
             </span>
-            <span className="p-2 rounded-lg bg-purple-50 text-purple-700">
-              <Sparkles className="w-4 h-4" />
-            </span>
+            <Sparkles className="w-4 h-4 text-purple-600" />
           </div>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-3xl font-serif font-bold text-[#2D3E35]">{leadCount}</span>
-            <span className="text-xs text-purple-700 font-medium">Referral Practices</span>
+          <div className="mt-1 flex items-baseline space-x-2">
+            <span className="text-2xl font-serif font-bold text-[#2D3E35]">{leadCount}</span>
+            <span className="text-xs text-purple-700">Studios</span>
           </div>
-          <div className="mt-2 text-[11px] text-[#5C6B5E]">Integrative medicine &amp; yoga studios</div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] shadow-sm">
+        <div className="p-3.5 rounded-xl bg-white border border-[#E5DDD0] shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-[#5C6B5E] uppercase tracking-wider">
-              Concierge Messages
+            <span className="text-[11px] font-medium text-[#5C6B5E] uppercase tracking-wider">
+              SMS Queue
             </span>
-            <span className="p-2 rounded-lg bg-[#C07D63]/10 text-[#C07D63]">
-              <Send className="w-4 h-4" />
-            </span>
+            <Send className="w-4 h-4 text-[#C07D63]" />
           </div>
-          <div className="mt-2 flex items-baseline space-x-2">
-            <span className="text-3xl font-serif font-bold text-[#2D3E35]">{smsQueueCount}</span>
-            <span className="text-xs text-[#C07D63] font-medium">Ready for Review</span>
+          <div className="mt-1 flex items-baseline space-x-2">
+            <span className="text-2xl font-serif font-bold text-[#2D3E35]">{smsQueueCount}</span>
+            <span className="text-xs text-[#C07D63]">Staged</span>
           </div>
-          <div className="mt-2 text-[11px] text-[#5C6B5E]">Founder pings &amp; flight check-ins</div>
         </div>
       </div>
 
       {/* 2. Retreat Group Capacity & Size Monitor (12-14 Guests) */}
-      <div className="bg-white rounded-xl border border-[#E5DDD0] p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="font-serif text-lg font-bold text-[#2D3E35]">
-              Intimate Retreat Groups (12–14 Guests Max)
-            </h2>
-            <p className="text-xs text-[#5C6B5E]">
-              Real-time availability protecting small group harmony, personalized care, and tranquility across all 4 sanctuaries.
-            </p>
-          </div>
-          <span className="text-xs font-semibold px-2.5 py-1 bg-[#F2ECE4] border border-[#E5DDD0] rounded text-[#2D3E35]">
-            Strict Limit: 14 Guests Max
+      <div className="bg-white rounded-xl border border-[#E5DDD0] p-4 shadow-xs">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-serif text-base font-bold text-[#2D3E35]">
+            Sanctuary Capacity (12–14 Guests Max)
+          </h2>
+          <span className="text-[11px] font-semibold px-2 py-0.5 bg-[#F2ECE4] border border-[#E5DDD0] rounded text-[#2D3E35]">
+            14 Guest Cap
           </span>
         </div>
 
@@ -631,7 +613,7 @@ export default function PortalDashboard() {
                           </span>
                         )}
                         <span
-                          className={`text-xs font-semibold px-2.5 py-0.5 rounded-full flex items-center space-x-1 ${isPending
+                          className={`text-xs font-semibold px-2 py-0.5 rounded-full flex items-center space-x-1 ${isPending
                               ? "bg-amber-100 text-amber-900 border border-amber-200"
                               : "bg-emerald-100 text-emerald-900 border border-emerald-200"
                             }`}
@@ -639,12 +621,12 @@ export default function PortalDashboard() {
                           {isPending ? (
                             <>
                               <AlertTriangle className="w-3 h-3 text-amber-700" />
-                              <span>AWAITING FOUNDER REVIEW</span>
+                              <span>Pending Review</span>
                             </>
                           ) : (
                             <>
                               <CheckCircle2 className="w-3 h-3 text-emerald-700" />
-                              <span>SYNCED TO CRM DATABASE</span>
+                              <span>Synced to CRM</span>
                             </>
                           )}
                         </span>
@@ -662,81 +644,47 @@ export default function PortalDashboard() {
                       </div>
                     </div>
 
-                    {/* Right: Actions, WhatsApp Dispatch, CRM Inspector & Drawer Toggle */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        onClick={() => setWhatsappIntake(intake)}
-                        className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition-colors shadow-2xs"
-                        title="Open WhatsApp Mobile Dispatch Simulator for this guest"
-                      >
-                        <Smartphone className="w-3.5 h-3.5 text-emerald-700" />
-                        <span>WhatsApp Dispatch</span>
-                      </button>
-
-                      <button
-                        onClick={() => setInspectorIntake(intake)}
-                        className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold text-[#2D3E35] bg-[#F2ECE4] hover:bg-[#EBE3D8] border border-[#E5DDD0] rounded-md transition-colors shadow-2xs cursor-pointer"
-                        title="Inspect Native CRM Contact, Trip Entities, and Stored Payment Schedules"
-                      >
-                        <Layers className="w-3.5 h-3.5 text-[#C07D63]" />
-                        <span>CRM Inspector</span>
-                      </button>
-
-                      <button
-                        onClick={() => setContinuityIntake(intake)}
-                        className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition-colors shadow-2xs cursor-pointer"
-                        title="Curate 30-Day Post-Sanctuary Continuity Care Journey"
-                      >
-                        <Calendar className="w-3.5 h-3.5 text-amber-700" />
-                        <span>30-Day Arc</span>
-                      </button>
-
+                    {/* Right: Concise Primary Actions & Drawer Toggle */}
+                    <div className="flex flex-wrap items-center gap-1.5">
                       {isPending && (
                         <button
                           onClick={() => handleAuthorizeSync(intake)}
                           disabled={syncingIntakeId === intake.id}
-                          className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold text-white bg-[#2D3E35] hover:bg-[#1F2C25] rounded-md transition-all shadow-sm"
+                          className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold text-white bg-[#2D3E35] hover:bg-[#1F2C25] rounded-md transition-all shadow-xs cursor-pointer"
                         >
                           <FileCheck className="w-3.5 h-3.5 text-[#FAF7F2]" />
                           <span>
-                            {syncingIntakeId === intake.id
-                              ? "Syncing..."
-                              : "1-Click CRM Sync"}
+                            {syncingIntakeId === intake.id ? "Syncing..." : "Approve & Sync"}
                           </span>
                         </button>
                       )}
 
-                      {isSynced && (
-                        <button
-                          onClick={() => setInspectorIntake(intake)}
-                          className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-medium text-emerald-800 bg-emerald-100/80 hover:bg-emerald-200/80 border border-emerald-300 rounded-md transition-colors cursor-pointer"
-                          title="View Native Credit Card Authorization & Payment Schedule"
-                        >
-                          <CreditCard className="w-3.5 h-3.5 text-emerald-700" />
-                          <span>Payment Schedule</span>
-                        </button>
-                      )}
-
                       <button
-                        onClick={() => handleOpenGuestHub(intake)}
-                        disabled={generatingHubId === intake.id}
-                        className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-semibold text-teal-900 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-md transition-colors shadow-2xs cursor-pointer"
-                        title="Generate & Open Private Guest Sanctuary Companion Magic Link"
+                        onClick={() => setInspectorIntake(intake)}
+                        className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-medium text-[#2D3E35] bg-[#F2ECE4] hover:bg-[#EBE3D8] border border-[#E5DDD0] rounded-md transition-colors cursor-pointer"
                       >
-                        <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-                        <span>{generatingHubId === intake.id ? "Generating..." : "Guest Hub"}</span>
+                        <Layers className="w-3.5 h-3.5 text-[#C07D63]" />
+                        <span>CRM Details</span>
                       </button>
 
+                      <button
+                        onClick={() => setWhatsappIntake(intake)}
+                        className="inline-flex items-center space-x-1 px-2.5 py-1.5 text-xs font-medium text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition-colors cursor-pointer"
+                      >
+                        <Smartphone className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>WhatsApp</span>
+                      </button>
 
                       <button
                         onClick={() => setExpandedIntakeId(isExpanded ? null : intake.id)}
-                        className="p-1.5 text-[#5C6B5E] hover:text-[#2D3E35] hover:bg-[#F2ECE4] rounded-md transition-colors"
-                        title={isExpanded ? "Collapse care plan" : "Expand clinical care plan"}
+                        className="px-2 py-1.5 text-xs font-medium text-[#5C6B5E] hover:text-[#2D3E35] hover:bg-[#F2ECE4] rounded-md transition-colors flex items-center gap-1 cursor-pointer"
+                        title={isExpanded ? "Collapse care plan" : "Expand care plan"}
                       >
+                        <span>Care Plan</span>
                         {isExpanded ? (
-                          <ChevronUp className="w-5 h-5" />
+                          <ChevronUp className="w-4 h-4" />
                         ) : (
-                          <ChevronDown className="w-5 h-5" />
+                          <ChevronDown className="w-4 h-4" />
                         )}
                       </button>
                     </div>
@@ -790,39 +738,25 @@ export default function PortalDashboard() {
                         <div className="p-3.5 rounded-lg border border-[#E5DDD0] bg-[#FAF7F2]/40 space-y-2">
                           <div className="font-semibold text-sm text-[#2D3E35] flex items-center justify-between">
                             <div className="flex items-center space-x-1.5">
-                              <HeartPulse className="w-4 h-4 text-[#C07D63]" />
-                              <span>Restorative Wellness Blueprint</span>
+                              <Sparkles className="w-4 h-4 text-[#C07D63]" />
+                              <span>Guest Wellness &amp; Dietary Preferences</span>
                             </div>
-                            {intake.clinical_screening_enabled ? (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-800 border border-rose-200 flex items-center gap-1">
-                                <span>🛡️ Elevated Clinical Safety</span>
-                              </span>
-                            ) : (
-                              <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                🌿 Standard Restorative Care
-                              </span>
-                            )}
+                            <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              🌿 Restorative Retreat
+                            </span>
                           </div>
                           <div>
                             <span className="font-medium text-[#5C6B5E]">Primary Focus:</span>{" "}
-                            {(intake.wellness_profile?.primary_focus as string) || (intake.clinical_profile?.intentions as string) || "Nervous system reset & circadian sleep restoration"}
+                            {(intake.wellness_profile?.primary_focus as string) || (intake.clinical_profile?.intentions as string) || "Restorative travel & deep rest"}
                           </div>
                           <div>
                             <span className="font-medium text-[#5C6B5E]">Restorative Rhythm:</span>{" "}
-                            {(intake.wellness_profile?.preferred_rhythm as string) || (intake.clinical_profile?.movement_experience as string) || "Gentle sunrise somatic yoga, 432Hz acoustic grounding"}
+                            {(intake.wellness_profile?.preferred_rhythm as string) || (intake.clinical_profile?.movement_experience as string) || "Gentle sunrise yoga & twilight sound immersion"}
                           </div>
                           <div>
-                            <span className="font-medium text-[#5C6B5E]">Nutrition &amp; Botanicals:</span>{" "}
-                            {(intake.wellness_profile?.nutrition_preferences as string) || "Anti-inflammatory Blue Zone organic botanicals"}
+                            <span className="font-medium text-[#5C6B5E]">Dietary &amp; Chef Notes:</span>{" "}
+                            {(intake.wellness_profile?.nutrition_preferences as string) || (intake.clinical_profile?.health_notes as string) || "Seed-oil-free Blue Zone organic menu"}
                           </div>
-                          {intake.clinical_screening_enabled && (
-                            <div className="mt-1.5 pt-1.5 border-t border-rose-200/80 text-rose-900 bg-rose-50/50 p-2 rounded">
-                              <span className="font-semibold text-[11px] block text-rose-950 mb-0.5">Elevated Clinical Review:</span>
-                              <span className="text-[11px] leading-relaxed">
-                                {((intake.clinical_profile?.flags as string[]) || []).join(", ") || (intake.clinical_profile?.health_notes as string) || "Acute medical review active for hot/cold contrast & sound immersion protocols."}
-                              </span>
-                            </div>
-                          )}
                         </div>
 
 
@@ -874,9 +808,24 @@ export default function PortalDashboard() {
 
                             <div className="flex items-center gap-2">
                               <button
+                                onClick={() => setContinuityIntake(intake)}
+                                className="inline-flex items-center space-x-1 px-2 py-1 text-xs font-medium text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-md transition-colors cursor-pointer"
+                              >
+                                <Calendar className="w-3 h-3 text-amber-700" />
+                                <span>30-Day Arc</span>
+                              </button>
+                              <button
+                                onClick={() => handleOpenGuestHub(intake)}
+                                disabled={generatingHubId === intake.id}
+                                className="inline-flex items-center space-x-1 px-2 py-1 text-xs font-medium text-teal-900 bg-teal-50 hover:bg-teal-100 border border-teal-200 rounded-md transition-colors cursor-pointer"
+                              >
+                                <Sparkles className="w-3 h-3 text-teal-600" />
+                                <span>{generatingHubId === intake.id ? "Opening..." : "Guest Hub"}</span>
+                              </button>
+                              <button
                                 onClick={() => handleGenerateThesis(intake.id)}
                                 disabled={generatingThesisId === intake.id}
-                                className="inline-flex items-center space-x-1 text-xs text-[#5C6B5E] hover:text-[#2D3E35]"
+                                className="inline-flex items-center space-x-1 text-xs text-[#5C6B5E] hover:text-[#2D3E35] cursor-pointer"
                               >
                                 <RefreshCw
                                   className={`w-3 h-3 ${generatingThesisId === intake.id ? "animate-spin" : ""

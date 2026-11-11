@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from typing import List, Dict, Any, Optional
@@ -8,9 +8,11 @@ import logging
 import secrets
 import uuid
 import threading
+import math
 
 _cohort_reservation_lock = threading.Lock()
 _bodywork_scheduling_lock = threading.Lock()
+_split_payment_lock = threading.Lock()
 
 from backend.database import get_db
 from backend.sidecar.models import CRMClient, CRMTrip, StagingIntake, GuestSomaticPulse, DestinationReview
@@ -41,6 +43,13 @@ def list_crm_clients(
         limit = getattr(limit, "default", 50) or 50
     if not isinstance(offset, int):
         offset = getattr(offset, "default", 0) or 0
+
+    if limit < 0:
+        limit = 50
+    elif limit > 1000:
+        limit = 1000
+    if offset < 0:
+        offset = 0
 
     query = db.query(CRMClient)
 
@@ -76,6 +85,11 @@ def list_crm_clients(
             "total_lifetime_spend": c.total_lifetime_spend,
             "total_trips_count": c.total_trips_count,
             "source": c.source,
+            "waiver_status": getattr(c, "waiver_status", "PENDING") or "PENDING",
+            "waiver_signed_at": c.waiver_signed_at.isoformat() if getattr(c, "waiver_signed_at", None) else None,
+            "medical_clearance_status": getattr(c, "medical_clearance_status", "PENDING_REVIEW") or "PENDING_REVIEW",
+            "companion_id": getattr(c, "companion_id", None),
+            "companion_name": getattr(c, "companion_name", None),
             "updated_at": c.updated_at.isoformat() if c.updated_at else None,
             "created_at": c.created_at.isoformat() if c.created_at else None,
         }
@@ -100,6 +114,21 @@ def get_crm_client_detail(client_id: str, db: Session = Depends(get_db)):
     bookings = db.query(Booking).filter(Booking.email == client.email).all()
     flights = db.query(FlightConciergeRequest).filter(FlightConciergeRequest.email == client.email).all()
 
+    unified_activities = list(getattr(client, "activity_log", []) or [])
+    for t in trips:
+        for ev in (t.activity_timeline or []):
+            unified_activities.append({
+                "id": f"trip_ev_{ev.get('timestamp', '')}_{secrets.token_hex(2)}",
+                "category": ev.get("event", "SYSTEM_EVENT"),
+                "summary": ev.get("title", "Trip Milestone"),
+                "details": ev.get("notes", ""),
+                "operator_name": ev.get("operator", "System Concierge"),
+                "timestamp": ev.get("timestamp", datetime.now(timezone.utc).isoformat()),
+                "trip_title": t.title,
+                "trip_id": t.id,
+            })
+    unified_activities.sort(key=lambda a: a.get("timestamp") or "", reverse=True)
+
     return {
         "client": {
             "id": client.id,
@@ -113,18 +142,25 @@ def get_crm_client_detail(client_id: str, db: Session = Depends(get_db)):
             "movement_experience": client.movement_experience,
             "intentions": client.intentions,
             "passport_valid_6mo": client.passport_valid_6mo,
+            "waiver_status": getattr(client, "waiver_status", "PENDING") or "PENDING",
+            "waiver_signed_at": client.waiver_signed_at.isoformat() if getattr(client, "waiver_signed_at", None) else None,
+            "medical_clearance_status": getattr(client, "medical_clearance_status", "PENDING_REVIEW") or "PENDING_REVIEW",
+            "companion_id": getattr(client, "companion_id", None),
+            "companion_name": getattr(client, "companion_name", None),
             "loyalty_programs": client.loyalty_programs or {},
             "total_lifetime_spend": client.total_lifetime_spend,
             "total_trips_count": len(trips) or client.total_trips_count,
             "source": client.source,
             "notes": client.notes,
+            "activity_log": client.activity_log or [],
             "created_at": client.created_at.isoformat(),
         },
+        "activities": unified_activities,
         "trips": [
             {
                 "id": t.id,
                 "crm_trip_id": t.crm_trip_id,
-                            "title": t.title,
+                "title": t.title,
                 "sanctuary_slug": t.sanctuary_slug,
                 "dates": t.dates,
                 "room_tier": t.room_tier,
@@ -143,6 +179,66 @@ def get_crm_client_detail(client_id: str, db: Session = Depends(get_db)):
     }
 
 
+class CRMActivityCreateRequest(BaseModel):
+    category: str = Field("NOTE", description="CALL, WHATSAPP, EMAIL, NOTE, CLINICAL")
+    summary: str = Field(..., min_length=1, max_length=160)
+    details: Optional[str] = None
+    operator_name: str = "Kareena Islam"
+
+
+@router.post("/clients/{client_id}/activities")
+def log_crm_client_activity(
+    client_id: str,
+    payload: CRMActivityCreateRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Appends a new chronological interaction note, call log, WhatsApp message,
+    or clinical directive to the client's dossier and linked trip timeline.
+    """
+    client = db.query(CRMClient).filter(
+        or_(CRMClient.id == client_id, CRMClient.crm_contact_id == client_id, CRMClient.email == client_id.lower())
+    ).first()
+    if not client:
+        raise HTTPException(status_code=404, detail="Client not found in native CRM")
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    new_activity = {
+        "id": f"act_{uuid.uuid4().hex[:8]}",
+        "category": payload.category.upper().strip(),
+        "summary": payload.summary.strip(),
+        "details": (payload.details or "").strip(),
+        "operator_name": payload.operator_name.strip() or "Kareena Islam",
+        "timestamp": now_iso,
+    }
+
+    current_log = list(getattr(client, "activity_log", []) or [])
+    current_log.insert(0, new_activity)
+    client.activity_log = current_log
+
+    # If client has active trips, also record milestone into the latest trip's timeline
+    active_trip = db.query(CRMTrip).filter(CRMTrip.client_id == client.id).order_by(CRMTrip.created_at.desc()).first()
+    if active_trip:
+        trip_timeline = list(active_trip.activity_timeline or [])
+        trip_timeline.append({
+            "event": payload.category.upper().strip(),
+            "title": payload.summary.strip(),
+            "timestamp": now_iso,
+            "operator": new_activity["operator_name"],
+            "notes": new_activity["details"],
+        })
+        active_trip.activity_timeline = trip_timeline
+
+    db.commit()
+    db.refresh(client)
+
+    return {
+        "success": True,
+        "activity": new_activity,
+        "activity_log": client.activity_log,
+    }
+
+
 class CRMClientCreateUpdateRequest(BaseModel):
     full_name: str
     email: str
@@ -151,7 +247,7 @@ class CRMClientCreateUpdateRequest(BaseModel):
     passport_number: Optional[str] = None
     passport_issuing_country: Optional[str] = "United States"
     passport_expiry: Optional[str] = None
-    passport_valid_6mo: bool = True
+    passport_valid_6mo: Optional[bool] = None
     dietary_requirements: Optional[str] = None
     health_notes: Optional[str] = None
     movement_experience: Optional[str] = "all-levels"
@@ -159,6 +255,21 @@ class CRMClientCreateUpdateRequest(BaseModel):
     tags: Optional[List[str]] = None
     notes: Optional[str] = None
     source: Optional[str] = "ADVISOR_DIRECT_ENTRY"
+
+    @field_validator("full_name")
+    @classmethod
+    def validate_name(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("Full name cannot be blank")
+        return v.strip()
+
+    @field_validator("email")
+    @classmethod
+    def validate_email_format(cls, v: str) -> str:
+        clean = v.strip().lower()
+        if "@" not in clean or "." not in clean.split("@")[-1]:
+            raise ValueError("Invalid email format")
+        return clean
 
 
 @router.post("/clients")
@@ -186,7 +297,7 @@ def create_or_upsert_crm_client(
             passport_number=payload.passport_number,
             passport_issuing_country=payload.passport_issuing_country,
             passport_expiry=payload.passport_expiry,
-            passport_valid_6mo=payload.passport_valid_6mo,
+            passport_valid_6mo=payload.passport_valid_6mo if payload.passport_valid_6mo is not None else True,
             dietary_requirements=payload.dietary_requirements,
             health_notes=payload.health_notes,
             movement_experience=payload.movement_experience or "all-levels",
@@ -210,7 +321,8 @@ def create_or_upsert_crm_client(
             client.passport_issuing_country = payload.passport_issuing_country
         if payload.passport_expiry is not None:
             client.passport_expiry = payload.passport_expiry
-        client.passport_valid_6mo = payload.passport_valid_6mo
+        if payload.passport_valid_6mo is not None:
+            client.passport_valid_6mo = payload.passport_valid_6mo
         if payload.dietary_requirements is not None:
             client.dietary_requirements = payload.dietary_requirements
         if payload.health_notes is not None:
@@ -230,6 +342,8 @@ def create_or_upsert_crm_client(
     return {
         "success": True,
         "is_new": is_new,
+        "id": client.id,
+        "email": client.email,
         "client": {
             "id": client.id,
             "crm_contact_id": client.crm_contact_id,
@@ -267,10 +381,16 @@ def update_crm_client_profile(
         "passport_issuing_country", "passport_expiry", "passport_valid_6mo",
         "dietary_requirements", "health_notes", "movement_experience",
         "intentions", "tags", "notes", "loyalty_programs",
+        "waiver_status", "medical_clearance_status", "companion_id", "companion_name",
     ]
     for field in editable_fields:
         if field in payload:
             setattr(client, field, payload[field])
+
+    if payload.get("waiver_status") == "SIGNED" and not getattr(client, "waiver_signed_at", None):
+        client.waiver_signed_at = datetime.now(timezone.utc)
+    elif payload.get("waiver_status") == "PENDING":
+        client.waiver_signed_at = None
 
     db.commit()
     db.refresh(client)
@@ -283,22 +403,54 @@ def update_crm_client_profile(
         "health_notes": client.health_notes,
         "tags": client.tags or [],
         "notes": client.notes,
+        "waiver_status": getattr(client, "waiver_status", "PENDING") or "PENDING",
+        "waiver_signed_at": client.waiver_signed_at.isoformat() if getattr(client, "waiver_signed_at", None) else None,
+        "medical_clearance_status": getattr(client, "medical_clearance_status", "PENDING_REVIEW") or "PENDING_REVIEW",
+        "companion_id": getattr(client, "companion_id", None),
+        "companion_name": getattr(client, "companion_name", None),
     }
 
 
 class CRMTripCreateRequest(BaseModel):
     client_id: Optional[str] = None
-    client_name: str
-    client_email: str
+    client_name: Optional[str] = None
+    client_email: Optional[str] = None
     sanctuary_slug: str = "puerto-vallarta-2027"
     title: Optional[str] = None
     dates: str = "Oct 10–15, 2027"
     room_tier: str = "Oceanfront King Suite"
-    total_investment: float = 9500.0
+    total_investment: float = Field(..., gt=0.0)
+    deposit_amount: Optional[float] = None
     currency: str = "USD"
     smart_flight: Optional[Dict[str, Any]] = None
+    ground_transfer: Optional[Dict[str, Any]] = None
     itinerary_blocks: Optional[List[Dict[str, Any]]] = None
     operator_name: str = "Kareena Islam, BSN, RN"
+
+    @field_validator("client_name")
+    @classmethod
+    def validate_trip_client_name(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not v.strip():
+            raise ValueError("Client name cannot be blank")
+        return v.strip() if v else None
+
+    @field_validator("client_email")
+    @classmethod
+    def validate_trip_email(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None:
+            clean = v.strip().lower()
+            if "@" not in clean or "." not in clean.split("@")[-1]:
+                raise ValueError("Invalid email format")
+            return clean
+        return None
+
+    @field_validator("total_investment")
+    @classmethod
+    def validate_total_investment(cls, v: float) -> float:
+        import math
+        if math.isnan(v) or math.isinf(v) or v <= 0.0:
+            raise ValueError("Total investment must be a positive finite number")
+        return v
 
 
 @router.post("/trips")
@@ -312,13 +464,17 @@ def create_crm_trip_record(
     and 70% balance schedule, seeds default circadian/somatic itinerary blocks if omitted,
     and updates the client's trip count and pipeline spend.
     """
-    clean_email = payload.client_email.strip().lower()
     client = None
     if payload.client_id:
         client = db.query(CRMClient).filter(CRMClient.id == payload.client_id).first()
-    if not client:
+    if not client and payload.client_email:
+        clean_email = payload.client_email.strip().lower()
         client = db.query(CRMClient).filter(CRMClient.email == clean_email).first()
+
     if not client:
+        if not payload.client_name or not payload.client_email:
+            raise HTTPException(status_code=422, detail="Either valid client_id or client_name and client_email required")
+        clean_email = payload.client_email.strip().lower()
         client = CRMClient(
             id=str(uuid.uuid4()),
             crm_contact_id=f"kai_cnt_{secrets.token_hex(6)}",
@@ -332,12 +488,22 @@ def create_crm_trip_record(
         db.add(client)
         db.flush()
 
-    deposit = round(payload.total_investment * 0.30, 2)
+    deposit = round(payload.deposit_amount if payload.deposit_amount is not None else (payload.total_investment * 0.30), 2)
     balance = round(payload.total_investment - deposit, 2)
     default_blocks = payload.itinerary_blocks or [
         {"day": 1, "time": "15:00", "title": "Private Airport Tarmac Greeting & Villa Check-In", "description": "Chilled electrolyte towel escort and grounding herbal tea."},
         {"day": 2, "time": "08:00", "title": "Morning 4-7-8 Vagal Breathwork & Coastal Movement", "description": "Parasympathetic downregulation and reformer alignment."},
         {"day": 3, "time": "17:30", "title": "432Hz Crystal Alchemy Sound Bath & Blue Zone Dinner", "description": "Acoustic nervous system stillness and anti-inflammatory dining."},
+    ]
+
+    initial_timeline = [
+        {
+            "event": "PROPOSAL_CREATED",
+            "title": "Sanctuary Proposal Created",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "operator": payload.operator_name,
+            "notes": f"Proposal generated for {client.full_name} ({payload.sanctuary_slug})"
+        }
     ]
 
     trip_title = payload.title or f"KAI Sanctuary — {payload.sanctuary_slug.replace('-', ' ').title()}"
@@ -359,7 +525,9 @@ def create_crm_trip_record(
         final_balance_status="SCHEDULED",
         currency=payload.currency,
         smart_flight=payload.smart_flight or {},
+        ground_transfer=payload.ground_transfer or {},
         itinerary_blocks=default_blocks,
+        activity_timeline=initial_timeline,
         created_by=payload.operator_name,
     )
     db.add(trip)
@@ -372,6 +540,12 @@ def create_crm_trip_record(
 
     return {
         "success": True,
+        "id": trip.id,
+        "crm_trip_id": trip.crm_trip_id,
+        "final_balance": trip.final_balance,
+        "deposit_amount": trip.deposit_amount,
+        "total_investment": trip.total_investment,
+        "activity_timeline": trip.activity_timeline or [],
         "trip": {
             "id": trip.id,
             "crm_trip_id": trip.crm_trip_id,
@@ -386,6 +560,7 @@ def create_crm_trip_record(
             "total_investment": trip.total_investment,
             "deposit_amount": trip.deposit_amount,
             "final_balance": trip.final_balance,
+            "activity_timeline": trip.activity_timeline or [],
             "itinerary_blocks": trip.itinerary_blocks,
         },
     }
@@ -408,14 +583,20 @@ def update_crm_trip_itinerary_blocks(
     if not trip:
         raise HTTPException(status_code=404, detail="Trip record not found in native CRM")
 
-    if "itinerary_blocks" in payload and isinstance(payload["itinerary_blocks"], list):
+    if "itinerary_blocks" in payload:
+        if not isinstance(payload["itinerary_blocks"], list):
+            raise HTTPException(status_code=422, detail="itinerary_blocks must be a list of block objects")
         trip.itinerary_blocks = payload["itinerary_blocks"]
     if "append_block" in payload and isinstance(payload["append_block"], dict):
         blocks = list(trip.itinerary_blocks or [])
         blocks.append(payload["append_block"])
         trip.itinerary_blocks = blocks
     if "status" in payload and payload["status"]:
-        trip.status = str(payload["status"])
+        allowed_statuses = ["PROPOSED_ITINERARY", "CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "MEDICAL_FREEZE"]
+        val = str(payload["status"]).strip().upper()
+        if val not in allowed_statuses:
+            raise HTTPException(status_code=422, detail=f"Invalid trip status: '{val}'. Allowed: {allowed_statuses}")
+        trip.status = val
     if "dates" in payload and payload["dates"]:
         trip.dates = str(payload["dates"])
     if "room_tier" in payload and payload["room_tier"]:
@@ -458,6 +639,13 @@ def list_crm_trips(
         limit = getattr(limit, "default", 50) or 50
     if not isinstance(offset, int):
         offset = getattr(offset, "default", 0) or 0
+
+    if limit < 0:
+        limit = 50
+    elif limit > 1000:
+        limit = 1000
+    if offset < 0:
+        offset = 0
 
     query = db.query(CRMTrip)
     if sanctuary:
@@ -507,6 +695,8 @@ def get_crm_trip_detail(trip_id: str, db: Session = Depends(get_db)):
     client = db.query(CRMClient).filter(CRMClient.id == trip.client_id).first()
 
     return {
+        "itinerary_blocks": trip.itinerary_blocks or [],
+        "payment_history": trip.payment_history or [],
         "trip": {
             "id": trip.id,
             "crm_trip_id": trip.crm_trip_id,
@@ -529,6 +719,7 @@ def get_crm_trip_detail(trip_id: str, db: Session = Depends(get_db)):
             "clinical_thesis": trip.clinical_thesis,
             "suggested_plan": trip.suggested_plan,
             "itinerary_blocks": trip.itinerary_blocks or [],
+            "payment_history": trip.payment_history or [],
             "activity_timeline": trip.activity_timeline or [],
             "deep_link": trip.deep_link,
             "proposal_url": trip.proposal_url,
@@ -566,6 +757,18 @@ def automate_trip_outreach(
     client = db.query(CRMClient).filter(CRMClient.id == trip.client_id).first()
     guest_name = trip.client_name
     recipient_email = trip.client_email
+
+    allowed_actions = {
+        "draft_welcome",
+        "draft_packing_guide",
+        "draft_flight_coordination",
+        "draft_post_retreat_arc",
+    }
+    if action_type not in allowed_actions:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Unknown automation action: {action_type}. Allowed: {sorted(list(allowed_actions))}"
+        )
 
     if action_type == "draft_welcome":
         content = (
@@ -634,11 +837,24 @@ def automate_trip_outreach(
     }
 
 
+def _record_trip_timeline_event(trip: CRMTrip, event: str, title: str, notes: str = "", operator: str = "Kareena Islam"):
+    timeline = list(trip.activity_timeline or [])
+    timeline.append({
+        "event": event,
+        "title": title,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "operator": operator,
+        "notes": notes,
+    })
+    trip.activity_timeline = timeline
+
+
 @router.post("/trips/{trip_id}/flight-delay")
 def update_trip_flight_delay(
     trip_id: str,
-    delay_minutes: int = Query(..., ge=1, le=1440, description="Delay in minutes"),
-    new_eta: str = Query(..., description="New arrival time (e.g. '21:45 PVR')"),
+    payload: Optional[Dict[str, Any]] = None,
+    delay_minutes: Optional[int] = Query(None, description="Delay in minutes"),
+    new_eta: Optional[str] = Query(None, description="New arrival time (e.g. '21:45 PVR')"),
     reason: Optional[str] = Query("Weather & Ground Delay Program", description="Delay rationale"),
     operator_name: str = Query("Kareena Islam"),
     db: Session = Depends(get_db)
@@ -648,6 +864,21 @@ def update_trip_flight_delay(
     Updates the smart_flight tracking block in the database and automatically stages
     an urgent chauffeur alignment draft for private tarmac SUV pickup.
     """
+    if payload and isinstance(payload, dict):
+        if "delay_minutes" in payload and payload["delay_minutes"] is not None:
+            delay_minutes = int(payload["delay_minutes"])
+        if "new_arrival_time" in payload and not new_eta:
+            new_eta = str(payload["new_arrival_time"])
+        if "notes" in payload:
+            reason = str(payload["notes"])
+
+    if delay_minutes is None:
+        raise HTTPException(status_code=422, detail="delay_minutes is required")
+    if delay_minutes < 1 or delay_minutes > 1440:
+        raise HTTPException(status_code=422, detail="delay_minutes must be between 1 and 1440")
+    if not new_eta:
+        new_eta = "21:45 PVR"
+
     trip = db.query(CRMTrip).filter(
         or_(CRMTrip.id == trip_id, CRMTrip.crm_trip_id == trip_id)
     ).first()
@@ -661,6 +892,14 @@ def update_trip_flight_delay(
     flight["delay_reason"] = reason
     flight["last_checked"] = datetime.now(timezone.utc).isoformat()
     trip.smart_flight = flight
+
+    _record_trip_timeline_event(
+        trip,
+        "FLIGHT_DELAY",
+        f"Flight Delay (+{delay_minutes}m)",
+        f"Revised ETA: {new_eta}. Reason: {reason}",
+        operator_name,
+    )
 
     guest_name = trip.client_name
     airline = flight.get("airline", "Partner Air")
@@ -693,6 +932,7 @@ def update_trip_flight_delay(
         "success": True,
         "message": f"Flight delay recorded (+{delay_minutes}m). Chauffeur alert staged.",
         "draft_id": draft.id,
+        "staged_draft_id": draft.id,
         "new_eta": new_eta,
         "smart_flight": flight,
     }
@@ -718,6 +958,13 @@ def upgrade_trip_suite_tier(
     if not trip:
         raise HTTPException(status_code=404, detail="Trip record not found in native CRM")
 
+    total_paid = round(sum(float(p.get("amount", 0.0)) for p in (trip.payment_history or [])), 2)
+    if new_total_investment < total_paid:
+        raise HTTPException(
+            status_code=400,
+            detail=f"New total investment (${new_total_investment:,.2f}) cannot be less than payments already collected (${total_paid:,.2f})"
+        )
+
     old_tier = trip.room_tier
     old_investment = trip.total_investment
 
@@ -728,6 +975,14 @@ def upgrade_trip_suite_tier(
     trip.total_investment = new_total_investment
     trip.deposit_amount = new_deposit
     trip.final_balance = new_balance
+
+    _record_trip_timeline_event(
+        trip,
+        "SUITE_UPGRADE",
+        f"Suite Upgraded to {new_room_tier}",
+        f"Investment adjusted from ${old_investment:,.2f} to ${new_total_investment:,.2f}.",
+        operator_name,
+    )
 
     # Update CRMClient total lifetime spend
     client = db.query(CRMClient).filter(CRMClient.id == trip.client_id).first()
@@ -774,6 +1029,7 @@ def upgrade_trip_suite_tier(
 @router.post("/clients/{client_id}/clinical-triage")
 def triage_client_clinical_profile(
     client_id: str,
+    payload: Optional[Dict[str, Any]] = None,
     operator_name: str = Query("Kareena Islam"),
     db: Session = Depends(get_db)
 ):
@@ -791,26 +1047,44 @@ def triage_client_clinical_profile(
     if not client:
         raise HTTPException(status_code=404, detail="Client not found in native CRM")
 
-    notes = f"{client.health_notes or ''} {client.dietary_requirements or ''} {client.intentions or ''}".lower()
+    extra_notes = ""
+    if payload and isinstance(payload, dict):
+        extra_notes = f"{payload.get('health_disclosure', '')} {payload.get('vital_context', '')}"
+
+    notes = f"{extra_notes} {client.health_notes or ''} {client.dietary_requirements or ''} {client.intentions or ''}".lower()
     
     flagged = []
     contraindications = []
+    blocked_modalities = []
 
     if any(k in notes for k in ["pacemaker", "arrhythmia", "cardiac", "hypertension", "heart condition"]):
         flagged.append("CARDIO_VASCULAR_RISK")
         contraindications.append("CONTRAINDICATION: Prohibit extreme cold plunge / sauna shock protocol.")
+        blocked_modalities.extend([
+            "Cold Plunge / Ice Immersion (<12°C)",
+            "High-Heat Finnish Sauna (>85°C)",
+            "Thermal Hydrotherapy (>38°C)"
+        ])
 
     if any(k in notes for k in ["pregnant", "pregnancy", "prenatal", "trimester"]):
         flagged.append("PREGNANCY_MODIFIED_SOMATICS")
         contraindications.append("MODIFICATION: Gentle prenatal alignment only; suppress acoustic bowls over lower abdomen.")
+        blocked_modalities.extend([
+            "High-Heat Finnish Sauna (>85°C)",
+            "Cold Plunge / Ice Immersion (<12°C)",
+            "Holotropic Hyperventilation Breathwork",
+            "Direct Heavy Acoustic Gong / High-Vibration Sound Bed on Abdomen"
+        ])
 
     if any(k in notes for k in ["anaphylaxis", "anaphylactic", "epipen", "epi-pen", "peanut allergy"]):
         flagged.append("ANAPHYLACTIC_ALLERGEN_ALERT")
         contraindications.append("HAZARD ALERT: Strict kitchen separation; verify dedicated food preparation surface.")
+        blocked_modalities.append("Unverified Shared-Facility Communal Dining")
 
     if any(k in notes for k in ["acl", "meniscus", "disc", "herniated", "post-op", "wheelchair"]):
         flagged.append("ORTHOPEDIC_RESTRICTED")
         contraindications.append("MOBILITY NOTE: Assign ground-level sanctuary suite; eliminate steep coastal trail walks.")
+        blocked_modalities.append("Steep Coastal Trail Treks & Heavy Axial Weight-Bearing")
 
     if not flagged:
         flagged.append("STANDARD_SOMATIC_CLEARANCE")
@@ -819,7 +1093,23 @@ def triage_client_clinical_profile(
     existing_tags = set(client.tags or [])
     existing_tags.update(flagged)
     client.tags = sorted(list(existing_tags))
+
+    # Stage ActionDraft for Nurse-Led human review
+    draft = ActionDraft(
+        type="clinical_triage_alert",
+        guest_name=client.full_name,
+        recipient_email=client.email,
+        content=(
+            f"Nurse-Led Clinical Triage Review for {client.full_name}\n"
+            f"Safety Category: {', '.join(flagged)}\n"
+            f"Contraindicated Modalities: {', '.join(blocked_modalities) if blocked_modalities else 'None'}\n"
+            f"Clinical Protocol Directives: {'; '.join(contraindications) if contraindications else 'Full somatic clearance'}"
+        ),
+        status="pending_review",
+    )
+    db.add(draft)
     db.commit()
+    db.refresh(draft)
 
     return {
         "success": True,
@@ -827,6 +1117,9 @@ def triage_client_clinical_profile(
         "email": client.email,
         "clinical_flags": flagged,
         "contraindications": contraindications,
+        "blocked_modalities": blocked_modalities or contraindications,
+        "action_draft_staged": True,
+        "draft_id": draft.id,
         "tags": client.tags,
         "safety_status": "HIGH_PRIORITY_REVIEW" if len(contraindications) > 0 else "CLEARED"
     }
@@ -835,7 +1128,8 @@ def triage_client_clinical_profile(
 @router.post("/trips/{trip_id}/emergency-medical-freeze")
 def freeze_trip_medical_emergency(
     trip_id: str,
-    clinical_event: str = Query(..., description="Description of the acute medical event or condition"),
+    payload: Optional[Dict[str, Any]] = None,
+    clinical_event: Optional[str] = Query(None, description="Description of the acute medical event or condition"),
     attending_clinician: str = "Kareena Islam, BSN, RN",
     local_facility: Optional[str] = None,
     db: Session = Depends(get_db)
@@ -855,6 +1149,12 @@ def freeze_trip_medical_emergency(
 
     client = db.query(CRMClient).filter(CRMClient.id == trip.client_id).first()
 
+    event_desc = clinical_event
+    if payload and isinstance(payload, dict):
+        event_desc = payload.get("reason") or payload.get("physician_note") or event_desc or "Acute clinical medical event"
+    if not event_desc:
+        event_desc = "Acute medical escalation requiring itinerary freeze"
+
     slug = (trip.sanctuary_slug or "").lower()
     if not local_facility:
         if "puerto-vallarta" in slug or "marival" in slug:
@@ -864,7 +1164,60 @@ def freeze_trip_medical_emergency(
         else:
             local_facility = "Regional Accredited Trauma Center & Global Air Ambulance Liaison"
 
-    trip.status = "EMERGENCY_MEDICAL_FREEZE"
+    trip.status = "MEDICAL_FREEZE"
+    voucher_code = f"KAI-VOUCHER-{secrets.token_hex(4).upper()}"
+
+    _record_trip_timeline_event(
+        trip,
+        "MEDICAL_FREEZE",
+        "Emergency Medical Freeze & Handover",
+        f"Clinician: {attending_clinician}. Reason: {event_desc}. Local facility: {local_facility}",
+        attending_clinician,
+    )
+
+    emergency_contact = client.emergency_contact if client and client.emergency_contact else {}
+    contact_name = emergency_contact.get("name", "Emergency Contact On File")
+    contact_phone = emergency_contact.get("phone", client.phone if client else "N/A")
+
+    content = (
+        f"CRITICAL MEDICAL ESCALATION & CLINICAL FREEZE\n"
+        f"Sanctuary: {trip.title} ({trip.dates})\n"
+        f"Guest: {trip.client_name} (DOB: {client.date_of_birth if client else 'On File'})\n"
+        f"Attending Nurse / Clinician: {attending_clinician}\n"
+        f"Clinical Event Trigger: {event_desc}\n"
+        f"Designated Emergency Center: {local_facility}\n"
+        f"Sanctuary Credit Voucher Code: {voucher_code}\n"
+        f"Next of Kin / Emergency Contact: {contact_name} ({contact_phone})\n\n"
+        f"Clinical Handover Notes:\n"
+        f"- Known Health Flags: {client.tags if client else 'None'}\n"
+        f"- Known Allergies / Diet: {client.dietary_requirements if client else 'None'}\n"
+        f"- Baseline Somatic Notes: {client.health_notes if client else 'None'}\n\n"
+        f"Action Dispatched: MedEvac transport pre-notified. Retreat activities for guest frozen with 100% financial credit protection."
+    )
+
+    draft = ActionDraft(
+        type="emergency_medical_liaison",
+        guest_name=trip.client_name,
+        recipient_email=trip.client_email,
+        content=content,
+        status="pending_review",
+    )
+    db.add(draft)
+    db.commit()
+    db.refresh(draft)
+
+    return {
+        "success": True,
+        "trip_id": trip.id,
+        "status": "MEDICAL_FREEZE",
+        "credit_voucher_code": voucher_code,
+        "guest_name": trip.client_name,
+        "clinical_event": event_desc,
+        "attending_clinician": attending_clinician,
+        "local_facility": local_facility,
+        "draft_id": draft.id,
+        "message": f"Clinical freeze enacted for {trip.client_name}. Hospital liaison staged [Draft #{draft.id}]."
+    }
 
     emergency_contact = client.emergency_contact if client and client.emergency_contact else {}
     contact_name = emergency_contact.get("name", "Emergency Contact On File")
@@ -1041,6 +1394,7 @@ def cancel_trip_with_refund_policy(
 @router.post("/trips/{trip_id}/payments")
 def record_trip_split_payment(
     trip_id: str,
+    payload: Optional[Dict[str, Any]] = None,
     amount: float = 0.0,
     payment_method: str = "WIRE_ACH",
     transaction_reference: str = "REF-DEFAULT",
@@ -1056,6 +1410,17 @@ def record_trip_split_payment(
     Tracks partial payments across multiple methods (Fedwire, SWIFT, ACH, corporate Amex, personal card).
     Recalculates deposit and final settlement balances in real time with exact 2-decimal precision (zero penny drift).
     """
+    if payload and isinstance(payload, dict):
+        if "amount" in payload and payload["amount"] is not None:
+            amount = float(payload["amount"])
+        if "payment_method" in payload and payload["payment_method"]:
+            payment_method = str(payload["payment_method"])
+        if "transaction_reference" in payload and payload["transaction_reference"]:
+            transaction_reference = str(payload["transaction_reference"])
+        if "notes" in payload:
+            notes = payload["notes"]
+        if "currency" in payload and payload["currency"]:
+            currency = str(payload["currency"])
     # Defensive unwraps if invoked directly in tests without passing Query defaults
     if not isinstance(currency, str):
         currency = getattr(currency, "default", "USD") or "USD"
@@ -1070,98 +1435,134 @@ def record_trip_split_payment(
     if not isinstance(amount, (int, float)):
         amount = getattr(amount, "default", 0.0) or 0.0
 
-    trip = db.query(CRMTrip).filter(
-        or_(CRMTrip.id == trip_id, CRMTrip.crm_trip_id == trip_id)
-    ).first()
-    if not trip:
-        raise HTTPException(status_code=404, detail="Trip record not found in native CRM")
+    if fx_rate is not None and (math.isnan(fx_rate) or math.isinf(fx_rate) or fx_rate <= 0):
+        raise HTTPException(status_code=422, detail="FX rate must be greater than zero")
 
-    client = db.query(CRMClient).filter(CRMClient.id == trip.client_id).first()
-
-    norm_currency = currency.strip().upper()
-    if fx_amount is not None and norm_currency != "USD":
-        usd_amount = round(fx_amount * fx_rate, 2)
-        orig_amount = round(fx_amount, 2)
+    if fx_amount is not None:
+        if math.isnan(fx_amount) or math.isinf(fx_amount) or fx_amount <= 0:
+            raise HTTPException(status_code=422, detail="FX amount must be greater than zero")
     else:
-        usd_amount = round(amount, 2)
-        orig_amount = round(fx_amount if fx_amount is not None else amount, 2)
+        if math.isnan(amount) or math.isinf(amount) or amount <= 0:
+            raise HTTPException(status_code=422, detail="Payment amount must be greater than zero")
 
-    history = list(trip.payment_history or [])
-    payment_record = {
-        "payment_id": str(uuid.uuid4()),
-        "amount": usd_amount,
-        "currency": norm_currency,
-        "fx_rate": round(fx_rate, 4),
-        "fx_amount": orig_amount,
-        "payment_method": payment_method.upper(),
-        "transaction_reference": transaction_reference.strip(),
-        "notes": notes,
-        "processed_by": operator_name,
-        "timestamp": datetime.now(timezone.utc).isoformat(),
-    }
-    history.append(payment_record)
-    trip.payment_history = history
+    with _split_payment_lock:
+        trip = db.query(CRMTrip).filter(
+            or_(CRMTrip.id == trip_id, CRMTrip.crm_trip_id == trip_id)
+        ).first()
+        if not trip:
+            raise HTTPException(status_code=404, detail="Trip record not found in native CRM")
 
-    total_paid = round(sum(p["amount"] for p in history), 2)
-    remaining_balance = max(0.0, round(trip.total_investment - total_paid, 2))
+        client = db.query(CRMClient).filter(CRMClient.id == trip.client_id).first()
 
-    if total_paid >= trip.deposit_amount:
-        trip.deposit_status = "PAID"
-    else:
-        trip.deposit_status = "PARTIALLY_PAID"
+        norm_currency = currency.strip().upper()
+        if fx_amount is not None:
+            usd_amount = round(fx_amount * fx_rate, 2)
+            orig_amount = round(fx_amount, 2)
+        else:
+            usd_amount = round(amount, 2)
+            orig_amount = round(amount, 2)
 
-    if remaining_balance == 0.0:
-        trip.final_balance_status = "SETTLED_IN_FULL"
-        trip.status = "CONFIRMED"
-        if client:
-            client.total_lifetime_spend = max(client.total_lifetime_spend, total_paid)
-    else:
-        trip.final_balance_status = "PARTIALLY_PAID"
+        history = list(trip.payment_history or [])
 
-    trip.final_balance = remaining_balance
+        clean_ref = transaction_reference.strip() if transaction_reference else "REF-DEFAULT"
+        if clean_ref and clean_ref != "REF-DEFAULT":
+            if any(p.get("transaction_reference") == clean_ref for p in history):
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"Transaction reference '{clean_ref}' has already been recorded."
+                )
 
-    fx_line = ""
-    if norm_currency != "USD":
-        fx_line = f"Original FX: {orig_amount:,.2f} {norm_currency} @ FX Rate {fx_rate:.4f}\n"
+        current_paid = round(sum(float(p.get("amount", 0.0)) for p in history), 2)
+        if current_paid + usd_amount > trip.total_investment + 0.005:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Payment amount (${usd_amount:,.2f}) exceeds remaining trip balance (${max(0.0, trip.total_investment - current_paid):,.2f})"
+            )
 
-    content = (
-        f"KAI WELLNESS RETREATS - PAYMENT RECEIPT & MULTI-CURRENCY LEDGER\n"
-        f"Guest: {trip.client_name} | Trip: {trip.title}\n"
-        f"Payment Recorded: ${usd_amount:,.2f} USD via {payment_method.upper()}\n"
-        f"{fx_line}"
-        f"Transaction / Wire Reference: {transaction_reference}\n"
-        f"Total Scheduled Investment: ${trip.total_investment:,.2f} USD\n"
-        f"Total Paid to Date: ${total_paid:,.2f} USD\n"
-        f"Remaining Outstanding Balance: ${remaining_balance:,.2f} USD\n"
-        f"Settlement Status: {trip.final_balance_status}"
-    )
+        payment_record = {
+            "payment_id": str(uuid.uuid4()),
+            "amount": usd_amount,
+            "currency": norm_currency,
+            "fx_rate": round(fx_rate, 4),
+            "fx_amount": orig_amount,
+            "payment_method": payment_method.upper(),
+            "transaction_reference": clean_ref,
+            "notes": notes,
+            "processed_by": operator_name,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        history.append(payment_record)
+        trip.payment_history = history
 
-    draft = ActionDraft(
-        type="split_payment_receipt",
-        guest_name=trip.client_name,
-        recipient_email=trip.client_email,
-        content=content,
-        status="pending_review",
-    )
-    db.add(draft)
-    db.commit()
-    db.refresh(draft)
+        total_paid = round(sum(p["amount"] for p in history), 2)
+        remaining_balance = max(0.0, round(trip.total_investment - total_paid, 2))
 
-    return {
-        "success": True,
-        "trip_id": trip.id,
-        "amount_recorded": usd_amount,
-        "currency": norm_currency,
-        "fx_amount": orig_amount,
-        "fx_rate": fx_rate,
-        "total_paid": total_paid,
-        "remaining_balance": remaining_balance,
-        "deposit_status": trip.deposit_status,
-        "final_balance_status": trip.final_balance_status,
-        "trip_status": trip.status,
-        "draft_id": draft.id,
-        "payment_count": len(history),
-    }
+        if total_paid >= trip.deposit_amount:
+            trip.deposit_status = "PAID"
+        else:
+            trip.deposit_status = "PARTIALLY_PAID"
+
+        if remaining_balance == 0.0:
+            trip.final_balance_status = "SETTLED_IN_FULL"
+            trip.status = "CONFIRMED"
+            if client:
+                client.total_lifetime_spend = max(client.total_lifetime_spend, total_paid)
+        else:
+            trip.final_balance_status = "PARTIALLY_PAID"
+
+        trip.final_balance = remaining_balance
+
+        _record_trip_timeline_event(
+            trip,
+            "PAYMENT_RECORDED",
+            f"Payment Recorded: ${usd_amount:,.2f} USD",
+            f"Method: {payment_method.upper()}. Ref: {clean_ref}. Balance remaining: ${remaining_balance:,.2f}",
+            operator_name,
+        )
+
+        fx_line = ""
+        if norm_currency != "USD":
+            fx_line = f"Original FX: {orig_amount:,.2f} {norm_currency} @ FX Rate {fx_rate:.4f}\n"
+
+        content = (
+            f"KAI WELLNESS RETREATS - PAYMENT RECEIPT & MULTI-CURRENCY LEDGER\n"
+            f"Guest: {trip.client_name} | Trip: {trip.title}\n"
+            f"Payment Recorded: ${usd_amount:,.2f} USD via {payment_method.upper()}\n"
+            f"{fx_line}"
+            f"Transaction / Wire Reference: {clean_ref}\n"
+            f"Total Scheduled Investment: ${trip.total_investment:,.2f} USD\n"
+            f"Total Paid to Date: ${total_paid:,.2f} USD\n"
+            f"Remaining Outstanding Balance: ${remaining_balance:,.2f} USD\n"
+            f"Settlement Status: {trip.final_balance_status}"
+        )
+
+        draft = ActionDraft(
+            type="split_payment_receipt",
+            guest_name=trip.client_name,
+            recipient_email=trip.client_email,
+            content=content,
+            status="pending_review",
+        )
+        db.add(draft)
+        db.commit()
+        db.refresh(draft)
+
+        return {
+            "success": True,
+            "trip_id": trip.id,
+            "amount_recorded": usd_amount,
+            "currency": norm_currency,
+            "fx_amount": orig_amount,
+            "fx_rate": fx_rate,
+            "total_paid": total_paid,
+            "remaining_balance": remaining_balance,
+            "final_balance": remaining_balance,
+            "deposit_status": trip.deposit_status,
+            "final_balance_status": trip.final_balance_status,
+            "trip_status": trip.status,
+            "draft_id": draft.id,
+            "payment_count": len(history),
+        }
 
 
 @router.get("/sanctuaries/{sanctuary_slug}/dietary-manifest")
@@ -1233,6 +1634,7 @@ def get_sanctuary_dietary_manifest(
 
         guest_manifest.append({
             "guest_name": trip.client_name,
+            "client_email": trip.client_email,
             "room_tier": trip.room_tier,
             "dietary_notes": raw_diet or "Standard gourmet wellness",
             "clinical_flags": flags,
@@ -1243,6 +1645,7 @@ def get_sanctuary_dietary_manifest(
         "sanctuary_slug": sanctuary_slug,
         "total_guests": len(guest_manifest),
         "category_summary": category_counts,
+        "guests": guest_manifest,
         "kitchen_manifest": guest_manifest,
         "generated_at": datetime.now(timezone.utc).isoformat(),
     }
@@ -1333,11 +1736,38 @@ def atomic_reserve_cohort(
     If full, atomically diverts to VIP Waitlist with priority queue placement.
     Protected by _cohort_reservation_lock to prevent overbooking race conditions.
     """
+    clean_name = full_name.strip()
+    clean_email = email.strip().lower()
+    clean_phone = phone.strip()
+
+    if not clean_name:
+        raise HTTPException(status_code=422, detail="Full name cannot be blank")
+    if "@" not in clean_email or "." not in clean_email.split("@")[-1]:
+        raise HTTPException(status_code=422, detail="Invalid email address format")
+
     with _cohort_reservation_lock:
+        existing_booking = db.query(Booking).filter(
+            Booking.retreat_id == sanctuary_slug,
+            Booking.email == clean_email,
+            Booking.status != "cancelled"
+        ).first()
+
         active_count = db.query(Booking).filter(
             Booking.retreat_id == sanctuary_slug,
             Booking.status != "cancelled"
         ).count()
+
+        if existing_booking:
+            return {
+                "allocated": True,
+                "status": "ALREADY_RESERVED",
+                "booking_reference": existing_booking.reference_code,
+                "message": f"Guest {clean_name} already holds an active reservation ({existing_booking.reference_code}) for {sanctuary_slug}.",
+                "cohort_count": active_count,
+                "waitlist_position": None,
+                "intake_id": None,
+                "draft_id": None,
+            }
 
         cohort = db.query(SanctuaryCohort).filter(SanctuaryCohort.slug == sanctuary_slug).first()
         cohort_capacity = cohort.capacity_limit if cohort else 14

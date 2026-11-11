@@ -27,6 +27,8 @@ import {
   CalendarPlus,
   SlidersHorizontal,
   FileSpreadsheet,
+  X,
+  ExternalLink,
 } from "lucide-react";
 import {
   fetchCrmClients,
@@ -43,16 +45,18 @@ import {
 import AttendeeSpreadsheetTab from "@/components/portal/crm/AttendeeSpreadsheetTab";
 import CohortCommandTab from "@/components/portal/crm/CohortCommandTab";
 import BillingFolioTab from "@/components/portal/crm/BillingFolioTab";
-import ClinicalSafetyTelemetryTab from "@/components/portal/crm/ClinicalSafetyTelemetryTab";
-import TripOperationsDrawer from "@/components/portal/crm/TripOperationsDrawer";
-import AIAutomationStudioTab from "@/components/portal/crm/AIAutomationStudioTab";
-import ClientFormModal from "@/components/portal/crm/ClientFormModal";
-import TripBuilderModal from "@/components/portal/crm/TripBuilderModal";
+import dynamic from "next/dynamic";
+import { GuestDetailDrawer } from "@/components/portal/crm/GuestDetailDrawer";
+import { onFormFill } from "@/lib/portal-form-bus";
+
+const ClientFormModal = dynamic(() => import("@/components/portal/crm/ClientFormModal"), { ssr: false });
+const TripBuilderModal = dynamic(() => import("@/components/portal/crm/TripBuilderModal"), { ssr: false });
 
 export default function NativeTravelCRMPage() {
   const [activeTab, setActiveTab] = useState<
-    "attendees" | "clients" | "trips" | "cohorts" | "billing" | "clinical" | "ai_playbooks"
+    "attendees" | "clients" | "trips" | "cohorts" | "billing" | "ai_playbooks"
   >("attendees");
+  const [guestViewMode, setGuestViewMode] = useState<"table" | "cards">("table");
   const [clients, setClients] = useState<CRMClientItem[]>([]);
   const [trips, setTrips] = useState<CRMTripItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,19 +78,16 @@ export default function NativeTravelCRMPage() {
   const [selectedTripDetail, setSelectedTripDetail] = useState<CRMTripDetailResponse | null>(null);
   const [loadingTripDetail, setLoadingTripDetail] = useState(false);
 
+  // Operational Lens & Shortcuts State
+  const [spreadsheetLens, setSpreadsheetLens] = useState<
+    "ALL" | "ALERTS" | "BALANCE_DUE" | "MISSING_FLIGHT"
+  >("ALL");
+  const [showShortcutsModal, setShowShortcutsModal] = useState(false);
+
   // Automation state
   const [automatingTripId, setAutomatingTripId] = useState<string | null>(null);
   const [automationFeedback, setAutomationFeedback] = useState<string | null>(null);
   const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
-
-  // Concurrency Stress Simulator toggle
-  const [showConcurrencyTest, setShowConcurrencyTest] = useState(false);
-  const [reserveName, setReserveName] = useState("Aria Montgomery");
-  const [reserveEmail, setReserveEmail] = useState("aria.montgomery@example.com");
-  const [reservePhone, setReservePhone] = useState("+1-310-555-0194");
-  const [reserveSanctuary, setReserveSanctuary] = useState("puerto-vallarta-2027");
-  const [reserveRoom, setReserveRoom] = useState("Oceanfront King Suite");
-  const [reserving, setReserving] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -113,6 +114,98 @@ export default function NativeTravelCRMPage() {
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    const handleCrmUpdated = () => {
+      loadData();
+    };
+    window.addEventListener("crm-updated", handleCrmUpdated);
+    const unsubFormFill = onFormFill((proposal) => {
+      loadData();
+      if (proposal.target_tab === "billing" || proposal.form_type === "billing_folio") {
+        setActiveTab("billing");
+      } else if (proposal.target_tab === "attendees" || proposal.form_type === "attendee_row") {
+        setActiveTab("attendees");
+        setGuestViewMode("table");
+      } else if (proposal.target_tab === "cohorts" || proposal.form_type === "cohort_update") {
+        setActiveTab("cohorts");
+      } else if (proposal.target_tab === "clients" || proposal.form_type === "client_form") {
+        setActiveTab("attendees");
+        setGuestViewMode("cards");
+        if (proposal.form_type === "client_form") {
+          setClientToEdit(null);
+          setClientModalOpen(true);
+        }
+      } else if (proposal.form_type === "trip_builder") {
+        setActiveTab("attendees");
+        setTripToEdit(null);
+        setTripModalOpen(true);
+      } else if (proposal.form_type === "crm_mutation") {
+        setAutomationFeedback(proposal.summary || "CRM record updated by KAI Assistant.");
+      }
+    });
+    return () => {
+      window.removeEventListener("crm-updated", handleCrmUpdated);
+      unsubFormFill();
+    };
+  }, [loadData]);
+
+  // Auto-dismiss floating toast notification after 4 seconds
+  useEffect(() => {
+    if (automationFeedback) {
+      const timer = setTimeout(() => {
+        setAutomationFeedback(null);
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [automationFeedback]);
+
+  // Global Hotkeys Listener (Shortcuts & Esc Dismissals)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        if (showShortcutsModal) setShowShortcutsModal(false);
+        if (selectedClientDetail) setSelectedClientDetail(null);
+        if (selectedTripDetail) setSelectedTripDetail(null);
+        return;
+      }
+
+      // Ignore hotkeys when typing in form controls
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA" ||
+        document.activeElement?.tagName === "SELECT"
+      ) {
+        return;
+      }
+
+      if (e.key === "?" || (e.shiftKey && e.key === "/")) {
+        e.preventDefault();
+        setShowShortcutsModal((prev) => !prev);
+      } else if (e.key === "n" || e.key === "N") {
+        e.preventDefault();
+        setClientToEdit(null);
+        setClientModalOpen(true);
+      } else if (e.key === "r" || e.key === "R") {
+        e.preventDefault();
+        setTripToEdit(null);
+        setPreselectedClientId(undefined);
+        setTripModalOpen(true);
+      } else if (e.key === "1") {
+        e.preventDefault();
+        setActiveTab("attendees");
+        setGuestViewMode("table");
+      } else if (e.key === "2") {
+        e.preventDefault();
+        setActiveTab("cohorts");
+      } else if (e.key === "3") {
+        e.preventDefault();
+        setActiveTab("billing");
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedClientDetail, selectedTripDetail, showShortcutsModal]);
+
   const handleOpenClientDetail = async (clientId: string) => {
     setLoadingClientDetail(true);
     try {
@@ -134,6 +227,22 @@ export default function NativeTravelCRMPage() {
       console.error("Failed to fetch trip detail:", err);
     } finally {
       setLoadingTripDetail(false);
+    }
+  };
+
+  const handleInspectCompanion = async (companionName: string, companionId?: string) => {
+    if (companionId) {
+      await handleOpenClientDetail(companionId);
+      return;
+    }
+    const cleanName = companionName.toLowerCase().trim();
+    const matched = clients.find(
+      (c) => c.full_name.toLowerCase().includes(cleanName) || cleanName.includes(c.full_name.toLowerCase())
+    );
+    if (matched) {
+      await handleOpenClientDetail(matched.id);
+    } else {
+      setAutomationFeedback(`Companion record for '${companionName}' not found in active guest database.`);
     }
   };
 
@@ -160,39 +269,6 @@ export default function NativeTravelCRMPage() {
     }
   };
 
-  const handleAtomicReserve = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setReserving(true);
-    try {
-      const res = await atomicReserveSanctuaryCohort(reserveSanctuary, {
-        fullName: reserveName,
-        email: reserveEmail,
-        phone: reservePhone,
-        roomPreference: reserveRoom,
-        movementExperience: "reformer-advanced",
-        healthNotes: "Mild vagal fatigue; prefers morning oceanfront sessions",
-        waiverSignature: reserveName,
-      });
-      if (res.allocated) {
-        setAutomationFeedback(
-          `Atomic Cohort Lock Confirmed [${res.booking_reference}]: ${reserveName} allocated to ${reserveSanctuary} (${res.cohort_count}/12 filled, ${res.spots_remaining} spots left · Draft #${res.draft_id}).`
-        );
-      } else {
-        setAutomationFeedback(
-          `Cohort Capacity Gate (12/12 Full): ${reserveName} placed on Priority VIP Waitlist (#${res.waitlist_position}) with $0 charge until suite release (Draft #${res.draft_id}).`
-        );
-      }
-      if (typeof window !== "undefined") {
-        window.dispatchEvent(new Event("drafts-updated"));
-      }
-      loadData();
-    } catch (err: unknown) {
-      setAutomationFeedback(`Notice: ${err instanceof Error ? err.message : "Reservation failed"}`);
-    } finally {
-      setReserving(false);
-    }
-  };
-
   // Metrics calculation
   const totalLifetimeSpend = clients.reduce((sum, c) => sum + (c.total_lifetime_spend || 0), 0);
   const activeFlightsCount = trips.filter(
@@ -210,279 +286,240 @@ export default function NativeTravelCRMPage() {
 
   return (
     <div className="space-y-6">
-      {/* Feedback Banner */}
-      {automationFeedback && (
-        <div className="p-3.5 rounded-xl bg-emerald-50 border border-emerald-300 text-emerald-950 flex items-center justify-between shadow-xs animate-in fade-in">
-          <div className="flex items-center gap-2 text-xs font-semibold">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-            <span>{automationFeedback}</span>
-          </div>
-          <button
-            onClick={() => setAutomationFeedback(null)}
-            className="text-emerald-700 hover:text-emerald-950 text-xs font-bold px-2 py-0.5 cursor-pointer"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
-
-      {/* Header & Title Strip */}
+      {/* Header & Title Strip (Clean Luxury Layout, Zero Emojis) */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center space-x-2 flex-wrap">
+          <div className="flex items-center space-x-2.5 flex-wrap">
             <h1 className="font-serif text-3xl font-bold text-[#2D3E35] tracking-tight">
-              KAI Sanctuary Retreat Operations &amp; Guest Management
+              Retreat &amp; Guest CRM
             </h1>
-            <span className="text-[10px] font-mono uppercase bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded-full font-bold">
-              Direct Sanctuary Database &middot; 36 Staff Workflows
+            <span className="text-[11px] font-mono font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+              <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+              <span>Auto-Saved &amp; Synced</span>
             </span>
           </div>
           <p className="text-sm text-[#5C6B5E] mt-1">
-            Guest Travel &amp; Retreat Care &middot; Manage Attendees, Bookings, Rooming, Payments &amp; Wellness Intakes
+            Click any guest row to edit rooms, status, payments, or dietary notes, or dispatch requests to KAI Assistant.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        {/* Always-Visible Primary Actions */}
+        <div className="flex items-center gap-2 flex-wrap">
           <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("kai:copilot:open"));
+              }
+            }}
+            className="inline-flex items-center space-x-1.5 px-3.5 py-2 text-xs font-bold bg-[#0D0D0D] text-white hover:bg-[#1A1A1A] border border-white/[0.12] rounded-lg transition-colors shadow-xs cursor-pointer"
+            title="Open KAI Assistant to ask or update anything"
+          >
+            <Bot className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Ask KAI Assistant</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setClientToEdit(null);
+              setClientModalOpen(true);
+            }}
+            className="inline-flex items-center space-x-1.5 px-3.5 py-2 text-xs font-bold bg-[#2D3E35] text-[#FAF7F2] hover:bg-[#1f2c25] rounded-lg transition-colors shadow-xs cursor-pointer"
+          >
+            <UserPlus className="w-3.5 h-3.5 text-emerald-400" />
+            <span>+ New Guest</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setTripToEdit(null);
+              setPreselectedClientId(undefined);
+              setTripModalOpen(true);
+            }}
+            className="inline-flex items-center space-x-1.5 px-3.5 py-2 text-xs font-bold bg-white hover:bg-[#F2ECE4] text-[#2D3E35] border border-[#E5DDD0] rounded-lg transition-colors shadow-xs cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5 text-[#C07D63]" />
+            <span>+ New Reservation</span>
+          </button>
+
+          <button
+            type="button"
             onClick={loadData}
             disabled={loading}
-            className="inline-flex items-center space-x-2 px-3.5 py-2 text-xs font-semibold text-[#2D3E35] bg-[#F2ECE4] hover:bg-[#EBE3D8] border border-[#E5DDD0] rounded-md transition-all shadow-xs cursor-pointer"
+            className="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold text-[#2D3E35] bg-[#F2ECE4] hover:bg-[#EBE3D8] border border-[#E5DDD0] rounded-lg transition-all cursor-pointer"
+            title="Refresh CRM data"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span>Refresh Guest List</span>
+            <span>Refresh</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowShortcutsModal(true)}
+            className="inline-flex items-center space-x-1 px-2.5 py-2 text-xs font-semibold text-[#5C6B5E] hover:text-[#2D3E35] bg-white hover:bg-[#F2ECE4] border border-[#E5DDD0] rounded-lg transition-colors cursor-pointer"
+            title="Keyboard Shortcuts (?)"
+          >
+            <span className="font-mono text-[11px] font-bold">?</span>
+            <span className="hidden sm:inline">Shortcuts</span>
           </button>
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
+      {/* KPI Cards Grid (Clickable Operational Deep-Links) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] shadow-xs">
+        <div
+          onClick={() => {
+            setActiveTab("attendees");
+            setGuestViewMode("cards");
+          }}
+          className="p-4 rounded-xl bg-white border border-[#E5DDD0] hover:border-[#2D3E35]/40 shadow-xs transition-colors cursor-pointer"
+        >
           <div className="flex items-center justify-between text-[#5C6B5E]">
-            <span className="text-xs font-semibold uppercase tracking-wider">Guest Contacts</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Guests</span>
             <Users className="w-4 h-4 text-[#2D3E35]" />
           </div>
           <div className="mt-2 text-2xl font-serif font-bold text-[#2D3E35]">{clients.length}</div>
-          <div className="text-[11px] text-[#5C6B5E] mt-0.5">Detailed Profiles &amp; Notes</div>
+          <div className="text-[11px] text-[#5C6B5E] mt-0.5">Active Directory &middot; Click for Cards</div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] shadow-xs">
+        <div
+          onClick={() => {
+            setActiveTab("attendees");
+            setGuestViewMode("table");
+            setSpreadsheetLens("ALL");
+          }}
+          className="p-4 rounded-xl bg-white border border-[#E5DDD0] hover:border-[#2D3E35]/40 shadow-xs transition-colors cursor-pointer"
+        >
           <div className="flex items-center justify-between text-[#5C6B5E]">
-            <span className="text-xs font-semibold uppercase tracking-wider">Retreat Bookings</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Bookings</span>
             <Layers className="w-4 h-4 text-[#C07D63]" />
           </div>
           <div className="mt-2 text-2xl font-serif font-bold text-[#2D3E35]">{trips.length}</div>
-          <div className="text-[11px] text-[#5C6B5E] mt-0.5">Current &amp; Upcoming Vacations</div>
+          <div className="text-[11px] text-[#5C6B5E] mt-0.5">Active Reservations &middot; Click for Roster</div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] shadow-xs">
+        <div
+          onClick={() => {
+            setActiveTab("attendees");
+            setGuestViewMode("table");
+            setSpreadsheetLens("BALANCE_DUE");
+          }}
+          className="p-4 rounded-xl bg-white border border-[#E5DDD0] hover:border-[#2D3E35]/40 shadow-xs transition-colors cursor-pointer"
+        >
           <div className="flex items-center justify-between text-[#5C6B5E]">
-            <span className="text-xs font-semibold uppercase tracking-wider">Total Revenue Tracked</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Revenue Tracked</span>
             <CreditCard className="w-4 h-4 text-emerald-700" />
           </div>
           <div className="mt-2 text-2xl font-serif font-bold text-[#2D3E35]">
             ${totalLifetimeSpend.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
           </div>
-          <div className="text-[11px] text-[#5C6B5E] mt-0.5">Paid Deposits &amp; Outstanding Balances</div>
+          <div className="text-[11px] text-[#5C6B5E] mt-0.5">Click for Balances Due</div>
         </div>
 
-        <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] shadow-xs">
+        <div
+          onClick={() => {
+            setActiveTab("attendees");
+            setGuestViewMode("table");
+            setSpreadsheetLens("MISSING_FLIGHT");
+          }}
+          className="p-4 rounded-xl bg-white border border-[#E5DDD0] hover:border-[#2D3E35]/40 shadow-xs transition-colors cursor-pointer"
+        >
           <div className="flex items-center justify-between text-[#5C6B5E]">
-            <span className="text-xs font-semibold uppercase tracking-wider">Flight &amp; Chauffeur Arrivals</span>
+            <span className="text-xs font-semibold uppercase tracking-wider">Flights &amp; Transfers</span>
             <Plane className="w-4 h-4 text-blue-700" />
           </div>
           <div className="mt-2 text-2xl font-serif font-bold text-[#2D3E35]">{activeFlightsCount}</div>
-          <div className="text-[11px] text-[#5C6B5E] mt-0.5">Flight Numbers &amp; Airport Transfers</div>
+          <div className="text-[11px] text-[#5C6B5E] mt-0.5">Click for Missing Flights</div>
         </div>
       </div>
 
-      {/* 7-Tab Workspace Navigation Bar */}
-      <div className="bg-white p-4 rounded-xl border border-[#E5DDD0] shadow-xs space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-[#E5DDD0]/60 pb-3">
+      {/* Streamlined Workspace Navigation Bar (3 Clean Workspaces) */}
+      <div className="bg-white p-3 rounded-xl border border-[#E5DDD0] shadow-xs space-y-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           <div className="flex flex-wrap bg-[#F2ECE4] rounded-lg p-1 text-xs border border-[#E5DDD0] gap-1">
             <button
               onClick={() => setActiveTab("attendees")}
-              className={`px-3.5 py-1.5 rounded-md font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer ${
-                activeTab === "attendees"
+              className={`px-3.5 py-1.5 rounded-md font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer ${activeTab === "attendees" || activeTab === "clients" || activeTab === "trips"
                   ? "bg-white text-[#2D3E35] shadow-xs"
                   : "text-[#5C6B5E] hover:text-[#2D3E35]"
-              }`}
+                }`}
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-[#1A73E8]" />
-              <span>Attendee Spreadsheet</span>
-              <span className="text-[10px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded-full font-bold ml-0.5">
-                Monday.com Grid
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("clients")}
-              className={`px-3.5 py-1.5 rounded-md font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer ${
-                activeTab === "clients"
-                  ? "bg-white text-[#2D3E35] shadow-xs"
-                  : "text-[#5C6B5E] hover:text-[#2D3E35]"
-              }`}
-            >
-              <Users className="w-3.5 h-3.5 text-[#2D3E35]" />
-              <span>Guest Profiles ({clients.length})</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("trips")}
-              className={`px-3.5 py-1.5 rounded-md font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer ${
-                activeTab === "trips"
-                  ? "bg-white text-[#2D3E35] shadow-xs"
-                  : "text-[#5C6B5E] hover:text-[#2D3E35]"
-              }`}
-            >
-              <Compass className="w-3.5 h-3.5 text-blue-700" />
-              <span>Vacations &amp; Itineraries ({trips.length})</span>
+              <span>Guest Roster &amp; Bookings ({trips.length})</span>
             </button>
 
             <button
               onClick={() => setActiveTab("cohorts")}
-              className={`px-3.5 py-1.5 rounded-md font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer ${
-                activeTab === "cohorts"
+              className={`px-3.5 py-1.5 rounded-md font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer ${activeTab === "cohorts"
                   ? "bg-white text-[#2D3E35] shadow-xs"
                   : "text-[#5C6B5E] hover:text-[#2D3E35]"
-              }`}
+                }`}
             >
               <Layers className="w-3.5 h-3.5 text-[#C07D63]" />
-              <span>Rooming &amp; Group Logistics</span>
+              <span>Villas &amp; Logistics</span>
             </button>
 
             <button
               onClick={() => setActiveTab("billing")}
-              className={`px-3.5 py-1.5 rounded-md font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer ${
-                activeTab === "billing"
+              className={`px-3.5 py-1.5 rounded-md font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer ${activeTab === "billing"
                   ? "bg-white text-[#2D3E35] shadow-xs"
                   : "text-[#5C6B5E] hover:text-[#2D3E35]"
-              }`}
+                }`}
             >
               <CreditCard className="w-3.5 h-3.5 text-emerald-700" />
-              <span>Payments &amp; Villa Folios</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("clinical")}
-              className={`px-3.5 py-1.5 rounded-md font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer ${
-                activeTab === "clinical"
-                  ? "bg-white text-[#2D3E35] shadow-xs"
-                  : "text-[#5C6B5E] hover:text-[#2D3E35]"
-              }`}
-            >
-              <HeartPulse className="w-3.5 h-3.5 text-rose-700" />
-              <span>Nurse Health &amp; Dietary Care</span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab("ai_playbooks")}
-              className={`px-3.5 py-1.5 rounded-md font-semibold transition-colors flex items-center space-x-1.5 cursor-pointer ${
-                activeTab === "ai_playbooks"
-                  ? "bg-stone-900 text-amber-300 shadow-xs"
-                  : "text-[#5C6B5E] hover:text-[#2D3E35]"
-              }`}
-            >
-              <Bot className="w-3.5 h-3.5 text-amber-500" />
-              <span>Retreat Assistant Tools</span>
+              <span>Billing &amp; Payments</span>
             </button>
           </div>
 
-          {/* Quick Search & Actions */}
-          <div className="flex items-center gap-2 w-full lg:w-auto">
-            <div className="relative flex-1 lg:w-64">
-              <Search className="w-4 h-4 text-[#5C6B5E] absolute left-3 top-2.5" />
-              <input
-                type="text"
-                placeholder="Search guest, email, phone..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-1.5 text-xs bg-[#FAF7F2] border border-[#E5DDD0] rounded-lg text-[#2D3E35] placeholder:text-[#5C6B5E]/60 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
-              />
-            </div>
-
-            {activeTab === "clients" && (
-              <button
-                onClick={() => {
-                  setClientToEdit(null);
-                  setClientModalOpen(true);
-                }}
-                className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold bg-[#2D3E35] text-[#FAF7F2] hover:bg-[#1f2c25] rounded-lg transition-colors shadow-xs shrink-0 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5 text-emerald-400" />
-                <span>New Client</span>
-              </button>
-            )}
-
-            {activeTab === "trips" && (
-              <button
-                onClick={() => {
-                  setTripToEdit(null);
-                  setPreselectedClientId(undefined);
-                  setTripModalOpen(true);
-                }}
-                className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold bg-[#2D3E35] text-[#FAF7F2] hover:bg-[#1f2c25] rounded-lg transition-colors shadow-xs shrink-0 cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Build Proposal</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Filter Pills (shown on Clients & Trips tabs) */}
-        {(activeTab === "clients" || activeTab === "trips") && (
-          <div className="flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[#5C6B5E] font-medium mr-1">Filter by Tag:</span>
-              {popularTags.map((tag) => (
+          {(activeTab === "attendees" || activeTab === "clients" || activeTab === "trips") && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-[#5C6B5E]">View Mode:</span>
+              <div className="bg-[#F2ECE4] rounded-lg p-0.5 border border-[#E5DDD0] flex items-center gap-1 text-xs">
                 <button
-                  key={tag}
-                  onClick={() => setSelectedTag(tag)}
-                  className={`px-2.5 py-0.5 rounded text-[11px] font-mono transition-colors cursor-pointer ${
-                    selectedTag === tag
-                      ? "bg-[#2D3E35] text-[#FAF7F2] font-bold"
-                      : "bg-[#FAF7F2] text-[#5C6B5E] hover:bg-[#F2ECE4] border border-[#E5DDD0]"
-                  }`}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("attendees");
+                    setGuestViewMode("table");
+                  }}
+                  className={`px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${guestViewMode === "table" && activeTab !== "clients"
+                      ? "bg-white text-[#2D3E35] shadow-xs"
+                      : "text-[#5C6B5E] hover:text-[#2D3E35]"
+                    }`}
                 >
-                  {tag}
+                  <FileSpreadsheet className="w-3 h-3 text-[#1A73E8]" />
+                  <span>Table View</span>
                 </button>
-              ))}
-            </div>
-
-            {activeTab === "trips" && (
-              <div className="flex items-center space-x-2">
-                <span className="text-[#5C6B5E]">Sanctuary Cohort:</span>
-                <select
-                  value={selectedSanctuary}
-                  onChange={(e) => setSelectedSanctuary(e.target.value)}
-                  className="text-xs bg-[#FAF7F2] border border-[#E5DDD0] rounded px-2.5 py-1 text-[#2D3E35] focus:outline-none"
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveTab("attendees");
+                    setGuestViewMode("cards");
+                  }}
+                  className={`px-2.5 py-1 rounded-md font-semibold transition-all flex items-center gap-1 cursor-pointer ${guestViewMode === "cards" || activeTab === "clients"
+                      ? "bg-white text-[#2D3E35] shadow-xs"
+                      : "text-[#5C6B5E] hover:text-[#2D3E35]"
+                    }`}
                 >
-                  <option value="ALL">All Sanctuaries</option>
-                  <option value="puerto-vallarta-2027">Puerto Vallarta</option>
-                  <option value="nosara">Nosara</option>
-                  <option value="amalfi">Amalfi</option>
-                  <option value="bali">Bali</option>
-                </select>
+                  <Users className="w-3 h-3 text-[#C07D63]" />
+                  <span>Guest Cards ({clients.length})</span>
+                </button>
               </div>
-            )}
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* TAB: ATTENDEE & VACATION SPREADSHEET (MONDAY.COM GRID) */}
-      {activeTab === "attendees" && (
+      {/* TAB: ATTENDEE & VACATION SPREADSHEET OR GUEST CARDS */}
+      {(activeTab === "attendees" && guestViewMode === "table") && (
         <AttendeeSpreadsheetTab
           clients={clients}
           trips={trips}
+          initialLens={spreadsheetLens}
           onRefreshData={loadData}
-        />
-      )}
-
-      {/* TAB 0: AI ASSISTANTS & SCENARIO PLAYBOOKS */}
-      {activeTab === "ai_playbooks" && (
-        <AIAutomationStudioTab
-          onRefresh={loadData}
-          onNotify={(msg) => setAutomationFeedback(msg)}
+          onInspectGuest={(clientId) => handleOpenClientDetail(clientId)}
+          onInspectTrip={(tripId) => handleOpenTripDetail(tripId)}
         />
       )}
 
@@ -492,196 +529,10 @@ export default function NativeTravelCRMPage() {
           trips={trips}
           onRefresh={loadData}
           onNotify={(msg) => setAutomationFeedback(msg)}
+          clients={clients}
+          onInspectGuest={(clientId) => handleOpenClientDetail(clientId)}
+          onInspectTrip={(tripId) => handleOpenTripDetail(tripId)}
         />
-      )}
-
-      {/* TAB 2: SUB-TRIPS, ITINERARIES & SMART AVIATION DESK */}
-      {activeTab === "trips" && (
-        <div className="space-y-4">
-          {trips.length === 0 ? (
-            <div className="text-center py-12 bg-white rounded-xl border border-[#E5DDD0] shadow-xs">
-              <Compass className="w-8 h-8 text-[#5C6B5E] mx-auto mb-2 opacity-50" />
-              <p className="font-serif text-lg font-bold text-[#2D3E35]">No Sanctuary Sub-Trips Stored</p>
-              <p className="text-xs text-[#5C6B5E] mt-1">
-                Sync an inquiry from the Guest Inquiries tab or use the Atomic Cohort Enrollment tool to generate a trip record.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {trips.map((trip) => {
-                const isExpanded = expandedTripId === trip.id;
-                const flight = trip.smart_flight || {};
-
-                return (
-                  <div
-                    key={trip.id}
-                    className="p-5 rounded-xl bg-white border border-[#E5DDD0] shadow-xs space-y-4"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                      <div>
-                        <div className="flex items-center space-x-2 flex-wrap">
-                          <span className="font-serif text-lg font-bold text-[#2D3E35]">
-                            {trip.title}
-                          </span>
-                          <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold bg-emerald-100 text-emerald-900 border border-emerald-200">
-                            {trip.status}
-                          </span>
-                        </div>
-                        <div className="text-xs text-[#5C6B5E] mt-1 flex items-center space-x-2 flex-wrap">
-                          <span>
-                            Guest: <strong className="text-[#2D3E35]">{trip.client_name}</strong>
-                          </span>
-                          <span>&middot;</span>
-                          <span>{trip.client_email}</span>
-                          <span>&middot;</span>
-                          <span className="font-medium text-[#2D3E35]">{trip.dates}</span>
-                          <span>&middot;</span>
-                          <span>Suite: {trip.room_tier}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center space-x-2">
-                        <span className="font-mono text-[10px] bg-[#FAF7F2] px-2 py-0.5 rounded border border-[#E5DDD0] text-[#5C6B5E]">
-                          {trip.crm_trip_id}
-                        </span>
-                        <button
-                          onClick={() => {
-                            setTripToEdit(trip);
-                            setTripModalOpen(true);
-                          }}
-                          className="inline-flex items-center space-x-1 px-2.5 py-1 rounded text-xs font-semibold bg-[#2D3E35] text-[#FAF7F2] hover:bg-[#1f2c25] transition-colors cursor-pointer"
-                        >
-                          <Edit3 className="w-3 h-3 text-emerald-400" />
-                          <span>Edit Itinerary</span>
-                        </button>
-                        <button
-                          onClick={() => handleOpenTripDetail(trip.id)}
-                          className="px-2.5 py-1 rounded text-xs font-semibold bg-[#FAF7F2] hover:bg-[#F2ECE4] border border-[#E5DDD0] text-[#2D3E35] cursor-pointer"
-                        >
-                          Full Itinerary
-                        </button>
-                        <button
-                          onClick={() => setExpandedTripId(isExpanded ? null : trip.id)}
-                          className="p-1.5 text-[#5C6B5E] hover:text-[#2D3E35] hover:bg-[#F2ECE4] rounded-md transition-colors cursor-pointer"
-                        >
-                          {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Financial & Flight Strip */}
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-xs">
-                      <div className="bg-[#FAF7F2] p-2.5 rounded-lg border border-[#E5DDD0]">
-                        <span className="text-[10px] text-[#5C6B5E] uppercase block font-semibold">Total Stay</span>
-                        <div className="font-bold text-sm text-[#2D3E35]">
-                          ${trip.total_investment.toLocaleString()} USD
-                        </div>
-                      </div>
-
-                      <div className="bg-[#FAF7F2] p-2.5 rounded-lg border border-[#E5DDD0]">
-                        <span className="text-[10px] text-[#5C6B5E] uppercase block font-semibold">30% Deposit</span>
-                        <div className="font-bold text-xs text-[#C07D63]">
-                          ${trip.deposit_amount.toLocaleString()} ({trip.deposit_status.replace(/_/g, " ")})
-                        </div>
-                      </div>
-
-                      <div className="bg-[#FAF7F2] p-2.5 rounded-lg border border-[#E5DDD0]">
-                        <span className="text-[10px] text-[#5C6B5E] uppercase block font-semibold">70% Balance</span>
-                        <div className="font-bold text-xs text-[#2D3E35]">
-                          ${trip.final_balance.toLocaleString()} (Due 45d Prior)
-                        </div>
-                      </div>
-
-                      <div className="bg-[#FAF7F2] p-2.5 rounded-lg border border-[#E5DDD0]">
-                        <span className="text-[10px] text-[#5C6B5E] uppercase block font-semibold">Smart Flight</span>
-                        <div className="font-semibold text-xs text-blue-900 truncate">
-                          {flight.airline ? `${flight.airline} (${flight.departure_airport || "MIA"})` : "TBD Desk"}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* 1-Click Lifecycle Outreach Bar */}
-                    <div className="pt-2 border-t border-[#E5DDD0]/60 space-y-2">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="font-semibold text-[#2D3E35] flex items-center space-x-1.5">
-                          <Sparkles className="w-3.5 h-3.5 text-[#C07D63]" />
-                          <span>1-Click Advisor Lifecycle Outreach &amp; Logistics Console:</span>
-                        </span>
-                        <button
-                          onClick={() => setExpandedTripId(isExpanded ? null : trip.id)}
-                          className="text-[11px] font-semibold text-[#C07D63] hover:underline cursor-pointer"
-                        >
-                          {isExpanded
-                            ? "Hide Flight/Charter/Luggage/Passport Console ▲"
-                            : "Open Flight, Jet Charter, Luggage & Passport Console ▼"}
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                        <button
-                          onClick={() => handleAutomate(trip.id, "draft_welcome", "Pre-Arrival Welcome")}
-                          disabled={automatingTripId === trip.id}
-                          className="px-2.5 py-1.5 rounded-md border border-[#E5DDD0] bg-[#FAF7F2] hover:bg-[#F2ECE4] text-xs font-medium text-[#2D3E35] transition-colors flex items-center justify-between group disabled:opacity-50 cursor-pointer"
-                        >
-                          <div className="flex items-center space-x-1.5 truncate">
-                            <Mail className="w-3 h-3 text-[#C07D63] shrink-0" />
-                            <span className="truncate">Pre-Arrival Welcome</span>
-                          </div>
-                          <SendHorizontal className="w-3 h-3 text-[#5C6B5E] group-hover:text-[#2D3E35] shrink-0" />
-                        </button>
-
-                        <button
-                          onClick={() => handleAutomate(trip.id, "draft_packing_guide", "14-Day Packing Guide")}
-                          disabled={automatingTripId === trip.id}
-                          className="px-2.5 py-1.5 rounded-md border border-[#E5DDD0] bg-[#FAF7F2] hover:bg-[#F2ECE4] text-xs font-medium text-[#2D3E35] transition-colors flex items-center justify-between group disabled:opacity-50 cursor-pointer"
-                        >
-                          <div className="flex items-center space-x-1.5 truncate">
-                            <Compass className="w-3 h-3 text-[#2D3E35] shrink-0" />
-                            <span className="truncate">Packing Guide</span>
-                          </div>
-                          <SendHorizontal className="w-3 h-3 text-[#5C6B5E] group-hover:text-[#2D3E35] shrink-0" />
-                        </button>
-
-                        <button
-                          onClick={() => handleAutomate(trip.id, "draft_flight_coordination", "Flight Alignment")}
-                          disabled={automatingTripId === trip.id}
-                          className="px-2.5 py-1.5 rounded-md border border-[#E5DDD0] bg-[#FAF7F2] hover:bg-[#F2ECE4] text-xs font-medium text-[#2D3E35] transition-colors flex items-center justify-between group disabled:opacity-50 cursor-pointer"
-                        >
-                          <div className="flex items-center space-x-1.5 truncate">
-                            <Plane className="w-3 h-3 text-blue-700 shrink-0" />
-                            <span className="truncate">Flight Desk Sync</span>
-                          </div>
-                          <SendHorizontal className="w-3 h-3 text-[#5C6B5E] group-hover:text-[#2D3E35] shrink-0" />
-                        </button>
-
-                        <button
-                          onClick={() => handleAutomate(trip.id, "draft_post_retreat_arc", "30-Day Continuity Arc")}
-                          disabled={automatingTripId === trip.id}
-                          className="px-2.5 py-1.5 rounded-md border border-[#E5DDD0] bg-[#FAF7F2] hover:bg-[#F2ECE4] text-xs font-medium text-[#2D3E35] transition-colors flex items-center justify-between group disabled:opacity-50 cursor-pointer"
-                        >
-                          <div className="flex items-center space-x-1.5 truncate">
-                            <FileCheck2 className="w-3 h-3 text-emerald-700 shrink-0" />
-                            <span className="truncate">30-Day Arc</span>
-                          </div>
-                          <SendHorizontal className="w-3 h-3 text-[#5C6B5E] group-hover:text-[#2D3E35] shrink-0" />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Interactive Sub-Trip Operations Console (Delay, FBO Divert, Charter W&B, Lost Luggage, Upgrade, Passport) */}
-                    {isExpanded && (
-                      <TripOperationsDrawer
-                        trip={trip}
-                        onRefresh={loadData}
-                        onNotify={(msg) => setAutomationFeedback(msg)}
-                      />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
       )}
 
       {/* TAB 3: SANCTUARY PAY, MULTI-CURRENCY FX & SPLIT FOLIOS */}
@@ -690,144 +541,65 @@ export default function NativeTravelCRMPage() {
           trips={trips}
           onRefresh={loadData}
           onNotify={(msg) => setAutomationFeedback(msg)}
-        />
-      )}
-
-      {/* TAB 4: RN CLINICAL SAFETY & SOMATIC TELEMETRY */}
-      {activeTab === "clinical" && (
-        <ClinicalSafetyTelemetryTab
           clients={clients}
-          trips={trips}
-          onRefresh={loadData}
-          onNotify={(msg) => setAutomationFeedback(msg)}
+          onInspectGuest={(clientId) => handleOpenClientDetail(clientId)}
+          onInspectTrip={(tripId) => handleOpenTripDetail(tripId)}
         />
       )}
 
-      {/* TAB 5: 360° CLIENT DOSSIERS & CONTACT MANAGEMENT */}
-      {activeTab === "clients" && (
-        <div className="space-y-6">
-          {/* Header Action Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-[#E5DDD0] shadow-xs">
-            <div>
-              <h3 className="font-serif text-base font-bold text-[#2D3E35] flex items-center space-x-2">
-                <Users className="w-4 h-4 text-[#C07D63]" />
-                <span>Client Dossiers &amp; Guest Registry ({clients.length} Profiles)</span>
+      {/* TAB 5: GUEST DIRECTORY */}
+      {/* TAB: GUEST DIRECTORY CARDS (Either via Guest Cards Toggle or Legacy Clients Tab) */}
+      {((activeTab === "attendees" && guestViewMode === "cards") || activeTab === "clients") && (
+        <div className="space-y-4">
+          {/* Header Action Bar with Instant Search */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-[#E5DDD0] shadow-xs">
+            <div className="flex items-center space-x-2">
+              <Users className="w-4 h-4 text-[#C07D63]" />
+              <h3 className="font-serif text-base font-bold text-[#2D3E35]">
+                Guest Directory ({clients.length})
               </h3>
-              <p className="text-xs text-[#5C6B5E] mt-0.5">
-                Comprehensive luxury travel dossiers, RN clinical screening notes, and passport validity records.
-              </p>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setShowConcurrencyTest(!showConcurrencyTest)}
-                className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-semibold text-[#5C6B5E] hover:text-[#2D3E35] bg-[#FAF7F2] hover:bg-[#F2ECE4] border border-[#E5DDD0] rounded-lg transition-colors cursor-pointer"
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5" />
-                <span>{showConcurrencyTest ? "Hide Capacity Checker" : "Test Room & Group Limit (12–14 Guests)"}</span>
-              </button>
+            <div className="flex items-center gap-2 flex-1 max-w-md justify-end">
+              <div className="relative flex-1 max-w-xs">
+                <Search className="w-3.5 h-3.5 text-[#5C6B5E] absolute left-3 top-2.5" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Filter guests by name or email..."
+                  className="w-full pl-9 pr-8 py-1.5 text-xs bg-[#FAF7F2] border border-[#E5DDD0] rounded-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-2.5 top-2.5 text-[#5C6B5E] hover:text-[#2D3E35] cursor-pointer"
+                    title="Clear search"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => {
                   setClientToEdit(null);
                   setClientModalOpen(true);
                 }}
-                className="inline-flex items-center space-x-1.5 px-3.5 py-1.5 text-xs font-bold bg-[#2D3E35] text-[#FAF7F2] hover:bg-[#1f2c25] rounded-lg transition-colors shadow-xs cursor-pointer"
+                className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold bg-[#2D3E35] text-[#FAF7F2] hover:bg-[#1f2c25] rounded-lg transition-colors shadow-xs cursor-pointer shrink-0"
               >
                 <UserPlus className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Create Client Dossier</span>
+                <span>+ New Guest</span>
               </button>
             </div>
           </div>
 
-          {/* Optional Collapsible Capacity Checker */}
-          {showConcurrencyTest && (
-            <div className="bg-white p-5 rounded-xl border border-[#E5DDD0] shadow-xs space-y-3 animate-in fade-in">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-serif text-sm font-bold text-[#2D3E35] flex items-center space-x-2">
-                    <UserPlus className="w-4 h-4 text-[#C07D63]" />
-                    <span>Intimate Group Size Safety Check (Guarantees max 12–14 guests per retreat)</span>
-                  </h4>
-                  <p className="text-xs text-[#5C6B5E]">
-                    Checks that guest enrollment automatically honors retreat villa limits; shifts #13+ guests to a priority waitlist without extra charge.
-                  </p>
-                </div>
-              </div>
-
-              <form
-                onSubmit={handleAtomicReserve}
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2.5 items-end text-xs"
-              >
-                <div>
-                  <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">Full Name</label>
-                  <input
-                    type="text"
-                    value={reserveName}
-                    onChange={(e) => setReserveName(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-[#E5DDD0] bg-[#FAF7F2]"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={reserveEmail}
-                    onChange={(e) => setReserveEmail(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-[#E5DDD0] bg-[#FAF7F2]"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">Phone</label>
-                  <input
-                    type="text"
-                    value={reservePhone}
-                    onChange={(e) => setReservePhone(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-[#E5DDD0] bg-[#FAF7F2]"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">Sanctuary</label>
-                  <select
-                    value={reserveSanctuary}
-                    onChange={(e) => setReserveSanctuary(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-[#E5DDD0] bg-[#FAF7F2]"
-                  >
-                    <option value="puerto-vallarta-2027">Puerto Vallarta</option>
-                    <option value="nosara">Nosara</option>
-                    <option value="amalfi">Amalfi</option>
-                    <option value="bali">Bali</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">Suite Tier</label>
-                  <input
-                    type="text"
-                    value={reserveRoom}
-                    onChange={(e) => setReserveRoom(e.target.value)}
-                    className="w-full px-2.5 py-1.5 rounded-lg border border-[#E5DDD0] bg-[#FAF7F2]"
-                  />
-                </div>
-                <button
-                  type="submit"
-                  disabled={reserving}
-                  className="py-1.5 px-3 rounded-lg bg-[#2D3E35] hover:bg-[#1f2c25] text-white font-semibold cursor-pointer"
-                >
-                  {reserving ? "Locking..." : "Atomic Reserve"}
-                </button>
-              </form>
-            </div>
-          )}
-
           {clients.length === 0 ? (
             <div className="text-center py-12 bg-white rounded-xl border border-[#E5DDD0] shadow-xs">
               <Users className="w-8 h-8 text-[#5C6B5E] mx-auto mb-2 opacity-50" />
-              <p className="font-serif text-lg font-bold text-[#2D3E35]">No CRM Clients Found</p>
+              <p className="font-serif text-lg font-bold text-[#2D3E35]">No Guests Found</p>
               <p className="text-xs text-[#5C6B5E] mt-1">
-                Approved website intakes are automatically converted to native CRM clients.
+                New guests who submit an inquiry or are added by staff will appear here.
               </p>
             </div>
           ) : (
@@ -873,7 +645,7 @@ export default function NativeTravelCRMPage() {
                   {/* Notes / Dietary */}
                   {(client.dietary_requirements || client.health_notes) && (
                     <div className="text-xs bg-amber-50/70 p-2.5 rounded-lg border border-amber-200/80 text-amber-950">
-                      <span className="font-semibold">Health &amp; Dietary Notes: </span>
+                      <span className="font-semibold">Dietary &amp; Guest Notes: </span>
                       <span>{client.dietary_requirements || client.health_notes}</span>
                     </div>
                   )}
@@ -901,7 +673,7 @@ export default function NativeTravelCRMPage() {
                           setClientModalOpen(true);
                         }}
                         className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold text-[#2D3E35] bg-[#FAF7F2] hover:bg-[#F2ECE4] border border-[#E5DDD0] rounded-md transition-colors cursor-pointer"
-                        title="Edit Client Dossier"
+                        title="Edit Guest Profile"
                       >
                         <Edit3 className="w-3 h-3 text-[#5C6B5E]" />
                         <span>Edit</span>
@@ -915,10 +687,10 @@ export default function NativeTravelCRMPage() {
                           setTripModalOpen(true);
                         }}
                         className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-md transition-colors cursor-pointer"
-                        title="Create Proposal for this Client"
+                        title="New Reservation for this Guest"
                       >
                         <CalendarPlus className="w-3 h-3 text-emerald-700" />
-                        <span>Build Proposal</span>
+                        <span>New Reservation</span>
                       </button>
 
                       <button
@@ -927,7 +699,7 @@ export default function NativeTravelCRMPage() {
                         disabled={loadingClientDetail}
                         className="inline-flex items-center space-x-1 px-3 py-1 text-xs font-semibold text-[#FAF7F2] bg-[#2D3E35] hover:bg-[#1f2c25] rounded-md transition-colors cursor-pointer"
                       >
-                        <span>360&deg; Dossier</span>
+                        <span>Guest Profile</span>
                         <ArrowRight className="w-3 h-3 ml-0.5" />
                       </button>
                     </div>
@@ -939,135 +711,36 @@ export default function NativeTravelCRMPage() {
         </div>
       )}
 
-      {/* 360-Degree Client Dossier Modal */}
+      {/* 360-Degree Guest Dossier & Compliance Slide-Over Drawer */}
       {selectedClientDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-[#FAF7F2] text-[#2D3E35] w-full max-w-2xl rounded-2xl border border-[#E5DDD0] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div className="px-6 py-4 bg-white border-b border-[#E5DDD0] flex items-center justify-between">
-              <div className="flex items-center space-x-2.5">
-                <span className="p-2 rounded-lg bg-[#2D3E35] text-[#FAF7F2]">
-                  <User className="w-4 h-4" />
-                </span>
-                <div>
-                  <h3 className="font-serif text-lg font-bold text-[#2D3E35]">
-                    {selectedClientDetail.client.full_name}
-                  </h3>
-                  <p className="text-xs text-[#5C6B5E]">
-                    Contact ID: <span className="font-mono">{selectedClientDetail.client.crm_contact_id}</span>
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setClientToEdit(selectedClientDetail.client);
-                    setSelectedClientDetail(null);
-                    setClientModalOpen(true);
-                  }}
-                  className="inline-flex items-center space-x-1 text-xs px-2.5 py-1 rounded bg-[#2D3E35] text-[#FAF7F2] hover:bg-[#1f2c25] font-semibold cursor-pointer"
-                >
-                  <Edit3 className="w-3 h-3 text-emerald-400" />
-                  <span>Edit Dossier</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPreselectedClientId(selectedClientDetail.client.id);
-                    setTripToEdit(null);
-                    setSelectedClientDetail(null);
-                    setTripModalOpen(true);
-                    setActiveTab("trips");
-                  }}
-                  className="inline-flex items-center space-x-1 text-xs px-2.5 py-1 rounded bg-emerald-50 text-emerald-900 border border-emerald-200 hover:bg-emerald-100 font-semibold cursor-pointer"
-                >
-                  <CalendarPlus className="w-3 h-3 text-emerald-700" />
-                  <span>Build Proposal</span>
-                </button>
-                <button
-                  onClick={() => setSelectedClientDetail(null)}
-                  className="text-xs px-2.5 py-1 rounded bg-[#F2ECE4] hover:bg-[#EBE3D8] font-semibold cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-
-            <div className="p-6 overflow-y-auto space-y-4 text-xs">
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <div className="p-3 rounded-lg bg-white border border-[#E5DDD0]">
-                  <span className="text-[10px] text-[#5C6B5E] uppercase block font-semibold">Email</span>
-                  <div className="font-semibold text-[#2D3E35]">{selectedClientDetail.client.email}</div>
-                </div>
-                <div className="p-3 rounded-lg bg-white border border-[#E5DDD0]">
-                  <span className="text-[10px] text-[#5C6B5E] uppercase block font-semibold">Phone</span>
-                  <div className="font-semibold text-[#2D3E35]">
-                    {selectedClientDetail.client.phone || "Not on file"}
-                  </div>
-                </div>
-                <div className="p-3 rounded-lg bg-white border border-[#E5DDD0]">
-                  <span className="text-[10px] text-[#5C6B5E] uppercase block font-semibold">Lifetime Spend</span>
-                  <div className="font-bold text-sm text-[#2D3E35]">
-                    ${selectedClientDetail.client.total_lifetime_spend.toLocaleString()}
-                  </div>
-                </div>
-              </div>
-
-              {/* Linked Trips in DB */}
-              <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] space-y-2">
-                <span className="font-bold text-xs uppercase tracking-wider text-[#2D3E35]">
-                  Linked Trips in Native DB ({selectedClientDetail.trips.length})
-                </span>
-                <div className="space-y-2 pt-1">
-                  {selectedClientDetail.trips.map((t) => (
-                    <div
-                      key={t.id}
-                      className="p-3 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] flex items-center justify-between"
-                    >
-                      <div>
-                        <div className="font-semibold text-[#2D3E35]">{t.title}</div>
-                        <div className="text-[11px] text-[#5C6B5E]">
-                          {t.dates} &middot; {t.room_tier} &middot; Status: {t.status}
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <div className="font-bold text-[#2D3E35]">${t.total_investment.toLocaleString()}</div>
-                        <div className="text-[10px] text-emerald-800 font-semibold">{t.deposit_status}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Health Notes & Tags */}
-              <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] space-y-2">
-                <span className="font-bold text-xs uppercase tracking-wider text-[#2D3E35]">
-                  Health &amp; Dietary Requirements
-                </span>
-                <p className="text-xs text-[#5C6B5E] leading-relaxed">
-                  {selectedClientDetail.client.health_notes ||
-                    selectedClientDetail.client.dietary_requirements ||
-                    "No clinical flags indicated. Standard organic Blue Zone dining protocol."}
-                </p>
-                <div className="flex flex-wrap gap-1 pt-2">
-                  {(selectedClientDetail.client.tags || []).map((t) => (
-                    <span
-                      key={t}
-                      className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-emerald-50 text-emerald-900 border border-emerald-200"
-                    >
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <GuestDetailDrawer
+          detail={selectedClientDetail}
+          onClose={() => setSelectedClientDetail(null)}
+          onEditClient={(clientToEdit) => {
+            setClientToEdit(clientToEdit);
+            setClientModalOpen(true);
+          }}
+          onNewProposal={(clientId) => {
+            setPreselectedClientId(clientId);
+            setTripToEdit(null);
+            setTripModalOpen(true);
+          }}
+          onAutomateTrip={(tripId, actionType, label) => handleAutomate(tripId, actionType as any, label)}
+          automatingTripId={automatingTripId}
+          onInspectCompanion={handleInspectCompanion}
+          onRefreshData={loadData}
+          onInspectTrip={(tripId) => handleOpenTripDetail(tripId)}
+        />
       )}
 
       {/* Full Trip Record Modal */}
       {selectedTripDetail && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSelectedTripDetail(null);
+          }}
+        >
           <div className="bg-[#FAF7F2] text-[#2D3E35] w-full max-w-2xl rounded-2xl border border-[#E5DDD0] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 bg-white border-b border-[#E5DDD0] flex items-center justify-between">
               <div>
@@ -1149,6 +822,96 @@ export default function NativeTravelCRMPage() {
         tripToEdit={tripToEdit}
         preselectedClientId={preselectedClientId}
       />
+
+      {/* Keyboard Shortcuts Cheat Sheet Overlay */}
+      {showShortcutsModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowShortcutsModal(false);
+          }}
+        >
+          <div className="bg-[#FAF7F2] text-[#2D3E35] w-full max-w-md rounded-2xl border border-[#E5DDD0] shadow-2xl overflow-hidden p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-[#E5DDD0] pb-3">
+              <div>
+                <h3 className="font-serif text-base font-bold text-[#2D3E35]">
+                  Concierge Keyboard Shortcuts
+                </h3>
+                <p className="text-xs text-[#5C6B5E]">High-speed navigation without mouse clicks</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowShortcutsModal(false)}
+                className="p-1 text-[#5C6B5E] hover:text-[#2D3E35] cursor-pointer"
+                aria-label="Close shortcuts"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2 text-xs">
+              <div className="flex items-center justify-between py-1.5 border-b border-[#E5DDD0]/60">
+                <span className="text-[#5C6B5E]">Focus Universal Search</span>
+                <kbd className="px-2 py-0.5 rounded bg-white border border-[#E5DDD0] font-mono text-[11px] font-bold shadow-xs">
+                  /
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-[#E5DDD0]/60">
+                <span className="text-[#5C6B5E]">New Guest Profile</span>
+                <kbd className="px-2 py-0.5 rounded bg-white border border-[#E5DDD0] font-mono text-[11px] font-bold shadow-xs">
+                  N
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-[#E5DDD0]/60">
+                <span className="text-[#5C6B5E]">New Reservation Proposal</span>
+                <kbd className="px-2 py-0.5 rounded bg-white border border-[#E5DDD0] font-mono text-[11px] font-bold shadow-xs">
+                  R
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-[#E5DDD0]/60">
+                <span className="text-[#5C6B5E]">Guest Roster &amp; Bookings</span>
+                <kbd className="px-2 py-0.5 rounded bg-white border border-[#E5DDD0] font-mono text-[11px] font-bold shadow-xs">
+                  1
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-[#E5DDD0]/60">
+                <span className="text-[#5C6B5E]">Villas &amp; Logistics (Cohorts)</span>
+                <kbd className="px-2 py-0.5 rounded bg-white border border-[#E5DDD0] font-mono text-[11px] font-bold shadow-xs">
+                  2
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-[#E5DDD0]/60">
+                <span className="text-[#5C6B5E]">Billing &amp; Payments</span>
+                <kbd className="px-2 py-0.5 rounded bg-white border border-[#E5DDD0] font-mono text-[11px] font-bold shadow-xs">
+                  3
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-1.5">
+                <span className="text-[#5C6B5E]">Close Drawer / Modal / Overlay</span>
+                <kbd className="px-2 py-0.5 rounded bg-white border border-[#E5DDD0] font-mono text-[11px] font-bold shadow-xs">
+                  Esc
+                </kbd>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Floating Auto-Dismissing Toast Notification */}
+      {automationFeedback && (
+        <div className="fixed bottom-5 right-5 z-50 bg-[#2D3E35] text-[#FAF7F2] px-4 py-3 rounded-xl shadow-xl border border-[#3E5246] text-xs flex items-center space-x-3 animate-in fade-in slide-in-from-bottom-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span className="font-medium">{automationFeedback}</span>
+          <button
+            type="button"
+            onClick={() => setAutomationFeedback(null)}
+            className="text-stone-400 hover:text-white ml-2 cursor-pointer p-0.5 rounded transition-colors"
+            aria-label="Dismiss Notification"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

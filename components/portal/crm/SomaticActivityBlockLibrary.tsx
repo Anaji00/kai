@@ -211,10 +211,10 @@ export default function SomaticActivityBlockLibrary({
           <div className="flex items-center gap-1.5 overflow-x-auto w-full sm:w-auto scrollbar-none">
             {[
               { id: "all", label: "All" },
-              { id: "somatic_wellness", label: "🧘 Somatics" },
-              { id: "blue_zone_dining", label: "🍽️ Dining" },
-              { id: "aviation_arrival", label: "✈️ Aviation" },
-              { id: "clinical_screening", label: "🩺 Clinical" },
+              { id: "somatic_wellness", label: "Somatics" },
+              { id: "blue_zone_dining", label: "Dining" },
+              { id: "aviation_arrival", label: "Aviation" },
+              { id: "clinical_screening", label: "Clinical" },
             ].map((cat) => (
               <button
                 key={cat.id}
@@ -271,7 +271,7 @@ export default function SomaticActivityBlockLibrary({
                           key={bIdx}
                           className="text-[9px] text-[#2D3E35]/80 bg-[#FAF7F2] border border-[#E5DDD0] px-1.5 py-0.2 rounded"
                         >
-                          ✓ {b}
+                          {b}
                         </span>
                       ))}
                     </div>

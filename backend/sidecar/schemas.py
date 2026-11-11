@@ -334,10 +334,10 @@ class CopilotChatRequest(BaseModel):
 
 
 class FormFillProposal(BaseModel):
-    form_type: str  # vendor_supplier, route_calculator, guest_intake, curated_dining, destination_guide, somatic_review, broadcast_sms, location_scraper
+    form_type: str  # vendor_supplier, route_calculator, guest_intake, curated_dining, destination_guide, somatic_review, broadcast_sms, location_scraper, crm_mutation
     form_title: str
-    target_tab: Optional[str] = None  # vendors, routes, dining, weather, destination, reviews, overview
-    target_url: Optional[str] = None  # e.g. /portal, /portal/vendors, /portal/travel-logistics?tab=dining
+    target_tab: Optional[str] = None  # vendors, routes, dining, weather, destination, reviews, overview, crm
+    target_url: Optional[str] = None  # e.g. /portal, /portal/crm, /portal/vendors, /portal/travel-logistics?tab=dining
     action_type: Optional[str] = None
     fields: Dict[str, Any] = Field(default_factory=dict)
     summary: str
@@ -345,6 +345,10 @@ class FormFillProposal(BaseModel):
     action_title: Optional[str] = None
     payload: Optional[Dict[str, Any]] = None
     approval_required: Optional[bool] = None
+    executed: Optional[bool] = False
+    entity_type: Optional[str] = None
+    record_id: Optional[str] = None
+    changes: Optional[Dict[str, Any]] = None
 
 
 class CopilotChatResponse(BaseModel):

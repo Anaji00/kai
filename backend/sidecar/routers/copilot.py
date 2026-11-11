@@ -1071,3 +1071,133 @@ def execute_ai_automation_playbook(
     }
 
 
+class CopilotExecuteActionRequest(BaseModel):
+    form_type: Optional[str] = "crm_mutation"
+    action_type: Optional[str] = "update_crm_record"
+    target_id: Optional[str] = None
+    sanctuary_slug: Optional[str] = "nosara"
+    fields: Dict[str, Any] = {}
+    payload: Optional[Dict[str, Any]] = None
+
+
+@router.post("/execute-action")
+def execute_copilot_crm_action(
+    req: CopilotExecuteActionRequest,
+    db: Session = Depends(get_db),
+):
+    """
+    Directly executes a CRM record mutation or creation from the AI Assistant widget
+    (e.g. touching client profiles, trip room tiers, payments, dietary/health notes,
+    cohort status, vendors, dining spots, calendar events, or approving drafts).
+    """
+    try:
+        merged_fields = dict(req.payload or {})
+        merged_fields.update(req.fields or {})
+        if req.sanctuary_slug and "sanctuary_slug" not in merged_fields:
+            merged_fields["sanctuary_slug"] = req.sanctuary_slug
+
+        proposal_dict = {
+            "form_type": req.form_type or "crm_mutation",
+            "action_type": req.action_type or merged_fields.get("action_type") or "update_crm_record",
+            "target_id": req.target_id or merged_fields.get("target_id"),
+            "fields": merged_fields,
+            "payload": merged_fields,
+        }
+        result = clinical_copilot.execute_crm_action(proposal_dict, db=db)
+        return result
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to execute copilot CRM action: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"CRM action execution failed: {str(e)}")
+
+
+@router.get("/crm-snapshot")
+def get_copilot_crm_snapshot(
+    sanctuary_slug: Optional[str] = None,
+    db: Session = Depends(get_db),
+):
+    """
+    Returns a live snapshot of CRM clients, trips, cohorts, vendors, and pending drafts
+    so the expandable AI widget can inspect and directly edit any record in real time.
+    """
+    from backend.sidecar.models import (
+        VendorSupplierRecord,
+        StagingIntake,
+    )
+    from backend.models import (
+        SanctuaryCohort,
+        ActionDraft,
+    )
+
+    clients = db.query(CRMClient).order_by(CRMClient.updated_at.desc()).limit(30).all()
+    trips_q = db.query(CRMTrip)
+    if sanctuary_slug:
+        trips_q = trips_q.filter(CRMTrip.sanctuary_slug.ilike(f"%{sanctuary_slug}%"))
+    trips = trips_q.order_by(CRMTrip.updated_at.desc()).limit(30).all()
+
+    cohorts = db.query(SanctuaryCohort).order_by(SanctuaryCohort.id.asc()).limit(15).all()
+    vendors = db.query(VendorSupplierRecord).limit(20).all()
+    pending_drafts = db.query(ActionDraft).filter(ActionDraft.status.in_(["PENDING", "pending_review"])).count()
+    intakes_count = db.query(StagingIntake).count()
+
+    return {
+        "counts": {
+            "clients": len(clients),
+            "trips": len(trips),
+            "cohorts": len(cohorts),
+            "vendors": len(vendors),
+            "pending_drafts": pending_drafts,
+            "intakes": intakes_count,
+        },
+        "clients": [
+            {
+                "id": c.id,
+                "crm_contact_id": c.crm_contact_id,
+                "full_name": c.full_name,
+                "email": c.email,
+                "phone": c.phone or "",
+                "vip_tier": (c.tags[0] if isinstance(c.tags, list) and c.tags else "VIP_GUEST"),
+                "lifetime_value": float(c.total_lifetime_spend or 0.0),
+                "dietary_requirements": c.dietary_requirements or "",
+                "health_notes": c.health_notes or "",
+                "passport_status": "VALID_6MO" if c.passport_valid_6mo else "PENDING",
+            }
+            for c in clients
+        ],
+        "trips": [
+            {
+                "id": t.id,
+                "crm_trip_id": t.crm_trip_id,
+                "client_id": t.client_id,
+                "client_name": t.client_name,
+                "sanctuary_slug": t.sanctuary_slug,
+                "retreat_Impression_name": t.title,
+                "room_tier": t.room_tier,
+                "status": t.status,
+                "total_investment": float(t.total_investment or 0.0),
+                "amount_paid": round(max(0.0, float(t.total_investment or 0.0) - float(t.final_balance or 0.0)), 2) if t.deposit_status == "PAID" else float(t.deposit_amount or 0.0),
+                "balance_due": float(t.final_balance or 0.0),
+                "flight_airline": (t.smart_flight or {}).get("airline", "") if isinstance(t.smart_flight, dict) else "",
+                "flight_number": (t.smart_flight or {}).get("flight_number", "") if isinstance(t.smart_flight, dict) else "",
+                "clinical_clearance_status": "CLEARED",
+            }
+            for t in trips
+        ],
+        "cohorts": [
+            {
+                "id": str(ch.id),
+                "cohort_code": ch.slug,
+                "sanctuary_slug": ch.slug,
+                "title": ch.title,
+                "check_in_date": ch.dates,
+                "check_out_date": ch.duration,
+                "max_capacity": ch.capacity_limit,
+                "booked_guests": max(0, (ch.capacity_limit or 14) - (ch.spots_remaining or 0)),
+                "status": ch.status,
+            }
+            for ch in cohorts
+        ],
+    }
+
+
+

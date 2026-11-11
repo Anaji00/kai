@@ -13,6 +13,9 @@ import {
   Tag,
   AlertCircle,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
 } from "lucide-react";
 import {
   CRMClientItem,
@@ -29,15 +32,21 @@ interface ClientFormModalProps {
 }
 
 const COMMON_TAGS = [
-  "VIP_RETREAT",
-  "CORTISOL_RESET",
-  "VAGAL_DYSREGULATION",
-  "LIE_FLAT_AIR",
-  "BLUE_ZONE_DIET",
-  "PRENATAL_CARE",
-  "ANAPHYLACTIC_ALERT",
-  "ORTHOPEDIC_SENSITIVE",
-  "GULFSTREAM_CHARTER",
+  "VIP Guest",
+  "Private Villa",
+  "Gluten-Free",
+  "Seed-Oil-Free",
+  "Chauffeur Pickup",
+  "First-Time Guest",
+];
+
+const DIETARY_QUICK_PRESETS = [
+  "Gluten-Free",
+  "Seed-Oil-Free",
+  "Vegan",
+  "Pescatarian",
+  "Nut-Free",
+  "Dairy-Free",
 ];
 
 export default function ClientFormModal({
@@ -69,8 +78,24 @@ export default function ClientFormModal({
   const [emgPhone, setEmgPhone] = useState("");
   const [emgEmail, setEmgEmail] = useState("");
 
+  // Collapsible progressive disclosure sections
+  const [showPassportSection, setShowPassportSection] = useState(false);
+  const [showEmergencySection, setShowEmergencySection] = useState(false);
+  const [showMovementSection, setShowMovementSection] = useState(false);
+
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Keyboard Escape listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (clientToEdit) {
@@ -83,6 +108,11 @@ export default function ClientFormModal({
       setIntentions(clientToEdit.intentions || "");
       setSelectedTags(clientToEdit.tags || []);
       setNotes((clientToEdit as any).notes || "");
+
+      // Auto-open sections if data exists
+      if ((clientToEdit as any).passport_number || clientToEdit.passport_valid_6mo) setShowPassportSection(true);
+      if ((clientToEdit as any).emergency_contact) setShowEmergencySection(true);
+      if (clientToEdit.movement_experience || clientToEdit.intentions) setShowMovementSection(true);
     } else {
       setFullName("");
       setEmail("");
@@ -95,13 +125,16 @@ export default function ClientFormModal({
       setHealthNotes("");
       setMovementExperience("Reformer Intermediate");
       setIntentions("");
-      setSelectedTags(["VIP_RETREAT", "CORTISOL_RESET"]);
+      setSelectedTags(["VIP Guest"]);
       setCustomTagInput("");
       setNotes("");
       setEmgName("");
       setEmgRelation("");
       setEmgPhone("");
       setEmgEmail("");
+      setShowPassportSection(false);
+      setShowEmergencySection(false);
+      setShowMovementSection(false);
     }
     setErrorMsg(null);
   }, [clientToEdit, isOpen]);
@@ -114,10 +147,25 @@ export default function ClientFormModal({
     );
   };
 
+  const handleToggleDietaryPreset = (preset: string) => {
+    const parts = dietaryRequirements
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    const exists = parts.some((p) => p.toLowerCase() === preset.toLowerCase());
+    let next: string;
+    if (exists) {
+      next = parts.filter((p) => p.toLowerCase() !== preset.toLowerCase()).join(", ");
+    } else {
+      next = parts.length > 0 ? `${parts.join(", ")}, ${preset}` : preset;
+    }
+    setDietaryRequirements(next);
+  };
+
   const handleAddCustomTag = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && customTagInput.trim()) {
       e.preventDefault();
-      const formatted = customTagInput.trim().toUpperCase().replace(/\s+/g, "_");
+      const formatted = customTagInput.trim();
       if (!selectedTags.includes(formatted)) {
         setSelectedTags([...selectedTags, formatted]);
       }
@@ -150,7 +198,7 @@ export default function ClientFormModal({
           passport_issuing_country: passportCountry.trim() || undefined,
           passport_expiry: passportExpiry.trim() || undefined,
         });
-        onSuccess(`Updated 360° dossier for ${fullName.trim()}.`);
+        onSuccess(`Saved profile changes for ${fullName.trim()}.`);
       } else {
         const payload: CRMClientCreatePayload = {
           full_name: fullName.trim(),
@@ -177,20 +225,25 @@ export default function ClientFormModal({
         };
         const res = await createCrmClient(payload);
         onSuccess(
-          `Created native CRM dossier for ${res.client.full_name} (${res.client.crm_contact_id}).`
+          `Saved guest profile for ${res.client.full_name}.`
         );
       }
       onClose();
     } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : "Failed to save client dossier");
+      setErrorMsg(err instanceof Error ? err.message : "Failed to save guest profile");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-      <div className="bg-[#FAF7F2] text-[#2D3E35] w-full max-w-3xl rounded-2xl border border-[#E5DDD0] shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in"
+    >
+      <div className="bg-[#FAF7F2] text-[#2D3E35] w-full max-w-2xl rounded-2xl border border-[#E5DDD0] shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
         <div className="px-6 py-4 bg-white border-b border-[#E5DDD0] flex items-center justify-between">
           <div className="flex items-center space-x-2.5">
@@ -199,23 +252,24 @@ export default function ClientFormModal({
             </span>
             <div>
               <h2 className="font-serif text-lg font-bold text-[#2D3E35]">
-                {isEditing ? `Edit Guest Profile: ${clientToEdit?.full_name}` : "Create Guest Profile & Notes"}
+                {isEditing ? `Edit Guest: ${clientToEdit?.full_name}` : "Add New Guest Profile"}
               </h2>
               <p className="text-xs text-[#5C6B5E]">
-                Guest contact profile with retreat preferences, dietary needs &amp; nurse intake notes
+                Essential contact details, dietary requirements, and sanctuary preferences
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-[#5C6B5E] hover:text-[#2D3E35] hover:bg-[#F2ECE4] transition-colors cursor-pointer"
+            title="Close (Esc)"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 text-xs">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-4 text-xs">
           {errorMsg && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-900 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
@@ -223,14 +277,14 @@ export default function ClientFormModal({
             </div>
           )}
 
-          {/* Section 1: Basic Identity */}
-          <div className="bg-white p-4 rounded-xl border border-[#E5DDD0] space-y-4">
+          {/* Section 1: Basic Identity (Essential) */}
+          <div className="bg-white p-4 rounded-xl border border-[#E5DDD0] space-y-3.5">
             <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-[#2D3E35]">
               <User className="w-4 h-4 text-[#C07D63]" />
-              <span>Guest Identity &amp; Contact</span>
+              <span>1. Contact &amp; Identity</span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">
                   Full Name <span className="text-rose-600">*</span>
@@ -240,7 +294,7 @@ export default function ClientFormModal({
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="e.g. Victoria Sterling"
-                  className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
+                  className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
                   required
                 />
               </div>
@@ -255,7 +309,7 @@ export default function ClientFormModal({
                   disabled={isEditing}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="e.g. victoria.sterling@example.com"
-                  className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] disabled:opacity-60 focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
+                  className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] disabled:opacity-60 focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
                   required
                 />
               </div>
@@ -269,7 +323,7 @@ export default function ClientFormModal({
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="e.g. +1-415-555-0192"
-                  className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
+                  className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
                 />
               </div>
 
@@ -281,95 +335,267 @@ export default function ClientFormModal({
                   type="date"
                   value={dateOfBirth}
                   onChange={(e) => setDateOfBirth(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
+                  className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
                 />
               </div>
             </div>
           </div>
 
-          {/* Section 2: Passport & Travel Documents */}
-          <div className="bg-white p-4 rounded-xl border border-[#E5DDD0] space-y-4">
+          {/* Section 2: Dietary, Allergies & Preferences (Essential) */}
+          <div className="bg-white p-4 rounded-xl border border-[#E5DDD0] space-y-3.5">
             <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-[#2D3E35]">
-              <FileText className="w-4 h-4 text-blue-700" />
-              <span>International Passport &amp; Validity</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">
-                  Passport Number
-                </label>
-                <input
-                  type="text"
-                  value={passportNumber}
-                  onChange={(e) => setPassportNumber(e.target.value)}
-                  placeholder="e.g. C10948271"
-                  className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] font-mono focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">
-                  Issuing Country
-                </label>
-                <input
-                  type="text"
-                  value={passportCountry}
-                  onChange={(e) => setPassportCountry(e.target.value)}
-                  placeholder="USA, GBR, CAN, CHE"
-                  className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">
-                  Passport Expiry Date
-                </label>
-                <input
-                  type="date"
-                  value={passportExpiry}
-                  onChange={(e) => setPassportExpiry(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section 3: Clinical, Somatic & Dietary Intake */}
-          <div className="bg-white p-4 rounded-xl border border-[#E5DDD0] space-y-4">
-            <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-[#2D3E35]">
-              <HeartPulse className="w-4 h-4 text-rose-600" />
-              <span>Somatic, Clinical &amp; Dietary Architecture</span>
+              <HeartPulse className="w-4 h-4 text-[#C07D63]" />
+              <span>2. Dietary &amp; Chef Protocols</span>
             </div>
 
             <div className="space-y-3">
               <div>
                 <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">
-                  Dietary Requirements &amp; Food Allergies (Audited for Kitchen Manifest)
+                  Dietary Requirements &amp; Food Allergies
                 </label>
                 <input
                   type="text"
                   value={dietaryRequirements}
                   onChange={(e) => setDietaryRequirements(e.target.value)}
-                  placeholder="e.g. Strict Celiac Gluten-Free, Tree Nut Allergy (carry EpiPen), Organic Pescatarian"
-                  className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
+                  placeholder="e.g. Gluten-Free, Seed-Oil-Free, Organic Pescatarian"
+                  className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
                 />
+                <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                  <span className="text-[10px] text-[#5C6B5E] font-medium mr-1">1-Click Quick Add:</span>
+                  {DIETARY_QUICK_PRESETS.map((preset) => {
+                    const active = dietaryRequirements.toLowerCase().includes(preset.toLowerCase());
+                    return (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => handleToggleDietaryPreset(preset)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors cursor-pointer ${
+                          active
+                            ? "bg-[#2D3E35] text-[#FAF7F2] font-bold"
+                            : "bg-[#F2ECE4] text-[#5C6B5E] hover:bg-[#EBE3D8]"
+                        }`}
+                      >
+                        {active ? preset : `+ ${preset}`}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div>
                 <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">
-                  Clinical &amp; Somatic Notes (Nurse Review)
+                  Hospitality &amp; Villa Notes
                 </label>
                 <textarea
                   value={healthNotes}
                   onChange={(e) => setHealthNotes(e.target.value)}
                   rows={2}
-                  placeholder="e.g. Elevated evening cortisol; cervical disc sensitivity; responds well to slow evening sound baths."
-                  className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
+                  placeholder="e.g. Quiet villa preference, morning sound bath, lavender aromatherapy."
+                  className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Tags */}
+              <div>
+                <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">
+                  Tags &amp; Badges
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {COMMON_TAGS.map((tag) => {
+                    const isSelected = selectedTags.includes(tag);
+                    return (
+                      <button
+                        key={tag}
+                        type="button"
+                        onClick={() => toggleTag(tag)}
+                        className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors cursor-pointer ${
+                          isSelected
+                            ? "bg-[#2D3E35] text-[#FAF7F2] font-bold"
+                            : "bg-[#FAF7F2] text-[#5C6B5E] hover:bg-[#F2ECE4] border border-[#E5DDD0]"
+                        }`}
+                      >
+                        {isSelected ? tag : `+ ${tag}`}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Section 3: Passport & Travel Documents (Collapsible Progressive Disclosure) */}
+          <div className="bg-white rounded-xl border border-[#E5DDD0] overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowPassportSection(!showPassportSection)}
+              className="w-full p-3.5 flex items-center justify-between text-left hover:bg-[#FAF7F2] transition cursor-pointer"
+            >
+              <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-[#2D3E35]">
+                <FileText className="w-4 h-4 text-blue-700" />
+                <span>Passport &amp; Travel Documents</span>
+                {passportNumber && (
+                  <span className="text-[10px] font-mono lowercase bg-blue-50 text-blue-800 px-2 py-0.5 rounded-full border border-blue-200">
+                    {passportCountry} · {passportNumber}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-[#5C6B5E]">
+                <span className="text-[11px] font-semibold">
+                  {showPassportSection ? "Hide" : passportNumber ? "View" : "+ Add"}
+                </span>
+                {showPassportSection ? (
+                  <ChevronUp className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                )}
+              </div>
+            </button>
+
+            {showPassportSection && (
+              <div className="p-4 pt-0 border-t border-[#E5DDD0]/60 grid grid-cols-1 sm:grid-cols-3 gap-3 animate-in fade-in">
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">
+                    Passport Number
+                  </label>
+                  <input
+                    type="text"
+                    value={passportNumber}
+                    onChange={(e) => setPassportNumber(e.target.value)}
+                    placeholder="e.g. C10948271"
+                    className="w-full px-3 py-1.5 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] font-mono focus:bg-white focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">
+                    Issuing Country
+                  </label>
+                  <input
+                    type="text"
+                    value={passportCountry}
+                    onChange={(e) => setPassportCountry(e.target.value)}
+                    placeholder="USA, GBR, CAN, CHE"
+                    className="w-full px-3 py-1.5 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:bg-white focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">
+                    Passport Expiry Date
+                  </label>
+                  <input
+                    type="date"
+                    value={passportExpiry}
+                    onChange={(e) => setPassportExpiry(e.target.value)}
+                    className="w-full px-3 py-1.5 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:bg-white focus:outline-none"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Section 4: Emergency Contact (Collapsible Progressive Disclosure) */}
+          <div className="bg-white rounded-xl border border-[#E5DDD0] overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowEmergencySection(!showEmergencySection)}
+              className="w-full p-3.5 flex items-center justify-between text-left hover:bg-[#FAF7F2] transition cursor-pointer"
+            >
+              <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-[#2D3E35]">
+                <Shield className="w-4 h-4 text-amber-700" />
+                <span>Emergency Contact &amp; Next of Kin</span>
+                {emgName && (
+                  <span className="text-[10px] font-normal bg-amber-50 text-amber-800 px-2 py-0.5 rounded-full border border-amber-200">
+                    {emgName} ({emgRelation || "Spouse"})
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-[#5C6B5E]">
+                <span className="text-[11px] font-semibold">
+                  {showEmergencySection ? "Hide" : emgName ? "View" : "+ Add"}
+                </span>
+                {showEmergencySection ? (
+                  <ChevronUp className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                )}
+              </div>
+            </button>
+
+            {showEmergencySection && (
+              <div className="p-4 pt-0 border-t border-[#E5DDD0]/60 grid grid-cols-1 sm:grid-cols-3 gap-3 animate-in fade-in">
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">
+                    Contact Name
+                  </label>
+                  <input
+                    type="text"
+                    value={emgName}
+                    onChange={(e) => setEmgName(e.target.value)}
+                    placeholder="e.g. Julian Sterling"
+                    className="w-full px-3 py-1.5 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:bg-white focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">
+                    Relationship
+                  </label>
+                  <input
+                    type="text"
+                    value={emgRelation}
+                    onChange={(e) => setEmgRelation(e.target.value)}
+                    placeholder="e.g. Spouse / Sibling"
+                    className="w-full px-3 py-1.5 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:bg-white focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">
+                    Emergency Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={emgPhone}
+                    onChange={(e) => setEmgPhone(e.target.value)}
+                    placeholder="e.g. +1-415-555-0199"
+                    className="w-full px-3 py-1.5 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:bg-white focus:outline-none"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Section 5: Movement & Reformer Experience (Collapsible Progressive Disclosure) */}
+          <div className="bg-white rounded-xl border border-[#E5DDD0] overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setShowMovementSection(!showMovementSection)}
+              className="w-full p-3.5 flex items-center justify-between text-left hover:bg-[#FAF7F2] transition cursor-pointer"
+            >
+              <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-[#2D3E35]">
+                <Sparkles className="w-4 h-4 text-emerald-700" />
+                <span>Movement Experience &amp; Intention</span>
+                {intentions && (
+                  <span className="text-[10px] font-normal truncate max-w-[150px] bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
+                    {intentions}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-[#5C6B5E]">
+                <span className="text-[11px] font-semibold">
+                  {showMovementSection ? "Hide" : intentions ? "View" : "+ Add"}
+                </span>
+                {showMovementSection ? (
+                  <ChevronUp className="w-3.5 h-3.5" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5" />
+                )}
+              </div>
+            </button>
+
+            {showMovementSection && (
+              <div className="p-4 pt-0 border-t border-[#E5DDD0]/60 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in fade-in">
                 <div>
                   <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">
                     Movement &amp; Reformer Experience
@@ -377,7 +603,7 @@ export default function ClientFormModal({
                   <select
                     value={movementExperience}
                     onChange={(e) => setMovementExperience(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:outline-none"
+                    className="w-full px-3 py-1.5 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:bg-white focus:outline-none cursor-pointer"
                   >
                     <option value="Beginner Somatic">Beginner Somatic</option>
                     <option value="Reformer Intermediate">Reformer Intermediate (1-3 yrs)</option>
@@ -394,107 +620,24 @@ export default function ClientFormModal({
                     type="text"
                     value={intentions}
                     onChange={(e) => setIntentions(e.target.value)}
-                    placeholder="e.g. Nervous system reset & restorative sleep realignment"
-                    className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:outline-none"
-                  >
-                  </input>
+                    placeholder="e.g. Nervous system reset & restorative sleep"
+                    className="w-full px-3 py-1.5 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:bg-white focus:outline-none"
+                  />
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
-          {/* Section 4: Tags & Classification */}
-          <div className="bg-white p-4 rounded-xl border border-[#E5DDD0] space-y-3">
-            <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-[#2D3E35]">
-              <Tag className="w-4 h-4 text-emerald-700" />
-              <span>CRM Classification &amp; Behavioral Tags</span>
-            </div>
-
-            <div className="flex flex-wrap gap-1.5">
-              {COMMON_TAGS.map((tag) => {
-                const isSelected = selectedTags.includes(tag);
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => toggleTag(tag)}
-                    className={`px-2.5 py-1 rounded text-[11px] font-mono transition-colors cursor-pointer ${
-                      isSelected
-                        ? "bg-[#2D3E35] text-[#FAF7F2] font-bold"
-                        : "bg-[#FAF7F2] text-[#5C6B5E] hover:bg-[#F2ECE4] border border-[#E5DDD0]"
-                    }`}
-                  >
-                    {isSelected ? `✓ ${tag}` : `+ ${tag}`}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="pt-2">
-              <input
-                type="text"
-                value={customTagInput}
-                onChange={(e) => setCustomTagInput(e.target.value)}
-                onKeyDown={handleAddCustomTag}
-                placeholder="Type custom tag and press Enter..."
-                className="w-full px-3 py-1.5 text-xs rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] font-mono placeholder:font-sans focus:outline-none"
-              />
-            </div>
-          </div>
-
-          {/* Section 5: Emergency Contact */}
-          <div className="bg-white p-4 rounded-xl border border-[#E5DDD0] space-y-3">
-            <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-[#2D3E35]">
-              <Shield className="w-4 h-4 text-amber-700" />
-              <span>Emergency Contact &amp; Next of Kin</span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">Name</label>
-                <input
-                  type="text"
-                  value={emgName}
-                  onChange={(e) => setEmgName(e.target.value)}
-                  placeholder="e.g. Julian Sterling"
-                  className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">Relationship</label>
-                <input
-                  type="text"
-                  value={emgRelation}
-                  onChange={(e) => setEmgRelation(e.target.value)}
-                  placeholder="e.g. Spouse / Sibling"
-                  className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">Phone</label>
-                <input
-                  type="tel"
-                  value={emgPhone}
-                  onChange={(e) => setEmgPhone(e.target.value)}
-                  placeholder="e.g. +1-415-555-0199"
-                  className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35]"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Section 6: Internal Advisor Notes */}
+          {/* Section 6: Internal Host Notes */}
           <div className="bg-white p-4 rounded-xl border border-[#E5DDD0] space-y-2">
             <label className="block text-[11px] font-bold uppercase tracking-wider text-[#2D3E35]">
-              Private Advisor Notes (Internal Staff Only)
+              Private Host Notes (Internal Staff Only)
             </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               rows={2}
-              placeholder="Private preferences, champagne vintage preference, flight seating nuances..."
+              placeholder="Private preferences, champagne vintage preference, room nuances..."
               className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:outline-none"
             />
           </div>
@@ -515,11 +658,11 @@ export default function ClientFormModal({
               className="px-5 py-2.5 rounded-lg bg-[#2D3E35] hover:bg-[#1f2c25] text-[#FAF7F2] text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center space-x-1.5"
             >
               {saving ? (
-                <span>Writing to WAL...</span>
+                <span>Saving Guest Profile...</span>
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>{isEditing ? "Save Dossier Changes" : "Create Client Dossier"}</span>
+                  <span>{isEditing ? "Save Guest Profile" : "Save New Guest"}</span>
                 </>
               )}
             </button>

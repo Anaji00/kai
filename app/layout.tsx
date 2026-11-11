@@ -23,9 +23,16 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://kaiwellnessretreats.com"),
   manifest: "/manifest.webmanifest",
   icons: {
-    icon: "/kai-logo.png",
-    shortcut: "/kai-logo.png",
-    apple: "/kai-logo-192.png",
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icon.png", type: "image/png", sizes: "32x32" },
+      { url: "/kai-logo.png", type: "image/png" },
+      { url: "/kai-logo-192.png", sizes: "192x192", type: "image/png" },
+    ],
+    shortcut: "/favicon.ico",
+    apple: [
+      { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
   },
   title: {
     default: "KAI Wellness Retreats | A Journey of Movement, Culture & Connection",

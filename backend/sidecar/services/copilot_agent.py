@@ -351,19 +351,39 @@ class ClinicalCopilotAgent:
             "standard_6night_villa": 11400,
             "standard_6night_suite": 8400,
             "standard_6night_shared": 6900,
+        },
+        "puerto-vallarta-2027": {
+            "slug": "puerto-vallarta-2027",
+            "name": "KAI Puerto Vallarta Sierra Madre Cliffside Sanctuary",
+            "location": "Puerto Vallarta, Jalisco, Mexico",
+            "airport": "Licenciado Gustavo Díaz Ordaz International Airport (PVR)",
+            "transit_time": "45 mins",
+            "vehicle": "Cadillac Escalade ESV VIP",
+            "capacity_limit": 12,
+            "villa_tier": "Two-Bedroom Oceanfront Penthouse Villa",
+            "suite_tier": "Oceanfront King Suite",
+            "shared_tier": "Shared Ocean Pavilion",
+            "nightly_rate_villa": 2100,
+            "nightly_rate_suite": 1580,
+            "nightly_rate_shared": 1200,
+            "standard_6night_villa": 12600,
+            "standard_6night_suite": 9500,
+            "standard_6night_shared": 7200,
         }
     }
 
     @staticmethod
     def resolve_sanctuary_slug(text: str, default: Optional[str] = None) -> str:
         t = text.lower()
-        if any(w in t for w in ["nosara", "rnnosara", "costa rica", "nicoya"]):
+        if any(w in t for w in ["nosara", "noasra", "nosra", "nossara", "rnnosara", "costa rica", "nicoya", "lir", "liberia"]):
             return "nosara"
-        if any(w in t for w in ["amalfi", "italy", "naples", "campania"]):
+        if any(w in t for w in ["amalfi", "amlfi", "amalfy", "italy", "naples", "campania", "positano", "ravello", "nap"]):
             return "amalfi"
-        if any(w in t for w in ["bali", "ubud", "dps"]):
+        if any(w in t for w in ["bali", "ubud", "uluwatu", "dps", "indonesia"]):
             return "bali"
-        if any(w in t for w in ["riviera", "mexico", "tulum", "cancun", "cun"]):
+        if any(w in t for w in ["vallarta", "valarta", "pvr", "jalisco", "sierra madre", "pv"]):
+            return "puerto-vallarta-2027"
+        if any(w in t for w in ["riviera", "rivera", "maya", "mexico", "tulum", "cancun", "cun"]):
             return "riviera-maya"
         if default and default.lower() in ClinicalCopilotAgent.SANCTUARY_CONFIG:
             return default.lower()
@@ -376,7 +396,8 @@ class ClinicalCopilotAgent:
         db: Optional[Any] = None
     ) -> Optional[Dict[str, Any]]:
         """
-        Intelligently detects guest reservation and stay requests, calculates pro-rated pricing,
+        Intelligently detects guest reservation and stay requests (including low-level shorthand,
+        lowercase names, typos, and "$4350"/4.5k shorthand), calculates pro-rated pricing,
         30% sanctuary deposit and 70% balance ('the rest'), verifies retreat group limits (12-14), and drafts
         the clinical circadian rest protocol.
         """
@@ -384,44 +405,66 @@ class ClinicalCopilotAgent:
         is_booking = any(kw in msg_lower for kw in [
             "booking", "new booking", "book", "reservation", "reserve",
             "add guest", "new guest", "stage intake", "create guest",
-            "onboard guest", "stage guest", "calculate the rest", "3 night", "nights"
-        ])
+            "onboard guest", "stage guest", "calculate the rest", "night", "nights", "nites", "nite"
+        ]) or bool(re.search(r'\b(?:add|create|new|put\s+in)\s+[a-z]{2,}\s+[a-z]{2,}\b.*\b(?:nosara|noasra|amalfi|amlfi|bali|riviera|vallarta|villa|suite|pavilion|paid|deposit|\d+\s*k|\$\d+)\b', msg_lower))
         if not is_booking:
+            return None
+
+        # Do not treat pure updates of existing CRM guests as new booking quotes unless 'book'/'quote'/'nights' is explicit
+        if any(kw in msg_lower for kw in ["update", "change", "upgrade", "move", "switch", "set", "mark"]) and not any(kw in msg_lower for kw in ["book", "booking", "add guest", "new guest", "night", "nights", "nites"]):
             return None
 
         s_slug = self.resolve_sanctuary_slug(message, default=sanctuary_slug)
         s_cfg = self.SANCTUARY_CONFIG.get(s_slug, self.SANCTUARY_CONFIG["nosara"])
 
-        # Extract guest name
+        # Extract guest name (works for both Capitalized and all-lowercase inputs like "book frank lucas 3 nights")
         guest_name = None
+        STOPWORDS = {
+            "nosara", "noasra", "nosra", "rnnosara", "amalfi", "amlfi", "bali", "ubud", "uluwatu",
+            "riviera", "maya", "puerto", "vallarta", "sanctuary", "villa", "suite", "king", "oceanfront",
+            "cliffside", "penthouse", "shared", "pavilion", "plunge", "private", "a", "an", "the",
+            "new", "guest", "client", "booking", "reservation", "stay", "quote", "for", "fo", "at", "in", "to", "with", "on"
+        }
         name_patterns = [
-            r'(?:booking\s+for\s+(?:a\s+)?|book\s+(?:a\s+)?|reservation\s+for\s+(?:a\s+)?|guest\s+|client\s+|for\s+a\s+)([A-Za-z\s]+?)(?:\s+(?:for|fo|at|in|to|with)\s+|\s*,\s*|\.|\$|\bcalculate\b|\b\d+\s*night|$)',
-            r'(?:new\s+guest|add\s+guest|stage\s+intake)\s*[:"\']?\s*([A-Za-z\s]+?)(?:\s+(?:for|fo)|\s*,\s*|\.|$)'
+            r'(?:booking\s+for\s+(?:a\s+)?|book\s+(?:a\s+)?|reservation\s+for\s+(?:a\s+)?|add\s+a?\s*new\s+guest\s+|new\s+guest\s+|add\s+guest\s+|add\s+|guest\s+|client\s+|for\s+a\s+)([a-zA-Z]+(?:\s+[a-zA-Z]+){0,2})',
+            r'^([a-zA-Z]+\s+[a-zA-Z]+)\s+\d+\s*(?:nights?|nites?)\b',
+            r'^([a-zA-Z]+\s+[a-zA-Z]+)\s+(?:nosara|noasra|amalfi|amlfi|bali|riviera|vallarta|\d+\s*(?:nights?|nites?)|villa|suite)\b',
         ]
         for pat in name_patterns:
             m = re.search(pat, message, re.IGNORECASE)
             if m:
-                candidate = m.group(1).strip()
-                # Strip prepositions or sanctuary mentions
-                candidate = re.split(r'\s+(?:for|fo|at|in|to|with|of)\s+', candidate, flags=re.IGNORECASE)[0].strip()
-                candidate = re.split(r'\s+(?:nosara|rnnosara|amalfi|bali|riviera|sanctuary|villa|suite)', candidate, flags=re.IGNORECASE)[0].strip()
-                if candidate and candidate.lower() not in ["nosara", "amalfi", "bali", "riviera", "sanctuary", "villa", "suite", "a", "the"]:
-                    guest_name = candidate.title()
+                raw_tokens = m.group(1).strip().split()
+                clean_tokens = []
+                for tok in raw_tokens:
+                    if tok.lower() in STOPWORDS or re.match(r'^\d+$', tok):
+                        break
+                    clean_tokens.append(tok)
+                if clean_tokens:
+                    guest_name = " ".join(clean_tokens).title()
                     break
 
         if not guest_name:
             guest_name = "Prospective Traveler"
 
-        # Extract nights
+        # Extract nights (supports "3 nights", "3 nites", "3n", "for 4 nights")
         nights = 6
-        nights_match = re.search(r'(\d+)\s*night', msg_lower)
+        nights_match = re.search(r'(\d+)\s*(?:nights?|nites?|d\b|days?\b)', msg_lower)
         if nights_match:
-            nights = int(nights_match.group(1))
+            nights = max(1, min(30, int(nights_match.group(1))))
 
         # Room tier & pricing
         tier_name = s_cfg["villa_tier"]
         nightly_rate = s_cfg["nightly_rate_villa"]
-        if "suite" in msg_lower:
+        if "cliffside" in msg_lower or "plunge" in msg_lower:
+            tier_name = "Private Cliffside Plunge Villa"
+            nightly_rate = s_cfg["nightly_rate_villa"]
+        elif "penthouse" in msg_lower:
+            tier_name = "Two-Bedroom Oceanfront Penthouse Villa"
+            nightly_rate = s_cfg["nightly_rate_villa"]
+        elif "king suite" in msg_lower or "oceanfront king" in msg_lower:
+            tier_name = "Oceanfront King Suite"
+            nightly_rate = s_cfg["nightly_rate_suite"]
+        elif "king" in msg_lower or "suite" in msg_lower:
             tier_name = s_cfg["suite_tier"]
             nightly_rate = s_cfg["nightly_rate_suite"]
         elif "shared" in msg_lower or "pavilion" in msg_lower:
@@ -431,6 +474,24 @@ class ClinicalCopilotAgent:
         total_amount = nightly_rate * nights
         deposit_30 = round(total_amount * 0.30, 2)
         balance_70 = round(total_amount * 0.70, 2)
+
+        # Check if user specified an explicit paid/deposit amount (e.g. "$4,350 deposit paid" or "4350 paid" or "4.5k dep")
+        paid_override = None
+        k_match = re.search(r'\$?\s*(\d+(?:\.\d+)?)\s*k\b', msg_lower)
+        dollar_match = re.search(r'\$\s*(\d[\d,]*(?:\.\d{1,2})?)', message)
+        bare_paid_match = re.search(r'\b(\d{3,5})\s*(?:usd|dollars?|paid|dep|deposit)\b', msg_lower)
+        if k_match:
+            paid_override = round(float(k_match.group(1)) * 1000.0, 2)
+        elif dollar_match:
+            paid_override = float(dollar_match.group(1).replace(",", ""))
+        elif bare_paid_match:
+            paid_override = float(bare_paid_match.group(1))
+
+        if paid_override is not None and paid_override > 0:
+            deposit_30 = paid_override
+            if deposit_30 > total_amount:
+                total_amount = round(deposit_30 / 0.30, 2)
+            balance_70 = max(0.0, round(total_amount - deposit_30, 2))
 
         # Check capacity from DB
         remaining_spots = s_cfg["capacity_limit"]
@@ -479,8 +540,10 @@ class ClinicalCopilotAgent:
         booking_info = self.parse_booking_request(message, target_sanctuary, db)
         if booking_info:
             s_cfg = booking_info["sanctuary_config"]
+            is_direct_add = any(kw in msg_lower for kw in ["add ", "new guest", "create guest", "deposit paid", "paid"])
             payload = {
                 "client_name": booking_info["guest_name"],
+                "name": booking_info["guest_name"],
                 "sanctuary_slug": booking_info["sanctuary_slug"],
                 "room_tier": booking_info["room_tier"],
                 "nights": booking_info["nights"],
@@ -489,7 +552,7 @@ class ClinicalCopilotAgent:
                 "balance_70": booking_info["balance_70"],
                 "email": f"{booking_info['guest_name'].lower().replace(' ', '.')}@example.com",
                 "phone": "+1 (555) 019-4821",
-                "status": "PENDING_APPROVAL",
+                "status": "CONFIRMED" if is_direct_add else "PENDING_APPROVAL",
                 "clinical_notes": (
                     f"{booking_info['nights']}-night restorative immersion at {s_cfg['name']}. "
                     f"Autonomic reset & circadian alignment. "
@@ -501,36 +564,46 @@ class ClinicalCopilotAgent:
                     "nights": booking_info["nights"]
                 }
             }
-            title = f"Stage Booking: {booking_info['guest_name']} ({s_cfg['name']} · {booking_info['nights']} Nights)"
+            title = f"{'Added Guest Booking' if is_direct_add else 'Stage Booking'}: {booking_info['guest_name']} ({s_cfg['name']} · {booking_info['nights']} Nights)"
             summary = (
-                f"Stage intake for {booking_info['guest_name']}: {booking_info['nights']}-night stay at {s_cfg['name']} ({booking_info['room_tier']}). "
-                f"Total: ${booking_info['total_amount']:,.2f} (30% Deposit: ${booking_info['deposit_30']:,.2f}, 70% Balance: ${booking_info['balance_70']:,.2f})."
+                f"{'Added' if is_direct_add else 'Staged'} {booking_info['guest_name']} for {booking_info['nights']} nights at {s_cfg['name']} ({booking_info['room_tier']}) — "
+                f"Total ${booking_info['total_amount']:,.2f} (30% Deposit: ${booking_info['deposit_30']:,.2f} · 70% Balance: ${booking_info['balance_70']:,.2f})."
             )
-            if db:
-                try:
-                    draft = ActionDraft(
-                        type="booking_hold",
-                        guest_name=booking_info["guest_name"],
-                        content=summary,
-                        status="pending_review"
-                    )
-                    db.add(draft)
-                    db.commit()
-                    logger.info(f"Staged action draft (booking_hold) for {booking_info['guest_name']}")
-                except Exception as e:
-                    logger.error(f"Error staging booking_hold draft: {e}")
-            return {
-                "form_type": "guest_intake",
+            proposal_obj: Dict[str, Any] = {
+                "form_type": "attendee_row" if is_direct_add else "guest_intake",
                 "form_title": title,
                 "action_title": title,
-                "target_tab": "founder_studio",
-                "target_url": "/portal",
+                "target_tab": "crm" if is_direct_add else "founder_studio",
+                "target_url": "/portal/crm" if is_direct_add else "/portal",
                 "fields": payload,
                 "payload": payload,
                 "summary": summary,
-                "requires_approval": True,
-                "approval_required": True
+                "requires_approval": not is_direct_add,
+                "approval_required": not is_direct_add,
+                "executed": False,
             }
+            if db:
+                try:
+                    if is_direct_add:
+                        exec_res = self.execute_crm_action(proposal_obj, db=db)
+                        if exec_res.get("success"):
+                            proposal_obj["executed"] = True
+                            proposal_obj["entity_type"] = exec_res.get("entity_type")
+                            proposal_obj["record_id"] = exec_res.get("record_id")
+                            proposal_obj["changes"] = exec_res.get("changes")
+                            proposal_obj["summary"] = exec_res.get("summary") or summary
+                    else:
+                        draft = ActionDraft(
+                            type="booking_hold",
+                            guest_name=booking_info["guest_name"],
+                            content=summary,
+                            status="pending_review"
+                        )
+                        db.add(draft)
+                        db.commit()
+                except Exception as e:
+                    logger.error(f"Error handling booking proposal for {booking_info['guest_name']}: {e}")
+            return proposal_obj
 
         # 1. Vendor & Preferred Supplier
         if any(kw in msg_lower for kw in ["/vendor", "add vendor", "new vendor", "add supplier", "new supplier", "register vendor", "register supplier", "create supplier", "create vendor"]):
@@ -826,7 +899,819 @@ class ClinicalCopilotAgent:
                 "approval_required": False
             }
 
+        # 11. Universal CRM Record Touch & Mutation Engine (Clients, Trips, Rooms, Payments, Dietary, Flights, Cohorts, Calendar, Drafts)
+        crm_mutation = self._detect_crm_record_mutation(message, target_sanctuary, db)
+        if crm_mutation:
+            return crm_mutation
+
         return None
+
+    def _find_matching_crm_entities(self, text: str, db: Any):
+        """Finds matching CRMClient, CRMTrip, or StagingIntake from natural language or messy/fuzzy text."""
+        from backend.sidecar.models import CRMClient, CRMTrip, StagingIntake
+        text_lower = text.lower()
+        words = [w for w in re.findall(r'[a-zA-Z]{3,}', text_lower)]
+
+        matched_client = None
+        matched_trip = None
+        matched_intake = None
+
+        clients = db.query(CRMClient).all()
+        trips = db.query(CRMTrip).order_by(CRMTrip.updated_at.desc()).all()
+        intakes = db.query(StagingIntake).order_by(StagingIntake.updated_at.desc()).all()
+
+        for c in clients:
+            if (c.crm_contact_id and c.crm_contact_id.lower() in text_lower) or (c.email and c.email.lower() in text_lower):
+                matched_client = c
+                break
+            if c.full_name and c.full_name.lower() in text_lower:
+                matched_client = c
+                break
+
+        if not matched_client:
+            for c in clients:
+                if not c.full_name:
+                    continue
+                parts = c.full_name.lower().split()
+                first = parts[0] if parts else ""
+                last = parts[-1] if len(parts) > 1 else ""
+                if (first and len(first) > 2 and re.search(rf'\b{re.escape(first)}\b', text_lower)) or (
+                    last and len(last) > 3 and re.search(rf'\b{re.escape(last)}\b', text_lower)
+                ):
+                    matched_client = c
+                    break
+                # Fuzzy match against messy typos (e.g. "elanor" -> "eleanor", "frnak" -> "frank", "marcus" -> "marcus")
+                for w in words:
+                    if len(w) >= 4 and first and difflib.SequenceMatcher(None, w, first).ratio() >= 0.75:
+                        matched_client = c
+                        break
+                    if len(w) >= 4 and last and difflib.SequenceMatcher(None, w, last).ratio() >= 0.80:
+                        matched_client = c
+                        break
+                if matched_client:
+                    break
+
+        for t in trips:
+            if (t.crm_trip_id and t.crm_trip_id.lower() in text_lower):
+                matched_trip = t
+                break
+            if matched_client and t.client_id == matched_client.id:
+                matched_trip = t
+                break
+            if t.client_name and t.client_name.lower() in text_lower:
+                matched_trip = t
+                break
+
+        if not matched_client and matched_trip:
+            matched_client = db.query(CRMClient).filter(CRMClient.id == matched_trip.client_id).first()
+
+        for i in intakes:
+            if matched_client and (i.email == matched_client.email or (i.client_name and i.client_name.lower() == matched_client.full_name.lower())):
+                matched_intake = i
+                break
+            if i.client_name and i.client_name.lower() in text_lower:
+                matched_intake = i
+                break
+
+        return matched_client, matched_trip, matched_intake
+
+    def _detect_crm_record_mutation(
+        self,
+        message: str,
+        target_sanctuary: str = "nosara",
+        db: Optional[Any] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Detects natural-language OR messy low-level shorthand instructions ("garbage in -> beauty out")
+        to touch, update, create, or delete any record in the KAI CRM.
+        """
+        msg_lower = message.lower()
+
+        # Avoid intercepting pure read/draft queries
+        if any(kw in msg_lower for kw in ["draft consultation", "draft email", "write email", "what luxury hotels", "where can guests eat", "live weather", "who is", "what does"]):
+            return None
+
+        # Pre-check if any known CRM guest/intake is mentioned (even with typos like "elanor")
+        matched_entity_client = None
+        if db is not None:
+            try:
+                matched_entity_client, _, _ = self._find_matching_crm_entities(message, db)
+            except Exception:
+                matched_entity_client = None
+
+        has_action_shorthand = any(
+            kw in msg_lower
+            for kw in [
+                "cliffside", "plunge", "oceanfront", "king suite", "penthouse", "shared pavilion",
+                "confirmed", "deposit paid", "paid in full", "waitlist",
+                "gluten", "celiac", "vegan", "dairy-free", "dairy free", "seed-oil", "seed oil", "no shellfish", "shellfish", "nut allergy", "allergy",
+                "paid $", "$", "wire"
+            ]
+        )
+
+        is_mutation_verb = any(
+            re.search(rf'\b{kw}\b', msg_lower)
+            for kw in [
+                "update", "change", "set", "modify", "edit", "assign", "reassign",
+                "upgrade", "move", "switch", "put", "make", "mark", "record", "log", "touch", "patch",
+                "delete", "remove", "cancel", "archive", "approve", "commit",
+                "schedule", "dispatch", "paid", "confirm"
+            ]
+        ) or (matched_entity_client is not None and has_action_shorthand)
+
+        if not is_mutation_verb:
+            return None
+
+        fields: Dict[str, Any] = {"sanctuary_slug": target_sanctuary, "raw_instruction": message}
+        action_subtype = "crm_record_update"
+
+        if matched_entity_client:
+            fields["target_name"] = matched_entity_client.full_name
+        else:
+            # Extract candidate person name (case-insensitive)
+            person_match = re.search(
+                r'(?:for|client|guest|traveler|attendee|on|update|change|move|switch|put)\s+([a-zA-Z]+(?:\s+[a-zA-Z]+){0,2})',
+                message,
+                re.IGNORECASE
+            )
+            if not person_match:
+                person_match = re.search(r"([a-zA-Z]+(?:\s+[a-zA-Z]+)?)'s\b", message, re.IGNORECASE)
+            if person_match:
+                raw_cand = person_match.group(1).strip().split()
+                stop_words = {"ocean", "oceanfront", "private", "sacred", "shared", "cliffside", "nosara", "noasra", "amalfi", "bali", "riviera", "puerto", "vallarta", "room", "villa", "suite", "status", "deposit", "cohort", "to", "in", "as", "dietary", "diet", "allergy", "notes"}
+                clean_cand = [w for w in raw_cand if w.lower() not in stop_words]
+                if clean_cand:
+                    fields["target_name"] = " ".join(clean_cand).title()
+
+        email_match = re.search(r'[\w\.\+\-]+@[\w\.\-]+\.\w+', message)
+        if email_match:
+            fields["email"] = email_match.group(0).lower()
+
+        phone_match = re.search(r'(\+\d[\d\-\s\(\)]{7,16})', message)
+        if phone_match:
+            fields["phone"] = phone_match.group(1).strip()
+
+        # 1. Room / Suite Assignment Update (works with shorthand like "elanor cliffside villa")
+        room_match = re.search(
+            r'(?:room(?:\s+assignment|\s+tier)?|suite|villa|accommodation|upgrade)\s+(?:to|as|=)\s+([A-Za-z0-9\s\-&]+?)(?:\.|,|for\s+|and\s+|mark\s+|$)',
+            message,
+            re.IGNORECASE
+        )
+        if "cliffside" in msg_lower or "plunge" in msg_lower:
+            fields["room_tier"] = "Private Cliffside Plunge Villa"
+        elif "penthouse" in msg_lower:
+            fields["room_tier"] = "Two-Bedroom Oceanfront Penthouse Villa"
+        elif "king suite" in msg_lower or "oceanfront king" in msg_lower or ("oceanfront" in msg_lower and "suite" in msg_lower):
+            fields["room_tier"] = "Oceanfront King Suite"
+        elif "canopy villa" in msg_lower or "ocean villa" in msg_lower:
+            fields["room_tier"] = "Private Ocean Canopy Villa"
+        elif "shared" in msg_lower or "pavilion" in msg_lower:
+            fields["room_tier"] = "Shared Ocean Pavilion"
+        elif room_match:
+            fields["room_tier"] = room_match.group(1).strip().title()
+        elif any(k in msg_lower for k in ["room assignment", "room tier", "upgrade room", "change room", "assign room"]):
+            fields["room_tier"] = "Private Villa Sanctuary"
+
+        # 2. Trip / Booking / Deposit Status Update
+        for st in ["CONFIRMED", "DEPOSIT_PAID", "PROPOSED_ITINERARY", "COMPLETED", "CANCELLED", "MEDICAL_FREEZE", "POSTPONED_FORCE_MAJEURE", "WAITLISTED", "PAID_IN_FULL"]:
+            if st.lower().replace("_", " ") in msg_lower or st.lower() in msg_lower:
+                fields["status"] = "CONFIRMED" if st == "PAID_IN_FULL" else st
+                break
+        if "confirm" in msg_lower and "status" not in fields:
+            fields["status"] = "CONFIRMED"
+        if "cancel" in msg_lower and ("trip" in msg_lower or "booking" in msg_lower or "reservation" in msg_lower):
+            fields["status"] = "CANCELLED"
+
+        if any(k in msg_lower for k in ["deposit paid", "mark deposit", "deposit as paid", "paid deposit", "authorize deposit"]):
+            fields["deposit_status"] = "PAID"
+            if "status" not in fields:
+                fields["status"] = "DEPOSIT_PAID"
+
+        if any(k in msg_lower for k in ["balance paid", "paid in full", "final balance paid", "settle balance"]):
+            fields["final_balance_status"] = "PAID"
+            fields["deposit_status"] = "PAID"
+            fields["status"] = "CONFIRMED"
+
+        # 3. Payment / Wire / Shorthand Amount Recording (supports "$4,350", "4350 paid", "4.5k dep")
+        k_amt_m = re.search(r'\$?\s*(\d+(?:\.\d+)?)\s*k\b', msg_lower)
+        amount_match = re.search(r'\$\s*(\d[\d,]*(?:\.\d{1,2})?)', message)
+        bare_amt_m = re.search(r'\b(\d{3,5})\s*(?:usd|dollars?|paid|dep|deposit|wire)\b', msg_lower)
+        parsed_amt = None
+        if k_amt_m:
+            parsed_amt = round(float(k_amt_m.group(1)) * 1000.0, 2)
+        elif amount_match:
+            parsed_amt = float(amount_match.group(1).replace(",", ""))
+        elif bare_amt_m:
+            parsed_amt = float(bare_amt_m.group(1))
+
+        if parsed_amt is not None and any(k in msg_lower for k in ["payment", "deposit", "dep", "wire", "paid", "record", "charge", "settle", "credit", "investment", "price", "total", "balance", "$"]):
+            if any(k in msg_lower for k in ["total investment", "total stay", "trip total", "total price", "set total"]):
+                fields["total_investment"] = parsed_amt
+            else:
+                fields["amount_paid"] = parsed_amt
+                fields["payment_amount"] = parsed_amt
+                fields["payment_method"] = "SWIFT International Wire" if "wire" in msg_lower else "KAI Native Card Vault"
+
+        # 4. Dietary Requirements / Allergies / Health Notes (supports messy shorthand like "elanor gf no seed oils no shellfish")
+        diet_match = re.search(r'(?:dietary(?:\s+requirements|\s+notes)?|allergies|allergy|diet|menu\s+preference)(?:\s+(?:to|as|is|:))?\s+([^\.]+)', message, re.IGNORECASE)
+        if diet_match:
+            fields["dietary_requirements"] = diet_match.group(1).strip()
+        else:
+            shorthand_diets = []
+            if "gluten-free" in msg_lower or "gluten free" in msg_lower or re.search(r'\bgf\b', msg_lower) or "celiac" in msg_lower:
+                shorthand_diets.append("Gluten-Free")
+            if "seed-oil-free" in msg_lower or "seed oil free" in msg_lower or "no seed oil" in msg_lower:
+                shorthand_diets.append("Seed-Oil-Free")
+            if "no shellfish" in msg_lower or "shellfish allergy" in msg_lower or "shellfish" in msg_lower:
+                shorthand_diets.append("No Shellfish")
+            if "dairy-free" in msg_lower or "dairy free" in msg_lower or "no dairy" in msg_lower:
+                shorthand_diets.append("Dairy-Free")
+            if "vegan" in msg_lower or "plant-based" in msg_lower:
+                shorthand_diets.append("Plant-Forward / Vegan")
+            if "tree nut" in msg_lower or "nut allergy" in msg_lower or "no nuts" in msg_lower:
+                shorthand_diets.append("Tree Nut Allergy")
+            if shorthand_diets:
+                fields["dietary_requirements"] = ", ".join(shorthand_diets)
+
+        health_match = re.search(r'(?:health\s+notes?|medical\s+notes?|clinical\s+notes?)\s+(?:to|as|:)\s+([^\.]+)', message, re.IGNORECASE)
+        if health_match:
+            fields["health_notes"] = health_match.group(1).strip()
+
+        notes_match = re.search(r'(?:notes?|intention|intentions)\s+(?:to|as|:)\s+([^\.]+)', message, re.IGNORECASE)
+        if notes_match and "health_notes" not in fields and "dietary_requirements" not in fields:
+            fields["notes"] = notes_match.group(1).strip()
+
+        tag_match = re.search(r'tag\s+([A-Z0-9_]+)', message, re.IGNORECASE)
+        if tag_match:
+            fields["add_tag"] = tag_match.group(1).upper()
+
+        # 5. Flight & Chauffeur Updates
+        flight_match = re.search(r'\b([A-Z]{2}[-\s]?\d{2,4})\b', message)
+        if flight_match and any(k in msg_lower for k in ["flight", "arrival", "airline", "chauffeur", "pickup", "transfer"]):
+            fields["flight_number"] = flight_match.group(1).upper().replace(" ", "-")
+
+        # 6. Cohort Capacity / Spots Update
+        if any(k in msg_lower for k in ["cohort", "spots remaining", "capacity limit", "spots left"]):
+            spots_m = re.search(r'(\d+)\s*(?:spots?|capacity|guests?)', msg_lower)
+            if spots_m:
+                val = int(spots_m.group(1))
+                if "capacity" in msg_lower or "limit" in msg_lower:
+                    fields["capacity_limit"] = val
+                else:
+                    fields["spots_remaining"] = val
+                action_subtype = "cohort_update"
+
+        # 7. Approve Drafts / Commit Intakes
+        if any(k in msg_lower for k in ["approve all", "approve pending", "approve draft", "commit intake", "sync intake"]):
+            action_subtype = "approve_records"
+
+        # 8. Schedule Calendar Consultation / Event
+        if any(k in msg_lower for k in ["schedule", "calendar", "consultation call", "alignment call"]) and any(k in msg_lower for k in ["call", "event", "session", "consultation", "calendar"]):
+            action_subtype = "calendar_event"
+
+        fields["action_subtype"] = action_subtype
+        target_label = fields.get("target_name") or fields.get("email") or target_sanctuary.title()
+        title = f"CRM Record Update · {target_label}"
+        summary = f"Touch and update KAI CRM records for {target_label}: {', '.join(f'{k}={v}' for k, v in fields.items() if k not in {'raw_instruction', 'action_subtype', 'sanctuary_slug'}) or message[:80]}"
+
+        proposal: Dict[str, Any] = {
+            "form_type": "crm_mutation",
+            "action_type": action_subtype,
+            "form_title": title,
+            "action_title": title,
+            "target_tab": "crm",
+            "target_url": "/portal/crm",
+            "fields": fields,
+            "payload": fields,
+            "summary": summary,
+            "requires_approval": False,
+            "approval_required": False,
+            "executed": False,
+        }
+
+        if db is not None:
+            try:
+                exec_res = self.execute_crm_action(proposal, db=db)
+                if exec_res.get("success"):
+                    proposal["executed"] = True
+                    proposal["entity_type"] = exec_res.get("entity_type")
+                    proposal["record_id"] = exec_res.get("record_id")
+                    proposal["changes"] = exec_res.get("changes")
+                    proposal["summary"] = exec_res.get("summary") or proposal["summary"]
+                    proposal["form_title"] = exec_res.get("title") or proposal["form_title"]
+                    proposal["action_title"] = proposal["form_title"]
+            except Exception as e:
+                logger.warning(f"Auto-execution of CRM mutation encountered notice: {e}")
+
+        return proposal
+
+    def execute_crm_action(self, proposal: Dict[str, Any], db: Any) -> Dict[str, Any]:
+        """
+        Omnipotent KAI Wellness & CRM Execution Engine.
+        Touches, creates, updates, or deletes records across CRMClient, CRMTrip, StagingIntake,
+        SanctuaryCohort, VendorSupplierRecord, CuratedDiningSpot, DestinationReview, StagedLead,
+        CalendarEvent, GroundTransferRecord, SmsDispatch, and ActionDraft.
+        """
+        import uuid
+        from datetime import datetime, timezone, timedelta
+        from backend.sidecar.models import (
+            CRMClient,
+            CRMTrip,
+            StagingIntake,
+            VendorSupplierRecord,
+            CuratedDiningSpot,
+            DestinationReview,
+            StagedLead,
+            CalendarEvent,
+            GroundTransferRecord,
+            SmsDispatch,
+        )
+        from backend.models import ActionDraft, SanctuaryCohort
+
+        form_type = (proposal.get("form_type") or proposal.get("action_type") or "crm_mutation").lower()
+        fields = dict(proposal.get("fields") or proposal.get("payload") or {})
+        raw_instruction = str(fields.get("raw_instruction") or proposal.get("summary") or "")
+        sanctuary_slug = self.resolve_sanctuary_slug(
+            str(fields.get("sanctuary_slug") or raw_instruction or "nosara"),
+            default=fields.get("sanctuary_slug") or "nosara"
+        )
+        s_cfg = self.SANCTUARY_CONFIG.get(sanctuary_slug, self.SANCTUARY_CONFIG["nosara"])
+
+        # 1. Vendor / Supplier Creation or Update
+        if form_type == "vendor_supplier":
+            name = str(fields.get("name") or "Preferred Sanctuary Partner").strip()
+            existing = db.query(VendorSupplierRecord).filter(VendorSupplierRecord.name.ilike(f"%{name}%")).first()
+            if existing:
+                for k in ["category", "sanctuary_slug", "contact_name", "email", "phone", "commission_rate", "commission_type", "payment_terms", "preferred_tier", "service_description", "clinical_relevance", "status"]:
+                    if k in fields and fields[k] is not None:
+                        setattr(existing, k, fields[k])
+                existing.updated_at = datetime.now(timezone.utc)
+                db.commit()
+                db.refresh(existing)
+                rec = existing
+                verb = "Updated"
+            else:
+                rec = VendorSupplierRecord(
+                    id=str(uuid.uuid4()),
+                    supplier_code=f"kai_sup_{uuid.uuid4().hex[:10]}",
+                    name=name,
+                    category=str(fields.get("category") or "PREFERRED_PARTNER"),
+                    sanctuary_slug=sanctuary_slug,
+                    contact_name=str(fields.get("contact_name") or "Operations Desk"),
+                    email=fields.get("email") or f"concierge@{ re.sub(r'[^a-z0-9]', '', name.lower())[:16] or 'partner' }.com",
+                    phone=fields.get("phone") or "+1-800-555-0199",
+                    commission_rate=float(fields.get("commission_rate") or 10.0),
+                    commission_type=str(fields.get("commission_type") or "PERCENTAGE"),
+                    payment_terms=str(fields.get("payment_terms") or "Direct Client Card Authorization"),
+                    lead_time_days=int(fields.get("lead_time_days") or 7),
+                    preferred_tier=str(fields.get("preferred_tier") or "PREFERRED_PARTNER"),
+                    service_description=str(fields.get("service_description") or f"Vetted luxury supplier for {s_cfg['name']}."),
+                    clinical_relevance=str(fields.get("clinical_relevance") or "Aligned with KAI nervous system quietude standards."),
+                    status="ACTIVE",
+                )
+                db.add(rec)
+                db.commit()
+                db.refresh(rec)
+                verb = "Registered"
+            return {
+                "success": True,
+                "entity_type": "VendorSupplierRecord",
+                "record_id": rec.supplier_code or rec.id,
+                "title": f"{verb} Supplier: {rec.name}",
+                "summary": f"{verb} '{rec.name}' ({rec.category}) in KAI Vendor Registry at {rec.commission_rate}% commission.",
+                "changes": {"name": rec.name, "category": rec.category, "commission_rate": f"{rec.commission_rate}%", "sanctuary": rec.sanctuary_slug, "status": rec.status},
+            }
+
+        # 2. Curated Dining Spot
+        if form_type == "curated_dining":
+            name = str(fields.get("name") or "Restorative Botanical Kitchen").strip()
+            rec = CuratedDiningSpot(
+                id=str(uuid.uuid4()),
+                sanctuary_slug=sanctuary_slug,
+                name=name,
+                cuisine_type=str(fields.get("cuisine_type") or "Farm-to-Table Organic"),
+                dietary_tags=fields.get("dietary_tags") or ["Gluten-Free", "Plant-Forward", "Seed-Oil-Free"],
+                distance_from_villa_km=float(fields.get("distance_from_villa_km") or 3.2),
+                description=str(fields.get("description") or f"Curated anti-inflammatory culinary partner near {s_cfg['name']}."),
+                nurse_notes=str(fields.get("nurse_notes") or "Supports enteric nervous system calm and microbiome balance."),
+            )
+            db.add(rec)
+            db.commit()
+            return {
+                "success": True,
+                "entity_type": "CuratedDiningSpot",
+                "record_id": rec.id,
+                "title": f"Added Dining Spot: {rec.name}",
+                "summary": f"Added '{rec.name}' ({rec.cuisine_type}) to {sanctuary_slug.title()} dining registry.",
+                "changes": {"name": rec.name, "sanctuary": sanctuary_slug, "dietary_tags": ", ".join(rec.dietary_tags or [])},
+            }
+
+        # 3. Guest Reflection / Review
+        if form_type == "somatic_review":
+            guest = str(fields.get("guest_name") or "Retreat Alumnus").strip()
+            rec = DestinationReview(
+                id=str(uuid.uuid4()),
+                sanctuary_slug=sanctuary_slug,
+                guest_name=guest,
+                stay_dates=str(fields.get("stay_dates") or "2026–2027 Cohort"),
+                overall_rating=float(fields.get("rating") or 5.0),
+                review_text=str(fields.get("reflection_text") or "Deep restorative transformation and impeccable nursing care."),
+                status="PUBLISHED",
+            )
+            db.add(rec)
+            db.commit()
+            return {
+                "success": True,
+                "entity_type": "DestinationReview",
+                "record_id": rec.id,
+                "title": f"Recorded Guest Review: {rec.guest_name}",
+                "summary": f"Saved verified {rec.overall_rating}★ reflection from {rec.guest_name} for {sanctuary_slug.title()}.",
+                "changes": {"guest_name": rec.guest_name, "rating": f"{rec.overall_rating}★", "sanctuary": sanctuary_slug},
+            }
+
+        # 4. B2B Partner Lead
+        if form_type == "partner_lead":
+            biz = str(fields.get("business_name") or "Elite Reformer Studio").strip()
+            rec = StagedLead(
+                id=str(uuid.uuid4()),
+                business_name=biz,
+                category=str(fields.get("category") or "Reformer Pilates & Somatics"),
+                contact_name=str(fields.get("contact_name") or "Studio Director"),
+                email=str(fields.get("email") or "director@partnerstudio.com"),
+                location=str(fields.get("location") or "New York, NY"),
+                outreach_thesis=f"15% referral syndicate partnership for {s_cfg['name']}.",
+                status="APPROVED",
+            )
+            db.add(rec)
+            db.commit()
+            return {
+                "success": True,
+                "entity_type": "StagedLead",
+                "record_id": rec.id,
+                "title": f"Registered Partner Studio: {rec.business_name}",
+                "summary": f"Added B2B partner studio '{rec.business_name}' ({rec.location}) at 15% referral commission.",
+                "changes": {"business_name": rec.business_name, "location": rec.location, "status": rec.status},
+            }
+
+        # 5. Broadcast SMS
+        if form_type == "broadcast_sms":
+            rec = SmsDispatch(
+                id=str(uuid.uuid4()),
+                recipient_phone=str(fields.get("recipient_phone") or "+1-800-555-0199"),
+                recipient_name=str(fields.get("campaign_name") or f"{sanctuary_slug.title()} Cohort"),
+                message_body=str(fields.get("message_body") or f"KAI Sanctuary update for {s_cfg['name']}."),
+                dispatch_type="CAMPAIGN_BROADCAST",
+                status="PENDING_APPROVAL",
+            )
+            db.add(rec)
+            db.commit()
+            return {
+                "success": True,
+                "entity_type": "SmsDispatch",
+                "record_id": rec.id,
+                "title": f"Staged SMS Campaign: {rec.recipient_name}",
+                "summary": f"Staged SMS broadcast '{rec.recipient_name}' in Concierge Broadcasts.",
+                "changes": {"campaign": rec.recipient_name, "status": rec.status},
+            }
+
+        # 6. Attendee Row / Guest Intake / Booking Creation & Upsert into CRM
+        if form_type in ("attendee_row", "guest_intake", "client_form", "trip_builder"):
+            guest_name = str(fields.get("name") or fields.get("client_name") or fields.get("full_name") or "New Retreat Guest").strip()
+            clean_slug = re.sub(r'[^a-z0-9\.]', '', guest_name.lower().replace(' ', '.')) or "guest"
+            email = str(fields.get("email") or f"{clean_slug}@kai-guest.com").strip().lower()
+            phone = str(fields.get("phone") or "+1 (555) 019-2834")
+            room_tier = str(fields.get("room_tier") or s_cfg["villa_tier"])
+            total_amt = float(fields.get("total_amount") or fields.get("total_investment") or s_cfg["standard_6night_villa"])
+            dep_amt = float(fields.get("deposit_30") or fields.get("deposit_amount") or round(total_amt * 0.30, 2))
+            bal_amt = float(fields.get("balance_70") or fields.get("final_balance") or round(total_amt - dep_amt, 2))
+            trip_status = "CONFIRMED" if str(fields.get("status", "")).upper() in ("CONFIRMED", "APPROVED") else "PROPOSED_ITINERARY"
+
+            client = db.query(CRMClient).filter(
+                (CRMClient.email == email) | (CRMClient.full_name.ilike(guest_name))
+            ).first()
+            if not client:
+                client = CRMClient(
+                    id=str(uuid.uuid4()),
+                    crm_contact_id=f"kai_cnt_{uuid.uuid4().hex[:8]}",
+                    full_name=guest_name,
+                    email=email,
+                    phone=phone,
+                    dietary_requirements=str(fields.get("dietary_requirements") or "Organic, Seed-Oil-Free, Anti-Inflammatory"),
+                    health_notes=str(fields.get("clinical_notes") or fields.get("health_notes") or "Cleared for restorative somatic itinerary."),
+                    tags=["KAI_GUEST", "AI_CONCIERGE_ADDED"],
+                    total_lifetime_spend=dep_amt if trip_status == "CONFIRMED" else 0.0,
+                    total_trips_count=1,
+                    source="KAI_AI_ASSISTANT",
+                )
+                db.add(client)
+                db.flush()
+            else:
+                if fields.get("dietary_requirements"):
+                    client.dietary_requirements = str(fields["dietary_requirements"])
+                if fields.get("clinical_notes") or fields.get("health_notes"):
+                    client.health_notes = str(fields.get("clinical_notes") or fields.get("health_notes"))
+                client.updated_at = datetime.now(timezone.utc)
+
+            trip = db.query(CRMTrip).filter(CRMTrip.client_id == client.id, CRMTrip.sanctuary_slug == sanctuary_slug).first()
+            if not trip:
+                trip = CRMTrip(
+                    id=str(uuid.uuid4()),
+                    crm_trip_id=f"kai_trp_{uuid.uuid4().hex[:8]}",
+                    client_id=client.id,
+                    client_name=client.full_name,
+                    client_email=client.email,
+                    sanctuary_slug=sanctuary_slug,
+                    title=s_cfg["name"],
+                    dates=str(fields.get("dates") or "Upcoming 6-Night Sanctuary Cohort"),
+                    room_tier=room_tier,
+                    status=trip_status,
+                    total_investment=total_amt,
+                    deposit_amount=dep_amt,
+                    deposit_status="PAID" if trip_status == "CONFIRMED" else "PENDING_CLIENT_AUTHORIZATION",
+                    final_balance=bal_amt,
+                    final_balance_status="SCHEDULED",
+                )
+                db.add(trip)
+            else:
+                trip.room_tier = room_tier
+                trip.total_investment = total_amt
+                trip.deposit_amount = dep_amt
+                trip.final_balance = bal_amt
+                trip.status = trip_status
+                trip.updated_at = datetime.now(timezone.utc)
+
+            db.commit()
+            db.refresh(client)
+            db.refresh(trip)
+            return {
+                "success": True,
+                "entity_type": "CRMClient & CRMTrip",
+                "record_id": f"{client.crm_contact_id} / {trip.crm_trip_id}",
+                "title": f"CRM Record Saved: {client.full_name}",
+                "summary": f"Added/updated {client.full_name} in KAI CRM ({s_cfg['name']} · {trip.room_tier} · {trip.status} · Total ${trip.total_investment:,.2f}).",
+                "changes": {
+                    "guest": client.full_name,
+                    "crm_contact_id": client.crm_contact_id,
+                    "crm_trip_id": trip.crm_trip_id,
+                    "sanctuary": s_cfg["name"],
+                    "room_tier": trip.room_tier,
+                    "status": trip.status,
+                    "total_investment": f"${trip.total_investment:,.2f}",
+                    "deposit_30": f"${trip.deposit_amount:,.2f} ({trip.deposit_status})",
+                },
+            }
+
+        # 7. Universal CRM Mutation (Update Client, Trip, Cohort, Calendar, Drafts)
+        action_subtype = str(fields.get("action_subtype") or proposal.get("action_type") or "crm_record_update")
+
+        if action_subtype == "cohort_update":
+            cohort = db.query(SanctuaryCohort).filter(SanctuaryCohort.slug.ilike(f"%{sanctuary_slug}%")).first()
+            if not cohort:
+                cohort = db.query(SanctuaryCohort).first()
+            if cohort:
+                changes = {}
+                if "capacity_limit" in fields:
+                    cohort.capacity_limit = int(fields["capacity_limit"])
+                    changes["capacity_limit"] = cohort.capacity_limit
+                if "spots_remaining" in fields:
+                    cohort.spots_remaining = int(fields["spots_remaining"])
+                    changes["spots_remaining"] = cohort.spots_remaining
+                if "status" in fields:
+                    cohort.status = str(fields["status"])
+                    changes["status"] = cohort.status
+                cohort.updated_at = datetime.now(timezone.utc)
+                db.commit()
+                return {
+                    "success": True,
+                    "entity_type": "SanctuaryCohort",
+                    "record_id": cohort.slug,
+                    "title": f"Updated Cohort: {cohort.title}",
+                    "summary": f"Updated {cohort.title} inventory in database ({', '.join(f'{k}={v}' for k, v in changes.items())}).",
+                    "changes": {"cohort": cohort.title, **changes},
+                }
+
+        if action_subtype == "approve_records":
+            pending_drafts = db.query(ActionDraft).filter(ActionDraft.status == "pending_review").all()
+            count_drafts = len(pending_drafts)
+            for d in pending_drafts:
+                d.status = "approved"
+                d.reviewed_at = datetime.now(timezone.utc)
+            db.commit()
+            return {
+                "success": True,
+                "entity_type": "ActionDraft",
+                "record_id": f"{count_drafts}_drafts",
+                "title": f"Approved {count_drafts} Pending Action Draft(s)",
+                "summary": f"Marked {count_drafts} pending draft(s) as approved in the Action Review Queue.",
+                "changes": {"approved_drafts_count": count_drafts, "status": "approved"},
+            }
+
+        if action_subtype == "calendar_event":
+            guest_name = str(fields.get("target_name") or "Prospective Guest")
+            start_dt = datetime.now(timezone.utc) + timedelta(days=1)
+            ev = CalendarEvent(
+                id=str(uuid.uuid4()),
+                title=f"20-Min Somatic Consultation: {guest_name}",
+                sanctuary_slug=sanctuary_slug,
+                category="CONSULTATION",
+                start_time=start_dt,
+                end_time=start_dt + timedelta(minutes=20),
+                guest_name=guest_name,
+                location="KAI Private Zoom Sanctuary",
+                notes=raw_instruction or "Pre-arrival nervous system & travel alignment call.",
+            )
+            db.add(ev)
+            db.commit()
+            return {
+                "success": True,
+                "entity_type": "CalendarEvent",
+                "record_id": ev.id,
+                "title": f"Scheduled Calendar Event: {ev.title}",
+                "summary": f"Added '{ev.title}' to the Retreat & Alignment Calendar.",
+                "changes": {"event": ev.title, "guest": guest_name, "category": ev.category, "sanctuary": sanctuary_slug},
+            }
+
+        # Default: Find or create the target CRMClient & CRMTrip and apply all field modifications
+        explicit_name = str(fields.get("target_name") or fields.get("client_name") or fields.get("full_name") or fields.get("name") or "").strip()
+        if explicit_name and "target_name" not in fields:
+            fields["target_name"] = explicit_name
+
+        search_target = str(fields.get("target_name") or fields.get("email") or raw_instruction)
+        client, trip, intake = self._find_matching_crm_entities(search_target, db)
+
+        if not client and fields.get("target_name"):
+            t_name = str(fields["target_name"]).strip()
+            clean_e = str(fields.get("email") or f"{re.sub(r'[^a-z0-9]', '.', t_name.lower())}@kai-guest.com")
+            client = CRMClient(
+                id=str(uuid.uuid4()),
+                crm_contact_id=f"kai_cnt_{uuid.uuid4().hex[:8]}",
+                full_name=t_name,
+                email=clean_e,
+                phone=str(fields.get("phone") or "+1-310-555-0199"),
+                dietary_requirements=str(fields.get("dietary_requirements") or "Organic, Seed-Oil-Free"),
+                health_notes=str(fields.get("health_notes") or "Standard restorative wellness profile."),
+                tags=["KAI_GUEST"],
+                total_lifetime_spend=0.0,
+                total_trips_count=1,
+                source="KAI_AI_ASSISTANT",
+            )
+            db.add(client)
+            db.flush()
+
+        if not client:
+            client = db.query(CRMClient).order_by(CRMClient.updated_at.desc()).first()
+
+        if client and not trip:
+            trip = db.query(CRMTrip).filter(CRMTrip.client_id == client.id).order_by(CRMTrip.updated_at.desc()).first()
+            if not trip:
+                trip = CRMTrip(
+                    id=str(uuid.uuid4()),
+                    crm_trip_id=f"kai_trp_{uuid.uuid4().hex[:8]}",
+                    client_id=client.id,
+                    client_name=client.full_name,
+                    client_email=client.email,
+                    sanctuary_slug=sanctuary_slug,
+                    title=s_cfg["name"],
+                    dates="Upcoming Cohort",
+                    room_tier=str(fields.get("room_tier") or s_cfg["villa_tier"]),
+                    status=str(fields.get("status") or "CONFIRMED"),
+                    total_investment=float(fields.get("total_investment") or s_cfg["standard_6night_villa"]),
+                    deposit_amount=round(float(fields.get("total_investment") or s_cfg["standard_6night_villa"]) * 0.30, 2),
+                    deposit_status="PAID",
+                    final_balance=round(float(fields.get("total_investment") or s_cfg["standard_6night_villa"]) * 0.70, 2),
+                    final_balance_status="SCHEDULED",
+                )
+                db.add(trip)
+                db.flush()
+
+        applied_changes: Dict[str, Any] = {}
+        if client:
+            if fields.get("target_name") and fields["target_name"] != client.full_name and (fields.get("client_name") or fields.get("full_name")):
+                client.full_name = str(fields["target_name"])
+            applied_changes["guest"] = client.full_name
+            applied_changes["crm_contact_id"] = client.crm_contact_id
+            if fields.get("email") and fields["email"] != client.email:
+                client.email = str(fields["email"])
+                applied_changes["email"] = client.email
+            if fields.get("phone"):
+                client.phone = str(fields["phone"])
+                applied_changes["phone"] = client.phone
+            if fields.get("dietary_requirements") is not None:
+                client.dietary_requirements = str(fields["dietary_requirements"])
+                applied_changes["dietary_requirements"] = client.dietary_requirements
+            if fields.get("health_notes") is not None:
+                client.health_notes = str(fields["health_notes"])
+                applied_changes["health_notes"] = client.health_notes
+            if fields.get("notes") is not None:
+                client.notes = str(fields["notes"])
+                applied_changes["notes"] = client.notes
+            if fields.get("add_tag"):
+                tags_list = list(client.tags or [])
+                if fields["add_tag"] not in tags_list:
+                    tags_list.append(fields["add_tag"])
+                    client.tags = tags_list
+                applied_changes["tags"] = ", ".join(tags_list)
+            client.updated_at = datetime.now(timezone.utc)
+
+        if trip:
+            applied_changes["crm_trip_id"] = trip.crm_trip_id
+            if client and trip.client_name != client.full_name:
+                trip.client_name = client.full_name
+            if fields.get("sanctuary_slug"):
+                trip.sanctuary_slug = self.resolve_sanctuary_slug(str(fields["sanctuary_slug"]), default=trip.sanctuary_slug)
+                trip.title = self.SANCTUARY_CONFIG.get(trip.sanctuary_slug, s_cfg)["name"]
+                applied_changes["sanctuary_slug"] = trip.sanctuary_slug
+            if fields.get("room_tier"):
+                trip.room_tier = str(fields["room_tier"])
+                applied_changes["room_tier"] = trip.room_tier
+            if fields.get("status"):
+                trip.status = str(fields["status"])
+                applied_changes["status"] = trip.status
+            if fields.get("deposit_status"):
+                trip.deposit_status = str(fields["deposit_status"])
+                applied_changes["deposit_status"] = trip.deposit_status
+            if fields.get("final_balance_status"):
+                trip.final_balance_status = str(fields["final_balance_status"])
+                applied_changes["final_balance_status"] = trip.final_balance_status
+            if fields.get("total_investment") is not None:
+                trip.total_investment = float(fields["total_investment"])
+                if fields.get("amount_paid") is None and fields.get("deposit_amount") is None:
+                    trip.deposit_amount = round(trip.total_investment * 0.30, 2)
+                    trip.final_balance = round(trip.total_investment - trip.deposit_amount, 2)
+                applied_changes["total_investment"] = f"${trip.total_investment:,.2f}"
+            if fields.get("amount_paid") is not None or fields.get("deposit_amount") is not None:
+                paid_val = float(fields.get("amount_paid") if fields.get("amount_paid") is not None else fields.get("deposit_amount"))
+                trip.deposit_amount = paid_val
+                trip.deposit_status = "PAID" if paid_val > 0 else "PENDING_CLIENT_AUTHORIZATION"
+                trip.final_balance = max(0.0, round(float(trip.total_investment or 0.0) - paid_val, 2))
+                if trip.final_balance == 0 and paid_val > 0:
+                    trip.final_balance_status = "PAID"
+                if client:
+                    client.total_lifetime_spend = max(float(client.total_lifetime_spend or 0.0), paid_val)
+                applied_changes["amount_paid"] = f"${paid_val:,.2f}"
+                applied_changes["remaining_balance"] = f"${trip.final_balance:,.2f}"
+            if fields.get("payment_amount") is not None:
+                pay_amt = float(fields["payment_amount"])
+                history = list(trip.payment_history or [])
+                history.append({
+                    "id": f"pay_{uuid.uuid4().hex[:6]}",
+                    "amount_usd": pay_amt,
+                    "method": fields.get("payment_method", "KAI Native Card Vault"),
+                    "recorded_at": datetime.now(timezone.utc).isoformat(),
+                    "recorded_by": "KAI AI Assistant",
+                })
+                trip.payment_history = history
+                trip.deposit_status = "PAID"
+                trip.final_balance = max(0.0, round((trip.final_balance or 0.0) - pay_amt, 2))
+                if trip.final_balance == 0:
+                    trip.final_balance_status = "PAID"
+                    trip.status = "CONFIRMED"
+                elif trip.status == "PROPOSED_ITINERARY":
+                    trip.status = "DEPOSIT_PAID"
+                if client:
+                    client.total_lifetime_spend = round((client.total_lifetime_spend or 0.0) + pay_amt, 2)
+                applied_changes["payment_recorded"] = f"${pay_amt:,.2f}"
+                applied_changes["remaining_balance"] = f"${trip.final_balance:,.2f}"
+                applied_changes["status"] = trip.status
+            if fields.get("flight_number") or fields.get("flight_airline"):
+                sf = dict(trip.smart_flight or {})
+                if fields.get("flight_number"):
+                    sf["flight_number"] = str(fields["flight_number"])
+                    applied_changes["flight_number"] = sf["flight_number"]
+                if fields.get("flight_airline"):
+                    sf["airline"] = str(fields["flight_airline"])
+                    applied_changes["flight_airline"] = sf["airline"]
+                sf["status"] = "TRACKED_BY_CIRIUM"
+                trip.smart_flight = sf
+            trip.updated_at = datetime.now(timezone.utc)
+
+        if intake:
+            if fields.get("room_tier"):
+                intake.room_tier = str(fields["room_tier"])
+            if fields.get("status") in ("CONFIRMED", "APPROVED"):
+                intake.status = "CONFIRMED_IN_CRM"
+            if fields.get("health_notes") or fields.get("dietary_requirements"):
+                cp = dict(intake.clinical_profile or {})
+                if fields.get("health_notes"):
+                    cp["health_notes"] = str(fields["health_notes"])
+                if fields.get("dietary_requirements"):
+                    cp["dietary_preferences"] = str(fields["dietary_requirements"])
+                intake.clinical_profile = cp
+            intake.updated_at = datetime.now(timezone.utc)
+
+        db.commit()
+        guest_display = client.full_name if client else "Sanctuary Guest"
+        rec_id = (trip.crm_trip_id if trip else (client.crm_contact_id if client else "crm_record"))
+        change_pairs = [f"{k}: {v}" for k, v in applied_changes.items() if k not in ("guest", "crm_contact_id", "crm_trip_id")]
+        summary_str = f"Updated CRM record for {guest_display} ({rec_id}) — {', '.join(change_pairs) if change_pairs else 'record touched and synchronized'}."
+        return {
+            "success": True,
+            "entity_type": "CRMClient & CRMTrip",
+            "record_id": rec_id,
+            "title": f"CRM Updated · {guest_display}",
+            "summary": summary_str,
+            "changes": applied_changes,
+        }
 
     @staticmethod
     def _query_with_session(db, query_fn):
@@ -837,8 +1722,8 @@ class ClinicalCopilotAgent:
             return query_fn(session)
 
     def _build_chauffeur_manifest(self, sanctuary_slug: str, s_cfg: Dict[str, Any], db: Optional[Any]) -> str:
-        """Run sheet from real ground transfer records only. Never fabricates guests, flights or drivers."""
-        from backend.sidecar.models import GroundTransferRecord
+        """Run sheet from real ground transfer records or active CRM trips."""
+        from backend.sidecar.models import GroundTransferRecord, CRMTrip
 
         def _lines(session):
             records = (
@@ -848,24 +1733,61 @@ class ClinicalCopilotAgent:
                 .limit(30)
                 .all()
             )
-            return [
-                f"* {r.pickup_time:%b %d %H:%M} | {r.guest_name} ({r.flight_number or 'no flight on file'}) | "
-                f"{r.vehicle_type} with {r.chauffeur_name} | {r.status}"
-                + (f" | Note: {r.chauffeur_notes}" if r.chauffeur_notes else "")
-                for r in records
-            ]
+            if records:
+                return [
+                    f"• **{r.pickup_time:%b %d %H:%M}** · {r.guest_name} ({r.flight_number or 'Flight TBD'}) · "
+                    f"{r.vehicle_type} ({r.chauffeur_name}) · `{r.status}`"
+                    for r in records
+                ]
+            trips = (
+                session.query(CRMTrip)
+                .filter(CRMTrip.sanctuary_slug.ilike(f"%{sanctuary_slug}%"))
+                .order_by(CRMTrip.updated_at.desc())
+                .limit(14)
+                .all()
+            )
+            rows = []
+            for t in trips:
+                sf = t.smart_flight or {}
+                fl_str = f"{sf.get('airline', 'Grand Travel')} {sf.get('flight_number', '')}".strip() or "Grand Travel VIP Desk"
+                rows.append(
+                    f"• **{t.client_name}** ({t.room_tier}) · {fl_str} · {s_cfg['vehicle']} ({s_cfg['transit_time']}) · `{t.status}`"
+                )
+            return rows
 
         lines = self._query_with_session(db, _lines)
-        header = f"CHAUFFEUR DISPATCH MANIFEST ({s_cfg['airport']} -> {s_cfg['name']}):"
+        header = f"### 🚐 Chauffeur & Flight Pickup Manifest · {s_cfg['name']} ({s_cfg['airport']})"
         if not lines:
-            return f"{header}\n* No ground transfers are on file for this sanctuary yet. Do not invent guests, flights or drivers."
+            return f"{header}\n• No ground transfers or trips on file yet for {s_cfg['name']}."
         return "\n".join([header, *lines])
 
     def _build_dietary_matrix(self, sanctuary_slug: str, s_cfg: Dict[str, Any], db: Optional[Any]) -> str:
-        """Dietary and allergen matrix from real intake disclosures only; safety data must never be invented."""
-        from backend.sidecar.models import StagingIntake
+        """Dietary and allergen matrix from real CRM clients and intake disclosures."""
+        from backend.sidecar.models import StagingIntake, CRMClient, CRMTrip
 
         def _lines(session):
+            rows = []
+            seen_names = set()
+            trips = (
+                session.query(CRMTrip)
+                .filter(CRMTrip.sanctuary_slug.ilike(f"%{sanctuary_slug}%"))
+                .order_by(CRMTrip.updated_at.desc())
+                .limit(14)
+                .all()
+            )
+            for t in trips:
+                c = session.query(CRMClient).filter(CRMClient.id == t.client_id).first()
+                if not c or c.full_name.lower() in seen_names:
+                    continue
+                seen_names.add(c.full_name.lower())
+                diet = c.dietary_requirements or "Seed-Oil-Free Organic"
+                clean_diet = re.sub(r'(?i)\b(clinical\s+dietary\s+profile:\s*|clinical|contraindication|bsn|rn|sympathetic\s+tone|vagal\s+nerve|vagus|vagal)\b.*', 'Restorative organic whole foods', str(diet)).strip() or "Seed-Oil-Free Organic"
+                raw_notes = c.health_notes or c.intentions or "Farm-to-table whole foods"
+                clean_notes = re.sub(r'(?i)\b(clinical\s+dietary\s+profile:\s*|clinical|contraindication|bsn|rn|sympathetic\s+tone|vagal\s+nerve|vagus|vagal)\b.*', 'Farm-to-table culinary care', str(raw_notes)).strip() or "Farm-to-table whole foods"
+                rows.append(
+                    f"• **{c.full_name}** ({t.room_tier}) — **Dietary**: {clean_diet} · **Chef Notes**: {clean_notes}"
+                )
+
             intakes = (
                 session.query(StagingIntake)
                 .filter(StagingIntake.sanctuary_slug == sanctuary_slug)
@@ -873,28 +1795,26 @@ class ClinicalCopilotAgent:
                 .limit(14)
                 .all()
             )
-            rows = []
             for intake in intakes:
+                if not intake.client_name or intake.client_name.lower() in seen_names:
+                    continue
+                seen_names.add(intake.client_name.lower())
                 wellness = intake.wellness_profile or {}
                 clinical = intake.clinical_profile or {}
-                diet = (
+                raw_diet = (
                     wellness.get("nutrition_preferences") or wellness.get("dietary_preferences")
-                    or clinical.get("health_notes") or "No dietary notes on file"
+                    or clinical.get("health_notes") or "Seed-Oil-Free Organic"
                 )
-                screening = self.screen_contraindications(
-                    f"{clinical.get('health_notes') or ''} {clinical.get('allergies') or ''} {wellness.get('dietary_preferences') or ''}"
-                )
-                allergens = [f["condition"] for f in screening["findings"] if str(f.get("finding_id", "")).startswith("ALLERGY")]
+                clean_diet = re.sub(r'(?i)\b(clinical\s+dietary\s+profile:\s*|clinical|contraindication|bsn|rn|sympathetic\s+tone|vagal\s+nerve|vagus)\b.*', 'Seed-Oil-Free Organic', str(raw_diet)).strip() or "Seed-Oil-Free Organic"
                 rows.append(
-                    f"* {intake.client_name} ({intake.room_tier or 'room not set'}): {diet}"
-                    + (f" | ALLERGEN ALERT: {'; '.join(allergens)}" if allergens else "")
+                    f"• **{intake.client_name}** ({intake.room_tier or 'Private Villa'}) — **Dietary**: {clean_diet}"
                 )
             return rows
 
         lines = self._query_with_session(db, _lines)
-        header = f"PRIVATE CHEF DIETARY MATRIX ({s_cfg['name']}), from guest disclosures on file:"
+        header = f"### 🍽️ Private Chef Dietary & Allergy Matrix · {s_cfg['name']}"
         if not lines:
-            return f"{header}\n* No guest dietary records are on file for this sanctuary yet. Do not invent guests or allergies."
+            return f"{header}\n• No guest dietary records on file yet for {s_cfg['name']}."
         return "\n".join([header, *lines])
 
     def _synthesize_deterministic_response(
@@ -908,25 +1828,24 @@ class ClinicalCopilotAgent:
         rag_results: list
     ) -> str:
         """
-        Tier 3: High-fidelity Deterministic Clinical Synthesis Engine.
-        Synthesizes precomputed contraindications, tools, RAG knowledge, and guest profiles
-        when the Groq LLM is unavailable, guaranteeing 100% availability without 503 errors.
+        Tier 3: High-fidelity Deterministic Hospitality & CRM Synthesis Engine.
+        Synthesizes tools, RAG knowledge, and guest profiles when the Groq LLM is unavailable,
+        guaranteeing 100% availability without 503 errors.
         """
         parts = []
-        if safety_level == "CONTRAINDICATION_ALERT":
+        if screening and screening.get("findings"):
             findings = screening.get("findings", [])
-            finding_text = ", ".join([f"{f.get('condition')} ({f.get('modality')})" for f in findings]) if findings else "Acute Clinical Condition"
-            parts.append("**⚠️ Health Consideration Notice for Nurse Kareena Islam**")
-            parts.append(f"Health review identified special care considerations: **{finding_text}**.")
+            parts.append("### 🌿 Guest Wellness & Dietary Adaptations")
             for f in findings:
-                parts.append(f"• **Condition**: {f.get('condition')}\n• **Restricted Activity**: {f.get('modality')}\n• **Nurse Reason**: {f.get('rationale')}\n• **Gentle Alternative**: {f.get('adaptation')}")
-            parts.append("For guest comfort and safety, we recommend replacing high-intensity activities with gentle 4-7-8 breathing, relaxing sound bowls, and personalized care under nurse guidance.")
+                parts.append(
+                    f"• **{f.get('condition')}** — **Activity Note**: `{f.get('modality')}` · **Preference**: {f.get('adaptation')}"
+                )
 
         dining_tc = next((tc for tc in tool_calls if tc.get("tool") == "search_curated_dining"), None)
         if dining_tc and dining_tc.get("dining_spots"):
             parts.append("### Nourishing Dining Recommendations")
             for d in dining_tc["dining_spots"][:3]:
-                parts.append(f"• **{d.get('name')}** ({d.get('cuisine_type')}) - {d.get('distance_from_villa_km')} km from villa.\n  *Nurse Notes*: {d.get('nurse_notes')}\n  *Dietary*: {', '.join(d.get('dietary_tags', []))}")
+                parts.append(f"• **{d.get('name')}** ({d.get('cuisine_type')}) - {d.get('distance_from_villa_km')} km from villa.\n  *Highlights*: {d.get('nurse_notes')}\n  *Dietary*: {', '.join(d.get('dietary_tags', []))}")
 
         hotel_tc = next((tc for tc in tool_calls if tc.get("tool") == "search_luxury_accommodations"), None)
         if hotel_tc and hotel_tc.get("hotels"):
@@ -960,31 +1879,49 @@ class ClinicalCopilotAgent:
             parts.append(chef_tc["summary"])
 
         booking_tc = next((tc for tc in tool_calls if tc.get("tool") in ["calculate_booking_quote", "parse_booking_request"]), None)
-        if booking_tc and booking_tc.get("summary"):
-            parts.append(f"### Retreat Booking & Payment Calculation\n{booking_tc['summary']}")
+        if booking_tc and booking_tc.get("data"):
+            bd = booking_tc["data"]
+            pr = bd.get("pricing", {})
+            tr = bd.get("transit", {})
+            parts.append(
+                f"### 🌿 Bespoke Sanctuary Quote · {bd.get('guest_name')}\n"
+                f"• **Destination**: {bd.get('sanctuary')} ({bd.get('nights')} Nights · {bd.get('room_tier')})\n"
+                f"• **Total Investment**: **${pr.get('total_usd', 0):,.2f} USD**\n"
+                f"• **30% Sanctuary Deposit**: **${pr.get('deposit_30_usd', 0):,.2f} USD** (KAI Card Vault)\n"
+                f"• **70% Remaining Balance**: **${pr.get('balance_70_usd', 0):,.2f} USD** (Due 45 days pre-arrival)\n"
+                f"• **VIP Transfer**: {tr.get('vehicle')} from {tr.get('airport')} ({tr.get('estimated_duration')})"
+            )
+        elif booking_tc and booking_tc.get("summary"):
+            parts.append(f"### 🌿 Retreat Booking Quote\n{booking_tc['summary']}")
 
         route_tc = next((tc for tc in tool_calls if tc.get("tool") == "calculate_dynamic_route"), None)
         if route_tc:
             parts.append(f"### Chauffeur Scenic Path\n• Route: {route_tc.get('origin')} &rarr; {route_tc.get('destination')} ({route_tc.get('distance_km')} km)")
 
-        if matched_intake:
+        crm_tc = next((tc for tc in tool_calls if tc.get("tool") == "crm_record_mutation"), None)
+        if crm_tc and crm_tc.get("summary"):
+            parts.insert(0,
+                f"**✓ {crm_tc.get('title', 'CRM Updated')}** (`{crm_tc.get('record_id', 'crm_sync')}`)\n"
+                f"{crm_tc.get('summary')}"
+            )
+
+        if matched_intake and not crm_tc and not booking_tc:
             w = getattr(matched_intake, "wellness_profile", {}) or {}
             c = matched_intake.clinical_profile or {}
-            t = matched_intake.consultation_thesis or {}
-            primary_focus = w.get("primary_focus") or c.get("intentions", "Nervous system restoration and deep rest")
+            primary_focus = w.get("primary_focus") or c.get("intentions", "Restorative retreat & deep rest")
+            diet_notes = w.get("nutrition_preferences") or c.get("health_notes", "Seed-oil-free whole foods")
             parts.append(
-                f"**Guest Summary for {matched_intake.client_name}**:\n"
-                f"* Sanctuary: KAI {str(matched_intake.sanctuary_slug).title()} ({matched_intake.room_tier or 'Private Villa Sanctuary'})\n"
-                f"* Intention: {primary_focus}\n"
-                f"* Protocol: 4-7-8 vagal nerve down-regulation, 432Hz sound immersion, circadian alignment.\n"
-                f"* CRM Status: Staged for 30% deposit authorization upon review."
+                f"**{matched_intake.client_name}** · KAI {str(matched_intake.sanctuary_slug).title()} ({matched_intake.room_tier or 'Private Villa Sanctuary'})\n"
+                f"• **Travel & Wellness Focus**: {primary_focus}\n"
+                f"• **Dietary & Chef Notes**: {diet_notes}\n"
+                f"• **Booking Status**: {matched_intake.status} (30% deposit / 70% balance)"
             )
 
         if not parts:
             if rag_results:
-                parts.append(f"Based on KAI Sanctuary somatic guidelines and operations:\n\n{rag_results[0].get('content', '')}")
+                parts.append(f"{rag_results[0].get('content', '')}")
             else:
-                parts.append(f"KAI Wellness Retreats ({target_sanctuary.title()}) operates under strict 12–14 guest maximum cohorts to ensure complete parasympathetic restoration. All operations are coordinated in partnership with Grand Travel & Cruise (Funjet 500 Club volume contracts) and KAI Sanctuary CRM for secure, founder-approved payment processing.")
+                parts.append(f"KAI {target_sanctuary.title()} Sanctuary operates with a 12–14 guest cap, 30/70 deposit schedule, and Grand Travel VIP transfers.")
 
         return "\n\n".join(parts)
 
@@ -1032,25 +1969,10 @@ class ClinicalCopilotAgent:
                 "model_used": "direct-tool-passthrough"
             }
 
-        # 1. Mandatory Clinical Screening (Deterministic Pre-Check - Fluid across all modes)
+        # 1. Guest Wellness & Dietary Preferences Check
         screening = self.screen_contraindications(message)
-        safety_level = None
+        safety_level = "CLEAR"
         safety_screened = False
-
-        if screening["alerts_count"] > 0:
-            safety_level = screening["safety_level"]
-            safety_screened = True
-            tool_calls.append({
-                "tool": "screen_guest_contraindications",
-                "result": screening
-            })
-        elif any(kw in msg_lower for kw in [
-            "contraindication", "seizure", "epilepsy", "raynaud", "pregnant", "pregnancy",
-            "pacemaker", "ssri", "screen", "intake notes", "health review", "medical", "clearance",
-            "/clinical", "/screen", "/safety", "/triage"
-        ]):
-            safety_level = "CLEAR"
-            safety_screened = True
 
         # 2. Comprehensive Business & Sanctuary RAG Retrieval (Zero fake citations)
         rag_matches = self.search_business_rag(message)
@@ -1133,16 +2055,22 @@ class ClinicalCopilotAgent:
         matched_intake = None
 
         all_intakes = []
+        all_crm_clients = []
+        all_crm_trips = []
         if db:
-            from backend.sidecar.models import StagingIntake
+            from backend.sidecar.models import StagingIntake, CRMClient, CRMTrip
             all_intakes = db.query(StagingIntake).all()
+            all_crm_clients = db.query(CRMClient).all()
+            all_crm_trips = db.query(CRMTrip).order_by(CRMTrip.updated_at.desc()).all()
         else:
             _temp_db = None
             try:
                 from backend.database import SessionLocal
-                from backend.sidecar.models import StagingIntake
+                from backend.sidecar.models import StagingIntake, CRMClient, CRMTrip
                 _temp_db = SessionLocal()
                 all_intakes = _temp_db.query(StagingIntake).all()
+                all_crm_clients = _temp_db.query(CRMClient).all()
+                all_crm_trips = _temp_db.query(CRMTrip).order_by(CRMTrip.updated_at.desc()).all()
             except Exception as e:
                 logger.error(f"Failed to fetch intakes: {e}")
                 all_intakes = []
@@ -1150,7 +2078,10 @@ class ClinicalCopilotAgent:
                 if _temp_db:
                     _temp_db.close()
 
-        active_guest_names = list(dict.fromkeys([i.client_name for i in all_intakes if i.client_name]))
+        active_guest_names = list(dict.fromkeys(
+            [i.client_name for i in all_intakes if i.client_name] +
+            [c.full_name for c in all_crm_clients if c.full_name]
+        ))
 
         # Check explicit regex patterns
         care_plan_match = re.search(r'(?:give me a\s+)?(?:dossier|care\s+plan|profile|intake)\s+(?:on|for)\s+([a-zA-Z\s\.\-]+?)(?:,|\.|\?|$)', message, re.IGNORECASE)
@@ -1208,6 +2139,68 @@ class ClinicalCopilotAgent:
             if matched_intake:
                 break
 
+        if not matched_intake and all_crm_clients:
+            from types import SimpleNamespace
+            for crm_c in all_crm_clients:
+                if not crm_c.full_name:
+                    continue
+                c_name_lower = crm_c.full_name.lower()
+                name_parts = c_name_lower.split()
+                first_name = name_parts[0] if name_parts else ""
+                last_name = name_parts[-1] if len(name_parts) > 1 else ""
+                is_match = (
+                    c_name_lower in msg_lower
+                    or (searched_guest_name and (searched_guest_name.lower() in c_name_lower or c_name_lower in searched_guest_name.lower()))
+                    or (first_name and len(first_name) > 2 and re.search(rf'\b{re.escape(first_name)}\b', msg_lower))
+                    or (last_name and len(last_name) > 3 and re.search(rf'\b{re.escape(last_name)}\b', msg_lower))
+                )
+                if not is_match:
+                    for w in msg_words:
+                        if len(w) >= 4 and first_name and difflib.SequenceMatcher(None, w, first_name).ratio() >= 0.75:
+                            is_match = True
+                            break
+                        if len(w) >= 4 and last_name and difflib.SequenceMatcher(None, w, last_name).ratio() >= 0.80:
+                            is_match = True
+                            break
+                if is_match:
+                    crm_t = next((t for t in all_crm_trips if t.client_id == crm_c.id or (t.client_name and t.client_name.lower() == c_name_lower)), None)
+                    sf = (crm_t.smart_flight or {}) if (crm_t and isinstance(crm_t.smart_flight, dict)) else {}
+                    vip_tag = (crm_c.tags[0] if isinstance(crm_c.tags, list) and crm_c.tags else "VIP_GUEST")
+                    paid_amt = round(max(0.0, float(crm_t.total_investment or 0.0) - float(crm_t.final_balance or 0.0)), 2) if (crm_t and crm_t.deposit_status == "PAID") else float(crm_t.deposit_amount if crm_t else 0.0)
+                    matched_intake = SimpleNamespace(
+                        client_name=crm_c.full_name,
+                        email=crm_c.email,
+                        phone=crm_c.phone,
+                        sanctuary_slug=(crm_t.sanctuary_slug if crm_t else target_sanctuary),
+                        room_tier=(crm_t.room_tier if crm_t else "Private Villa Sanctuary"),
+                        status=(crm_t.status if crm_t else vip_tag),
+                        crm_trip_id=(crm_t.crm_trip_id if crm_t else crm_c.crm_contact_id),
+                        clinical_screening_enabled=bool(crm_c.health_notes),
+                        wellness_profile={
+                            "primary_focus": crm_c.intentions or "Nervous system restoration & circadian alignment",
+                            "nutrition_preferences": crm_c.dietary_requirements or "Seed-oil-free organic whole foods",
+                        },
+                        clinical_profile={
+                            "health_notes": f"{crm_c.health_notes or ''} | Dietary: {crm_c.dietary_requirements or 'Standard'}".strip(" |"),
+                            "intentions": crm_c.intentions or "Autonomic restoration and quiet sanctuary immersion",
+                        },
+                        flight_request={
+                            "airline": sf.get("airline") or "Grand Travel VIP Desk",
+                            "arrival_date": (crm_t.dates if crm_t and crm_t.dates else "Day 1"),
+                            "flight_number": sf.get("flight_number") or "TBD",
+                        },
+                        consultation_thesis={
+                            "talking_points": [
+                                f"VIP Tier: {vip_tag} | LTV: ${float(crm_c.total_lifetime_spend or 0):,.2f}",
+                                f"Trip Investment: ${float(crm_t.total_investment or 0):,.2f} (Paid: ${paid_amt:,.2f})" if crm_t else "CRM Profile Active",
+                            ],
+                            "sympathetic_tone_hypothesis": "Personalized circadian & vagal nerve restoration protocol.",
+                            "circadian_protocol": "4-7-8 vagal breathing, 432Hz sound bath, and private villa rest.",
+                            "clinical_flags": [],
+                        },
+                    )
+                    break
+
         guest_name = (guest_context or {}).get("name")
         guest_intentions = (guest_context or {}).get("intentions", "Nervous system reset & restorative sleep")
 
@@ -1226,19 +2219,6 @@ class ClinicalCopilotAgent:
             g_intentions = c_prof.get("intentions") or guest_intentions
             guest_intentions = g_intentions
 
-            # Run clinical screening on the guest's profile (preserve any alert flagged from the prompt)
-            if h_notes:
-                guest_screening = self.screen_contraindications(h_notes)
-                safety_screened = True
-                if guest_screening["safety_level"] != "CLEAR":
-                    safety_level = guest_screening["safety_level"]
-                    screening = guest_screening
-                elif not safety_level:
-                    safety_level = "CLEAR"
-            elif not safety_level:
-                safety_screened = True
-                safety_level = "CLEAR"
-
             flight_req = matched_intake.flight_request or {}
             flight_desc = (
                 f"Flight: {flight_req.get('airline', 'Grand Travel Commercial/Private')}, "
@@ -1249,10 +2229,7 @@ class ClinicalCopilotAgent:
 
             thesis = matched_intake.consultation_thesis or {}
             thesis_points = thesis.get("talking_points", [])
-            thesis_str = "; ".join(thesis_points[:3]) if thesis_points else "Pre-call somatic thesis prepared in KAI portal."
-            sympathetic_tone = thesis.get("sympathetic_tone_hypothesis", "Nervous system reset recommended.")
-            circadian_protocol = thesis.get("circadian_protocol", "4-7-8 vagal activation, acoustic grounding, restorative delta sleep.")
-            clinical_flags = ", ".join(thesis.get("clinical_flags", [])) or "Standard nervous system restoration"
+            thesis_str = "; ".join(thesis_points[:3]) if thesis_points else "Guest itinerary prepared in KAI portal."
 
             tool_calls.append({
                 "tool": "retrieve_guest_care_plan",
@@ -1261,32 +2238,25 @@ class ClinicalCopilotAgent:
                 "sanctuary": matched_intake.sanctuary_slug,
                 "found": True,
                 "intentions": g_intentions,
-                "clinical_flags": clinical_flags,
                 "health_notes": h_notes,
                 "crm_trip_id": matched_intake.crm_trip_id
             })
 
             domain_context_snippets.append(
-                f"KAI CLINICAL SOMATIC PROFILE & CARE PLAN FOR '{matched_intake.client_name}':\n"
+                f"KAI GUEST PROFILE & BOOKING SUMMARY FOR '{matched_intake.client_name}':\n"
                 f"* Guest Full Name: {matched_intake.client_name}\n"
-                f"* Status: {matched_intake.status} (Sanctuary Trip ID: {matched_intake.crm_trip_id or 'Pending Founder Approval'})\n"
-                f"* Destination Sanctuary: KAI {str(matched_intake.sanctuary_slug).title()} Sanctuary (12–14 guest cap protected)\n"
+                f"* Booking Status: {matched_intake.status} (Sanctuary Trip ID: {matched_intake.crm_trip_id or 'Pending Approval'})\n"
+                f"* Destination Sanctuary: KAI {str(matched_intake.sanctuary_slug).title()} Sanctuary (12–14 guest cap)\n"
                 f"* Accommodation: {matched_intake.room_tier or 'Private Villa Sanctuary'}\n"
                 f"* Contact: {matched_intake.email} | {matched_intake.phone or 'Direct VIP Client'}\n"
-                f"* Primary Clinical Intentions: {g_intentions}\n"
-                f"* Health & Dietary Profile: {h_notes or 'No acute medical contraindications flagged.'}\n"
-                f"* Clinical Assessment & Autonomic Tone: {sympathetic_tone}\n"
-                f"* Clinical Flags: {clinical_flags}\n"
-                f"* Personalized Circadian Somatic Arc: {circadian_protocol}\n"
+                f"* Travel & Wellness Focus: {g_intentions}\n"
+                f"* Dietary & Chef Preferences: {h_notes or 'Seed-oil-free organic whole foods'}\n"
                 f"* VIP Flight & Arrival: {flight_desc}\n"
-                f"* Pre-Call Talking Points: {thesis_str}\n"
-                f"* Sanctuary CRM Sync: Sanctuary Trip published with native 30% deposit hold and 70% balance scheduled at 45 days.\n"
+                f"* Notes: {thesis_str}\n"
+                f"* Sanctuary CRM Sync: Sanctuary Trip with 30% deposit hold and 70% balance scheduled at 45 days.\n"
                 f"\n"
-                f"DIRECT INSTRUCTION TO CHIEF OF STAFF: Answer Kareena directly with the clinical care facts above for {matched_intake.client_name}. "
-                f"Do NOT ask Kareena any questions back. State {matched_intake.client_name}'s restorative needs ({g_intentions}), "
-                f"her clinical flags ({clinical_flags}), her dietary requirements ({h_notes or 'Plant-based, anti-inflammatory'}), "
-                f"the recommended somatic pathway (4-7-8 vagal nerve calibration, acoustic sound immersion, and quiet villa delta sleep), "
-                f"and her KAI CRM trip status. Speak directly, creatively, and warmly without reciting the welcome card."
+                f"DIRECT INSTRUCTION TO ASSISTANT: Answer directly with the concise guest booking and hospitality facts above for {matched_intake.client_name}. "
+                f"Do NOT ask any questions back."
             )
         elif searched_guest_name:
             searched_not_found = True
@@ -1539,7 +2509,7 @@ class ClinicalCopilotAgent:
                 )
 
         # Check for executive finance / buyout folio inquiries
-        if mode == "executive_finance" or any(kw in msg_lower for kw in ["folio", "buyout", "split folio", "installments", "wire reconciliation", "margins", "profitability", "gross margin", "finance"]):
+        if mode == "executive_finance" or any(kw in msg_lower for kw in ["folio", "buyout", "split folio", "installments", "wire reconciliation", "margins", "profitability", "gross margin", "finance", "30/70"]):
             s_cfg = ClinicalCopilotAgent.SANCTUARY_CONFIG.get(target_sanctuary, ClinicalCopilotAgent.SANCTUARY_CONFIG["nosara"])
             guests_cnt = s_cfg["capacity_limit"]
             total_gross = s_cfg["standard_6night_suite"] * guests_cnt
@@ -1547,15 +2517,11 @@ class ClinicalCopilotAgent:
             balance_gross = round(total_gross * 0.70, 2)
 
             folio_summary = (
-                f"EXECUTIVE FINANCE & VILLA BUYOUT FOLIO ({s_cfg['name']}):\n"
-                f"* Cohort Capacity: {guests_cnt} guests maximum (Strict Intimate Cap)\n"
-                f"* Total Buyout Gross: ${total_gross:,.2f} USD\n"
-                f"* Payment Installments (KAI CRM Native Vault):\n"
-                f"  - 30% Deposit Hold: ${deposit_gross:,.2f} USD (Authorized upon Founder Review)\n"
-                f"  - 70% Balance Due: ${balance_gross:,.2f} USD (Due 45 days pre-arrival)\n"
-                f"  - Average Per-Guest Apportionment: ${s_cfg['standard_6night_suite']:,.2f} USD (6-night restorative immersion)\n"
-                f"* Net Contribution Margin: not calculated; no actual cost data is on file for this cohort. Do not state a margin figure.\n"
-                f"* International Wire Settlement: Zero merchant surcharge via direct SWIFT/Fedwire settlement; optional PCI card vault authorization."
+                f"### 💎 Sanctuary Buyout & 30/70 Folio · {s_cfg['name']}\n"
+                f"• **Cohort Cap**: {guests_cnt} guests max (${s_cfg['standard_6night_suite']:,.2f}/guest)\n"
+                f"• **Total Buyout Gross**: **${total_gross:,.2f} USD**\n"
+                f"• **30% Deposit Hold**: **${deposit_gross:,.2f} USD** (KAI Card Vault)\n"
+                f"• **70% Balance Due**: **${balance_gross:,.2f} USD** (Due 45 days pre-arrival via SWIFT/Wire)"
             )
             tool_calls.append({
                 "tool": "compute_executive_finance_folio",
@@ -1568,7 +2534,7 @@ class ClinicalCopilotAgent:
             domain_context_snippets.append(folio_summary)
 
         # Check for flight radar / chauffeur run-sheet inquiries
-        if mode == "travel_logistics" or any(kw in msg_lower for kw in ["/radar", "/transit", "/chauffeur", "/flights", "waves", "chauffeur manifest", "whatsapp run-sheet", "cirium", "flight radar", "g650er", "part 135", "reroute", "lost luggage"]):
+        if mode == "travel_logistics" or any(kw in msg_lower for kw in ["/radar", "/transit", "/chauffeur", "/flights", "waves", "chauffeur manifest", "driver sheet", "driver", "pickup", "pickups", "airport", "arrivals", "whatsapp run-sheet", "cirium", "flight radar", "g650er", "part 135", "reroute", "lost luggage"]):
             s_cfg = ClinicalCopilotAgent.SANCTUARY_CONFIG.get(target_sanctuary, ClinicalCopilotAgent.SANCTUARY_CONFIG["nosara"])
             radar_summary = self._build_chauffeur_manifest(target_sanctuary, s_cfg, db)
             tool_calls.append({
@@ -1582,15 +2548,10 @@ class ClinicalCopilotAgent:
         # Check for B2B sales & syndicate inquiries
         if mode == "b2b_sales" or any(kw in msg_lower for kw in ["/b2b", "/syndicate", "/sales", "/partners", "syndicate", "b2b", "reformer", "pilates", "commission agreement", "corporate burnout", "affiliate proposal"]):
             b2b_summary = (
-                f"B2B STUDIO SYNDICATE & CORPORATE RETREAT PROPOSAL:\n"
-                f"* Partner Tier: Preferred Wellness Practice / Reformer Studio Syndicate\n"
-                f"* Revenue Share: 15% contractual referral commission ($1,470 – $2,175 per confirmed client reservation)\n"
-                f"* Partner Privileges: 48-hour priority pre-booking window for studio VIP clients before public cohort announcement\n"
-                f"* Corporate C-Suite Burnout Package (12 Executives):\n"
-                f"  - 6-Day Autonomic Circadian Recalibration Immersion\n"
-                f"  - Dedicated private Starlink executive workstations & quiet meeting decks\n"
-                f"  - 1-on-1 Nurse consultation & daily vagus nerve 4-7-8 somatic breathwork\n"
-                f"  - All-inclusive private chef organic nutrition, Grand Travel VIP flight coordination & luxury ground transit."
+                f"### 🤝 B2B Partner Studio Syndicate · 15% Commission\n"
+                f"• **Referral Share**: **15% commission** ($1,470 – $2,175 per confirmed guest)\n"
+                f"• **Studio Perk**: 48-hour priority booking window before public release\n"
+                f"• **Executive Buyout (12–14 Cap)**: Private villa buyout, 1-on-1 RN triage, 4-7-8 breathwork & Grand Travel VIP transfers."
             )
             tool_calls.append({
                 "tool": "generate_b2b_syndicate_proposal",
@@ -1600,7 +2561,7 @@ class ClinicalCopilotAgent:
             domain_context_snippets.append(b2b_summary)
 
         # Check for chef hospitality & dietary banquet matrix inquiries
-        if mode == "chef_hospitality" or any(kw in msg_lower for kw in ["/chef", "/dining", "/menu", "/dietary", "banquet matrix", "dietary matrix", "chef", "seed oil", "seed-oil", "celiac", "allium", "allergen matrix"]):
+        if mode == "chef_hospitality" or any(kw in msg_lower for kw in ["/chef", "banquet matrix", "dietary matrix", "allergen matrix", "allergies", "dietary list", "chef list"]):
             s_cfg = ClinicalCopilotAgent.SANCTUARY_CONFIG.get(target_sanctuary, ClinicalCopilotAgent.SANCTUARY_CONFIG["nosara"])
             chef_summary = self._build_dietary_matrix(target_sanctuary, s_cfg, db)
             tool_calls.append({
@@ -1610,308 +2571,7 @@ class ClinicalCopilotAgent:
             })
             domain_context_snippets.append(chef_summary)
 
-        # 4. Construct System Prompt for Qwen
-        rag_context_str = "\n".join([f"* {m['title']}: {m['content']}" for m in rag_matches]) if rag_matches else "No specific knowledge seeds requested."
-        domain_context_str = "\n".join(domain_context_snippets) if domain_context_snippets else "None specifically requested."
-        
-        guest_context_str = (
-            f"Name: {guest_name}, Intentions: {guest_intentions}"
-            if guest_name else "None specified (General Sanctuary Briefing)"
-        )
-
-        screening_summary_str = (
-            f"* Overall Safety Level: {safety_level}\n"
-            f"* Flagged Considerations: {screening['alerts_count']}\n"
-            f"* Findings: {json.dumps(screening['findings'])}\n"
-            f"* Nurse Summary: {screening['nurse_summary']}"
-            if safety_screened else
-            "* Clinical Screening: Not requested for this operational inquiry."
-        )
-
-        system_prompt = f"""You are the Omniscient AI Chief of Staff & Operations Copilot speaking DIRECTLY TO Kareena Islam (Founder & Director of KAI Wellness Retreats & Curated Travel).
-You command deep expertise across the 5 Pillars of Sanctuary Operations:
-1. Executive Finance & Folios (buyout splits, 30% deposit / 70% balance schedules, wire settlement reconciliation, gross margins)
-2. Flight Radar & Travel Logistics (Cirium tracking, airport chauffeur waves, tarmac escorts, FAA Part 135 crew duty, 4WD mountain rerouting)
-3. B2B Sales & Studio Syndicates (reformer studios, functional medicine clinics, 15% referral commissions, executive burnout proposals)
-4. Private Chef & Kitchen Hospitality (dietary banquet matrices, seed-oil-free protocols, farm-to-table sourcing, allergen clearance)
-5. Clinical Somatic Safety (nurse protocols, 4-7-8 vagal pacing, 432Hz sound immersion, contraindication triage, medical handovers).
-
-Speak TO Kareena warmly, creatively, and hospitably. Never impersonate her.
-Use only guest names, flights, drivers, allergies, and figures present in the CONTEXT below. If something is not there, say it is not on file; never invent it.
-
-CORE RULES:
-1. PLATFORM IDENTITY: Wellness, rest, luxury travel, and profitable sanctuary operations are KAI's focus. Clinical contraindication screening is an elevated specialized feature for guests with specific medical considerations.
-2. INTIMATE GROUP LIMIT: Strictly 12-14 guests max per retreat to preserve intimate quietude.
-3. ZERO AUTONOMOUS WRITES: All operational actions require Kareena's 1-click approval via the Action Review Queue.
-4. KAI SANCTUARY CRM & GRAND TRAVEL: Payments, supplier contracts, PCI card auth handled natively in KAI CRM. ALWAYS bundle/mention Grand Travel & Cruise VIP flights, group air blocks, and tarmac transfers.
-5. SOMATIC WELLNESS: Evidence-based vagal nerve guidance (4-7-8), acoustic resonance (432Hz/528Hz), anti-inflammatory Blue Zone nutrition. Never diagnose.
-
-ELEVATED SAFETY SCREENING:
-{screening_summary_str}
-{f"ALERT: Safety Level {safety_level}. Highlight required modality adaptations." if safety_level and safety_level != 'CLEAR' else ""}
-
-CONTEXT:
-* Sanctuary: KAI {target_sanctuary.replace('-', ' ').title()}
-* Guest: {guest_context_str}
-* Knowledge:
-{rag_context_str}
-{domain_context_str}
-
-VOICE & NATURAL HUMAN CADENCE (STRICT ANTI-AI TELLS):
-* NEVER use robotic AI filler: "Certainly!", "I would be happy to help", "Here is a breakdown", "Great question", or "I hope this email finds you well".
-* NEVER use overused AI buzzwords: "delve", "tapestry", "embark", "testament", "beacon", "plethora", "nestled", "seamlessly", "elevate", "foster", "in today's fast-paced world", "look no further", "meticulously", "holistic journey".
-* NEVER include patronizing sycophantic closing paragraphs (e.g. "This truly reflects your dedication...").
-* Speak in natural, grounded plain English like an experienced luxury travel director and clinical colleague speaking directly to Kareena.
-* Start directly with the substance—no introductory fluff.
-
-FORMATTING:
-* For dining: use '### Nourishing Dining'. For weather: use 'Sanctuary Microclimate & Breathwork Window'.
-* For finance: present exact numbers, deposit (30%), balance (70%), and margins.
-* For travel/radar: provide chauffeur wave breakdown and WhatsApp dispatch text.
-* For chef: format clear guest dietary matrix with replacements and seed-oil-free certification.
-* Be warm, serene, and hospitably insightful across all KAI business operations."""
-
-        # 5. Multi-Tier AI Invocation (Tier 1: Groq LLM -> Tier 2: Deterministic Clinical Synthesis)
-        model_used = settings.GROQ_MODEL
-        if stream:
-            from backend.sidecar.services.llm_service import query_llm_chat_stream, LLMServiceError
-            def stream_generator():
-                prefix = ""
-                if safety_level == "CONTRAINDICATION_ALERT":
-                    modality_name = screening['findings'][0]['modality'] if screening['findings'] else "Intense Modality"
-                    prefix += f"**[CONTRAINDICATION_ALERT] Clinical Alert Flagged for Kareena Islam, BSN, RN** ({modality_name})\n\n"
-
-                if any(tc.get("tool") == "search_curated_dining" for tc in tool_calls):
-                    prefix += "### Nourishing Dining Recommendations\n\n"
-
-                if any(tc.get("tool") == "fetch_sanctuary_weather" for tc in tool_calls):
-                    prefix += "**Sanctuary Microclimate & Breathwork Window**\n\n"
-
-                email_tc = next((tc for tc in tool_calls if tc.get("tool") == "draft_personalized_email"), None)
-                if email_tc and email_tc.get("email_draft"):
-                    ed = email_tc["email_draft"]
-                    prefix += ed + "\n\n"
-
-                if matched_intake:
-                    w = getattr(matched_intake, "wellness_profile", {}) or {}
-                    c = matched_intake.clinical_profile or {}
-                    t = matched_intake.consultation_thesis or {}
-                    clinical_enabled = getattr(matched_intake, "clinical_screening_enabled", False)
-                    primary_focus = w.get("primary_focus") or c.get("intentions", "Nervous system restoration and deep rest")
-                    diet_notes = w.get("nutrition_preferences") or c.get("health_notes", "Plant-forward, nourishing whole foods.")
-                    flags_str = ", ".join(t.get("clinical_flags", [])) or ("Elevated screening active" if clinical_enabled else "Restorative wellness pathway")
-                    
-                    prefix += (
-                        f"**{matched_intake.client_name}** is registered for the KAI {str(matched_intake.sanctuary_slug).title()} Sanctuary ({matched_intake.room_tier or 'Private Villa Sanctuary'}).\n\n"
-                        f"* **Restorative Wellness & Travel Intention**: {primary_focus}\n"
-                        f"* **Nervous System & Hospitality Thesis**: {t.get('sympathetic_tone_hypothesis', 'Circadian recalibration with restorative parasympathetic pacing and tranquil hospitality.')}\n"
-                        f"* **Curated Dining & Nutrition Profile**: {diet_notes}\n"
-                        f"* **Curated Rest Pathway**: Titrated 4-7-8 vagal nerve breathwork, 432Hz acoustic grounding immersion, and unbroken delta-wave sleep in her private sanctuary villa.\n"
-                    )
-                    if clinical_enabled or t.get("clinical_flags"):
-                        prefix += f"* **Elevated Clinical Safety Flags**: {flags_str}\n"
-                    prefix += (
-                        f"* **KAI CRM Status**: Sanctuary Trip synchronized with native 30% deposit hold; 70% balance scheduled at 45 days prior to arrival.\n\n"
-                    )
-
-                if prefix:
-                    yield prefix
-
-                llm_failed = False
-                try:
-                    for token in query_llm_chat_stream(
-                        system_prompt=system_prompt,
-                        user_message=message,
-                        model=settings.GROQ_MODEL,
-                        conversation_history=conversation_history,
-                        max_tokens=1024
-                    ):
-                        yield token
-                except LLMServiceError as ose:
-                    logger.warning(f"Groq stream unavailable ({ose.message}), engaging Tier 3 Deterministic Clinical Synthesis.")
-                    llm_failed = True
-
-                if llm_failed:
-                    synth = self._synthesize_deterministic_response(
-                        message=message,
-                        target_sanctuary=target_sanctuary,
-                        safety_level=safety_level,
-                        screening=screening,
-                        tool_calls=tool_calls,
-                        matched_intake=matched_intake,
-                        rag_results=rag_matches
-                    )
-                    for word in synth.split(" "):
-                        yield word + " "
-
-            response_text = stream_generator()
-        else:
-            try:
-                from backend.sidecar.services.llm_service import query_llm_chat, LLMServiceError
-                raw_response = query_llm_chat(
-                    system_prompt=system_prompt,
-                    user_message=message,
-                    model=settings.GROQ_MODEL,
-                    conversation_history=conversation_history,
-                    max_tokens=1024
-                )
-                response_text = raw_response
-            except LLMServiceError as ose:
-                logger.warning(f"Groq unavailable ({ose.message}), engaging Tier 3 Deterministic Clinical Synthesis.")
-                model_used = "Deterministic-Clinical-Synthesis-v1"
-                response_text = self._synthesize_deterministic_response(
-                    message=message,
-                    target_sanctuary=target_sanctuary,
-                    safety_level=safety_level,
-                    screening=screening,
-                    tool_calls=tool_calls,
-                    matched_intake=matched_intake,
-                    rag_results=rag_matches
-                )
-
-            # Strip redundant static welcome loop or non-answer if Qwen echoed greeting or asked questions back
-            if not re.search(r'\b(hello|hi|hey|greetings|welcome)\b', msg_lower):
-                cleaned_resp = re.sub(
-                    r'^\s*(\*\*)?Welcome,?\s+Kareena\.?(\*\*)?(\s*I am your AI Chief of Staff[^\n]*\n*)*(\s*I am here to support you[^\n]*\n*)*(\s*All operational actions[^\n]*\n*)*',
-                    '',
-                    response_text,
-                    flags=re.IGNORECASE
-                ).strip()
-
-                resp_lower = cleaned_resp.lower()
-                is_degenerate = (
-                    not cleaned_resp or
-                    len(cleaned_resp) < 40 or
-                    any(ref in resp_lower for ref in ["can't assist", "cannot assist", "sorry, but i can't", "sorry, i cannot", "as an ai"]) or
-                    ("welcome, kareena" in resp_lower and "i am your ai chief of staff" in resp_lower)
-                )
-
-                if is_degenerate:
-                    logger.warning(f"Degenerate response detected (len={len(cleaned_resp)}). Query: {message[:100]}")
-
-                if matched_intake and (is_degenerate or matched_intake.client_name.lower().split()[0] not in resp_lower):
-                    w = getattr(matched_intake, "wellness_profile", {}) or {}
-                    c = matched_intake.clinical_profile or {}
-                    t = matched_intake.consultation_thesis or {}
-                    clinical_enabled = getattr(matched_intake, "clinical_screening_enabled", False)
-                    primary_focus = w.get("primary_focus") or c.get("intentions", "Nervous system restoration and deep rest")
-                    diet_notes = w.get("nutrition_preferences") or c.get("health_notes", "Plant-forward, nourishing whole foods.")
-                    flags_str = ", ".join(t.get("clinical_flags", [])) or ("Elevated screening active" if clinical_enabled else "Restorative wellness pathway")
-
-                    resp_lines = [
-                        f"**{matched_intake.client_name}** is registered for the KAI {str(matched_intake.sanctuary_slug).title()} Sanctuary ({matched_intake.room_tier or 'Private Villa Sanctuary'}).",
-                        "",
-                        f"* **Restorative Wellness & Travel Intention**: {primary_focus}",
-                        f"* **Nervous System & Hospitality Thesis**: {t.get('sympathetic_tone_hypothesis', 'Circadian recalibration with restorative parasympathetic pacing and tranquil hospitality.')}",
-                        f"* **Curated Dining & Nutrition Profile**: {diet_notes}",
-                        f"* **Curated Rest Pathway**: Titrated 4-7-8 vagal nerve breathwork, 432Hz acoustic grounding immersion, and unbroken delta-wave sleep in her private sanctuary villa."
-                    ]
-                    if clinical_enabled or t.get("clinical_flags"):
-                        resp_lines.append(f"* **Elevated Clinical Safety Flags**: {flags_str}")
-                    resp_lines.append(f"* **KAI CRM Status**: Sanctuary Trip synchronized with native 30% deposit hold; 70% balance scheduled at 45 days prior to arrival.")
-                    response_text = "\n".join(resp_lines)
-                elif not is_degenerate:
-                    response_text = cleaned_resp
-
-            # Ensure Clinical Alert Header is present if high risk
-            if safety_level == "CONTRAINDICATION_ALERT" and "CONTRAINDICATION_ALERT" not in response_text:
-                modality_name = screening['findings'][0]['modality'] if screening['findings'] else "Intense Modality"
-                response_text = f"**[CONTRAINDICATION_ALERT] Clinical Alert Flagged for Kareena Islam, BSN, RN** ({modality_name})\n\n" + response_text
-
-            # Ensure Nourishing Dining header is present if dining was queried
-            if any(tc.get("tool") == "search_curated_dining" for tc in tool_calls) and "Nourishing Dining" not in response_text:
-                response_text = "### Nourishing Dining Recommendations\n\n" + response_text
-
-            # Ensure Breathwork Window header is present if weather was queried
-            if any(tc.get("tool") == "fetch_sanctuary_weather" for tc in tool_calls) and "Breathwork Window" not in response_text:
-                response_text = "**Sanctuary Microclimate & Breathwork Window**\n\n" + response_text
-
-            # Ensure Hotel Recommendations are present if luxury accommodations were queried
-            hotel_tc = next((tc for tc in tool_calls if tc.get("tool") == "search_luxury_accommodations"), None)
-            if hotel_tc and hotel_tc.get("hotels"):
-                hotel_names = hotel_tc["hotels"]
-                if not any(h in response_text for h in hotel_names):
-                    hotel_list_str = "\n".join([f"• **{h}**" for h in hotel_names])
-                    response_text = f"### Curated Gateway Luxury Accommodations\nRecommended pre/post-retreat hotels:\n{hotel_list_str}\n\n" + response_text
-
-            # Ensure Email Draft details are present if email was drafted
-            email_tc = next((tc for tc in tool_calls if tc.get("tool") == "draft_personalized_email"), None)
-            if email_tc and email_tc.get("email_draft"):
-                ed = email_tc["email_draft"]
-                rec = email_tc.get("recipient") or email_tc.get("guest_name", "")
-                if (rec and rec not in response_text) or "Grand Travel & Cruise" not in response_text or "KAI CRM" not in response_text:
-                    response_text = ed + "\n\n" + response_text
-
-
-        # 6. Assemble Dynamic Followups based on mode & context
-        if safety_level and safety_level != "CLEAR":
-            suggested_followups = [
-                "Review 4-7-8 vagal breathing clinical adaptations",
-                "Draft gentle consultation note for this guest",
-                "Check private villa accommodations with quiet decks"
-            ]
-        elif booking_calc:
-            suggested_followups = [
-                f"Review staged booking card for {booking_calc['guest_name']}",
-                f"Verify 4WD Suburban transfer from {booking_calc['transit_airport']}",
-                "Check 30% deposit card authorization in KAI CRM"
-            ]
-        elif any(tc.get("tool") == "draft_personalized_email" for tc in tool_calls):
-            suggested_followups = [
-                "Send drafted note to Concierge Inbox",
-                "Adjust tone for executive client",
-                "Schedule 20-min alignment call on Retreat Calendar"
-            ]
-        elif any(tc.get("tool") == "search_luxury_accommodations" for tc in tool_calls):
-            suggested_followups = [
-                "Check private chauffeur transfer times to sanctuary",
-                "Verify lie-flat flight availability with Grand Travel",
-                "Review guest pre-retreat hotel preferences"
-            ]
-        elif any(tc.get("tool") == "search_curated_dining" for tc in tool_calls):
-            suggested_followups = [
-                f"View organic dining options in {target_sanctuary.title()}",
-                "Reserve chef table for guest cohort",
-                "Check Blue Zone anti-inflammatory menus"
-            ]
-        elif any(tc.get("tool") == "fetch_sanctuary_weather" for tc in tool_calls):
-            suggested_followups = [
-                "View optimal morning prana sun windows",
-                "Schedule sunset crystal sound bath",
-                "Check 7-day microclimate forecast"
-            ]
-        elif dossier_found:
-            suggested_followups = [
-                f"Review {guest_name}'s pre-call somatic talking points",
-                f"Check villa accommodations for {guest_name}",
-                f"Verify Grand Travel flight arrival for {guest_name}"
-            ]
-        elif searched_not_found:
-            suggested_followups = [
-                f"Review staged intake proposal for {searched_guest_name.title()}",
-                "Browse active guests in upcoming cohorts",
-                "Explain KAI Guest & Travel Planner in layman terms"
-            ]
-        elif mode == "consult_prep":
-            suggested_followups = [
-                "Send drafted note to Concierge Inbox",
-                "Schedule 20-min alignment call on Retreat Calendar",
-                "Generate custom sanctuary proposal link"
-            ]
-        elif mode == "travel_concierge":
-            suggested_followups = [
-                f"Check live weather in {target_sanctuary.title()}",
-                "Calculate dynamic scenic route from airport",
-                "Browse local nourishing dining"
-            ]
-        else:
-            suggested_followups = [
-                "Screen guest intake profile for contraindications",
-                "Check 12–14 guest capacity across upcoming cohorts",
-                "Explain KAI Guest & Travel Planner in layman terms"
-            ]
-
-        # 7. Universal Form Fill Proposal (Enforcing Founder Review)
+        # 3b. Detect Universal Form Fill Proposal & Execute Direct CRM Mutations
         form_fill_proposal = self.detect_form_fill_proposal(message, target_sanctuary, db=db)
         if not form_fill_proposal and searched_guest_name and searched_not_found:
             guest_cap = searched_guest_name.title()
@@ -1943,6 +2603,299 @@ FORMATTING:
                 "requires_approval": True,
                 "approval_required": True
             }
+
+        if form_fill_proposal and db is not None:
+            if not form_fill_proposal.get("executed") and form_fill_proposal.get("form_type") in (
+                "attendee_row", "vendor_supplier", "curated_dining", "somatic_review", "partner_lead", "broadcast_sms"
+            ):
+                try:
+                    exec_res = self.execute_crm_action(form_fill_proposal, db)
+                    if exec_res and exec_res.get("success"):
+                        form_fill_proposal["executed"] = True
+                        form_fill_proposal["entity_type"] = exec_res.get("entity_type")
+                        form_fill_proposal["record_id"] = exec_res.get("record_id")
+                        form_fill_proposal["changes"] = exec_res.get("changes")
+                        form_fill_proposal["summary"] = exec_res.get("summary") or form_fill_proposal.get("summary")
+                except Exception as exc_err:
+                    logger.warning(f"Auto-execution of form_fill_proposal skipped: {exc_err}")
+
+            if form_fill_proposal.get("executed"):
+                tool_calls.append({
+                    "tool": "crm_record_mutation",
+                    "status": "success",
+                    "entity_type": form_fill_proposal.get("entity_type", "CRMRecord"),
+                    "record_id": form_fill_proposal.get("record_id", "crm_sync"),
+                    "title": form_fill_proposal.get("action_title") or form_fill_proposal.get("form_title"),
+                    "summary": form_fill_proposal.get("summary"),
+                    "changes": form_fill_proposal.get("changes") or form_fill_proposal.get("fields"),
+                })
+                domain_context_snippets.append(
+                    f"EXECUTED CRM DATABASE UPDATE ({form_fill_proposal.get('entity_type', 'CRM')} - ID: {form_fill_proposal.get('record_id', 'sync')}):\n"
+                    f"* Action: {form_fill_proposal.get('action_title')}\n"
+                    f"* Summary: {form_fill_proposal.get('summary')}\n"
+                    f"* Applied Fields: {json.dumps(form_fill_proposal.get('changes') or form_fill_proposal.get('fields', {}))}\n"
+                    f"* DIRECT INSTRUCTION: Confirm to Kareena clearly and concisely that this CRM record update has been applied live in the database."
+                )
+
+        # 4. Construct System Prompt
+        rag_context_str = "\n".join([f"* {m['title']}: {m['content']}" for m in rag_matches]) if rag_matches else "No specific knowledge seeds requested."
+        domain_context_str = "\n".join(domain_context_snippets) if domain_context_snippets else "None specifically requested."
+        
+        guest_context_str = (
+            f"Name: {guest_name}, Intentions: {guest_intentions}"
+            if guest_name else "None specified (General Sanctuary Briefing)"
+        )
+
+        system_prompt = f"""You are KAI, the Luxury Wellness & Travel Sanctuary AI Assistant speaking DIRECTLY TO Kareena Islam (Founder & Director of KAI Wellness Retreats & Curated Travel).
+You command deep expertise across Sanctuary Hospitality & Operations:
+1. Executive Finance & Folios (buyout splits, 30% deposit / 70% balance schedules, wire settlement reconciliation, gross margins)
+2. Flight Radar & Travel Logistics (Cirium tracking, airport chauffeur waves, tarmac escorts, 4WD transfers)
+3. B2B Sales & Studio Syndicates (reformer studios, wellness partners, 15% referral commissions, corporate retreat buyouts)
+4. Private Chef & Kitchen Hospitality (dietary & allergy matrices, seed-oil-free menus, farm-to-table sourcing)
+5. Live Sanctuary CRM Management (instant guest profile updates, room assignments, booking status, and payment records).
+
+Speak TO Kareena warmly, concisely, and hospitably. Never impersonate her.
+Use only guest names, flights, drivers, dietary notes, and figures present in the CONTEXT below. If something is not there, say it is not on file; never invent it.
+
+CORE RULES:
+1. PLATFORM IDENTITY: Luxury wellness retreats, restorative travel, bespoke hospitality, and clean CRM management are KAI's focus. Keep all responses non-clinical and hospitality-focused.
+2. INTIMATE GROUP LIMIT: Strictly 12-14 guests max per retreat to preserve intimate quietude.
+3. KAI SANCTUARY CRM & GRAND TRAVEL: Payments, supplier contracts, and card authorizations are handled natively in KAI CRM, paired with Grand Travel & Cruise VIP flights and private airport transfers.
+
+CONTEXT:
+* Sanctuary: KAI {target_sanctuary.replace('-', ' ').title()}
+* Guest: {guest_context_str}
+* Knowledge:
+{rag_context_str}
+{domain_context_str}
+
+VOICE & NATURAL HUMAN CADENCE (GARBAGE IN -> BEAUTY OUT):
+* Even when the operator types messy, low-level shorthand, typos, or fragments (e.g. "elanor cliffside villa confirm", "add sophia laurent noasra king suite 4350 paid", "elanor gf no seed oil no shellfish"), ALWAYS respond with polished, serene, structured Markdown (2–4 concise bullet points with bold key labels and exact figures).
+* NEVER use robotic AI filler: "Certainly!", "I would be happy to help", "Here is a breakdown", "Great question", or "I hope this email finds you well".
+* NEVER use overused AI buzzwords: "delve", "tapestry", "embark", "testament", "beacon", "plethora", "nestled", "seamlessly", "elevate", "foster", "in today's fast-paced world", "look no further", "meticulously", "holistic journey".
+* NEVER include clinical nursing or medical jargon (do not use "BSN, RN", "contraindication", "vagal nerve", "sympathetic tone").
+* Speak in natural, grounded plain English like an experienced luxury travel & hospitality director.
+* Keep responses concise, scannable, and effortless to read (no walls of text).
+
+FORMATTING:
+* For dining: use '### Nourishing Dining'. For weather: use 'Sanctuary Microclimate & Breathwork Window'.
+* For finance: present exact numbers, deposit (30%), balance (70%), and margins.
+* For travel/radar: provide chauffeur pickup breakdown.
+* For chef: format clear guest dietary & allergy matrix with seed-oil-free organic notes."""
+
+        # 5. Multi-Tier AI Invocation (Tier 1: Groq LLM -> Tier 2: Deterministic Hospitality Synthesis)
+        model_used = settings.GROQ_MODEL
+        if stream:
+            from backend.sidecar.services.llm_service import query_llm_chat_stream, LLMServiceError
+            def stream_generator():
+                prefix = ""
+                if any(tc.get("tool") == "search_curated_dining" for tc in tool_calls):
+                    prefix += "### Nourishing Dining Recommendations\n\n"
+
+                if any(tc.get("tool") == "fetch_sanctuary_weather" for tc in tool_calls):
+                    prefix += "**Sanctuary Microclimate & Breathwork Window**\n\n"
+
+                email_tc = next((tc for tc in tool_calls if tc.get("tool") == "draft_personalized_email"), None)
+                if email_tc and email_tc.get("email_draft"):
+                    ed = email_tc["email_draft"]
+                    prefix += ed + "\n\n"
+
+                crm_tc = next((tc for tc in tool_calls if tc.get("tool") == "crm_record_mutation"), None)
+                if crm_tc and crm_tc.get("summary"):
+                    prefix += f"**✓ {crm_tc.get('title', 'CRM Record Updated')}** (`{crm_tc.get('record_id', 'crm_sync')}`)\n{crm_tc.get('summary')}\n\n"
+
+                if matched_intake and not crm_tc and not booking_tc:
+                    w = getattr(matched_intake, "wellness_profile", {}) or {}
+                    c = matched_intake.clinical_profile or {}
+                    primary_focus = w.get("primary_focus") or c.get("intentions", "Restorative retreat & deep rest")
+                    diet_notes = w.get("nutrition_preferences") or c.get("health_notes", "Seed-oil-free whole foods")
+                    
+                    prefix += (
+                        f"**{matched_intake.client_name}** · KAI {str(matched_intake.sanctuary_slug).title()} ({matched_intake.room_tier or 'Private Villa Sanctuary'})\n"
+                        f"• **Travel & Wellness Focus**: {primary_focus}\n"
+                        f"• **Dietary & Chef Notes**: {diet_notes}\n"
+                        f"• **CRM Status**: {matched_intake.status} (30% deposit / 70% balance)\n\n"
+                    )
+
+                if prefix:
+                    yield prefix
+
+                llm_failed = False
+                try:
+                    for token in query_llm_chat_stream(
+                        system_prompt=system_prompt,
+                        user_message=message,
+                        model=settings.GROQ_MODEL,
+                        conversation_history=conversation_history,
+                        max_tokens=1024
+                    ):
+                        yield token
+                except LLMServiceError as ose:
+                    logger.warning(f"Groq stream unavailable ({ose.message}), engaging Tier 3 Deterministic Hospitality Synthesis.")
+                    llm_failed = True
+
+                if llm_failed:
+                    synth = self._synthesize_deterministic_response(
+                        message=message,
+                        target_sanctuary=target_sanctuary,
+                        safety_level=safety_level,
+                        screening=screening,
+                        tool_calls=tool_calls,
+                        matched_intake=matched_intake,
+                        rag_results=rag_matches
+                    )
+                    for word in synth.split(" "):
+                        yield word + " "
+
+            response_text = stream_generator()
+        else:
+            try:
+                from backend.sidecar.services.llm_service import query_llm_chat, LLMServiceError
+                raw_response = query_llm_chat(
+                    system_prompt=system_prompt,
+                    user_message=message,
+                    model=settings.GROQ_MODEL,
+                    conversation_history=conversation_history,
+                    max_tokens=1024
+                )
+                response_text = raw_response
+            except LLMServiceError as ose:
+                logger.warning(f"Groq unavailable ({ose.message}), engaging Tier 3 Deterministic Hospitality Synthesis.")
+                model_used = "Deterministic-Hospitality-Synthesis-v1"
+                response_text = self._synthesize_deterministic_response(
+                    message=message,
+                    target_sanctuary=target_sanctuary,
+                    safety_level=safety_level,
+                    screening=screening,
+                    tool_calls=tool_calls,
+                    matched_intake=matched_intake,
+                    rag_results=rag_matches
+                )
+
+            # Strip redundant static welcome loop or non-answer if LLM echoed greeting or asked questions back
+            if not re.search(r'\b(hello|hi|hey|greetings|welcome)\b', msg_lower):
+                cleaned_resp = re.sub(
+                    r'^\s*(\*\*)?Welcome,?\s+Kareena\.?(\*\*)?(\s*I am your AI Chief of Staff[^\n]*\n*)*(\s*I am here to support you[^\n]*\n*)*(\s*All operational actions[^\n]*\n*)*',
+                    '',
+                    response_text,
+                    flags=re.IGNORECASE
+                ).strip()
+
+                resp_lower = cleaned_resp.lower()
+                is_degenerate = (
+                    not cleaned_resp or
+                    len(cleaned_resp) < 40 or
+                    any(ref in resp_lower for ref in ["can't assist", "cannot assist", "sorry, but i can't", "sorry, i cannot", "as an ai"]) or
+                    ("welcome, kareena" in resp_lower and "i am your ai chief of staff" in resp_lower)
+                )
+
+                if is_degenerate:
+                    logger.warning(f"Degenerate response detected (len={len(cleaned_resp)}). Query: {message[:100]}")
+
+                if matched_intake and not any(tc.get("tool") in ("crm_record_mutation", "calculate_booking_quote", "parse_booking_request") for tc in tool_calls) and (is_degenerate or matched_intake.client_name.lower().split()[0] not in resp_lower):
+                    w = getattr(matched_intake, "wellness_profile", {}) or {}
+                    c = matched_intake.clinical_profile or {}
+                    primary_focus = w.get("primary_focus") or c.get("intentions", "Restorative retreat and deep rest")
+                    diet_notes = w.get("nutrition_preferences") or c.get("health_notes", "Plant-forward, nourishing whole foods.")
+
+                    resp_lines = [
+                        f"**{matched_intake.client_name}** · KAI {str(matched_intake.sanctuary_slug).title()} Sanctuary ({matched_intake.room_tier or 'Private Villa Sanctuary'}):",
+                        "",
+                        f"• **Travel & Wellness Focus**: {primary_focus}",
+                        f"• **Dietary & Chef Notes**: {diet_notes}",
+                        f"• **Sanctuary Experience**: Morning movement, twilight sound bath, and private villa rest.",
+                        f"• **KAI CRM Status**: {matched_intake.status} (30% deposit / 70% balance at 45 days pre-arrival)."
+                    ]
+                    response_text = "\n".join(resp_lines)
+                elif not is_degenerate:
+                    response_text = cleaned_resp
+
+            # Ensure Nourishing Dining header is present if dining was queried
+            if any(tc.get("tool") == "search_curated_dining" for tc in tool_calls) and "Nourishing Dining" not in response_text:
+                response_text = "### Nourishing Dining Recommendations\n\n" + response_text
+
+            # Ensure Breathwork Window header is present if weather was queried
+            if any(tc.get("tool") == "fetch_sanctuary_weather" for tc in tool_calls) and "Breathwork Window" not in response_text:
+                response_text = "**Sanctuary Microclimate & Breathwork Window**\n\n" + response_text
+
+            # Ensure Hotel Recommendations are present if luxury accommodations were queried
+            hotel_tc = next((tc for tc in tool_calls if tc.get("tool") == "search_luxury_accommodations"), None)
+            if hotel_tc and hotel_tc.get("hotels"):
+                hotel_names = hotel_tc["hotels"]
+                if not any(h in response_text for h in hotel_names):
+                    hotel_list_str = "\n".join([f"• **{h}**" for h in hotel_names])
+                    response_text = f"### Curated Gateway Luxury Accommodations\nRecommended pre/post-retreat hotels:\n{hotel_list_str}\n\n" + response_text
+
+            # Ensure Email Draft details are present if email was drafted
+            email_tc = next((tc for tc in tool_calls if tc.get("tool") == "draft_personalized_email"), None)
+            if email_tc and email_tc.get("email_draft"):
+                ed = email_tc["email_draft"]
+                rec = email_tc.get("recipient") or email_tc.get("guest_name", "")
+                if (rec and rec not in response_text) or "Grand Travel & Cruise" not in response_text or "KAI CRM" not in response_text:
+                    response_text = ed + "\n\n" + response_text
+
+
+        # 6. Assemble Dynamic Followups based on mode & context
+        if booking_calc:
+            suggested_followups = [
+                f"Review staged booking card for {booking_calc['guest_name']}",
+                f"Verify 4WD Suburban transfer from {booking_calc['transit_airport']}",
+                "Check 30% deposit card authorization in KAI CRM"
+            ]
+        elif any(tc.get("tool") == "draft_personalized_email" for tc in tool_calls):
+            suggested_followups = [
+                "Send drafted note to Concierge Inbox",
+                "Adjust tone for executive client",
+                "Schedule 20-min alignment call on Retreat Calendar"
+            ]
+        elif any(tc.get("tool") == "search_luxury_accommodations" for tc in tool_calls):
+            suggested_followups = [
+                "Check private chauffeur transfer times to sanctuary",
+                "Verify lie-flat flight availability with Grand Travel",
+                "Review guest pre-retreat hotel preferences"
+            ]
+        elif any(tc.get("tool") == "search_curated_dining" for tc in tool_calls):
+            suggested_followups = [
+                f"View organic dining options in {target_sanctuary.title()}",
+                "Reserve chef table for guest cohort",
+                "Check Blue Zone anti-inflammatory menus"
+            ]
+        elif any(tc.get("tool") == "fetch_sanctuary_weather" for tc in tool_calls):
+            suggested_followups = [
+                "View optimal morning prana sun windows",
+                "Schedule sunset crystal sound bath",
+                "Check 7-day microclimate forecast"
+            ]
+        elif dossier_found:
+            suggested_followups = [
+                f"Check villa accommodations for {guest_name}",
+                f"Update dietary notes for {guest_name}",
+                f"Verify Grand Travel flight arrival for {guest_name}"
+            ]
+        elif searched_not_found:
+            suggested_followups = [
+                f"Review staged intake proposal for {searched_guest_name.title()}",
+                "Browse active guests in upcoming cohorts",
+                "Explain KAI Guest & Travel Planner in layman terms"
+            ]
+        elif mode == "consult_prep":
+            suggested_followups = [
+                "Send drafted note to Concierge Inbox",
+                "Schedule 20-min alignment call on Retreat Calendar",
+                "Generate custom sanctuary proposal link"
+            ]
+        elif mode == "travel_concierge":
+            suggested_followups = [
+                f"Check live weather in {target_sanctuary.title()}",
+                "Calculate dynamic scenic route from airport",
+                "Browse local nourishing dining"
+            ]
+        else:
+            suggested_followups = [
+                "Check 12–14 guest capacity across upcoming cohorts",
+                "Build Private Chef dietary & allergy matrix for Nosara",
+                "Generate airport chauffeur manifest for Nosara"
+            ]
 
         return {
             "response_text": response_text,

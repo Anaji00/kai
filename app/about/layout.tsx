@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "About Kareena Islam, RN & Founders | Clinical & Somatic Mastery | KAI",
+  title: "The Hearts Behind KAI | Kareena Islam, BSN, RN & Armaan Islam | KAI",
   description:
-    "Meet founder Kareena Islam, BSN, RN and Armaan Islam. Learn how a nurse and an Ironman athlete came together with Grand Travel & Cruise to create small wellness retreats.",
+    "Meet Kareena Islam, BSN, RN and Armaan Islam—the hearts behind KAI. Discover their passion for caring, healing, movement, and meaningful connection.",
   alternates: {
     canonical: "https://kaiwellnessretreats.com/about",
   },
   openGraph: {
-    title: "About the Founders of KAI Wellness Retreats | Kareena Islam, BSN, RN",
+    title: "The Hearts Behind KAI Wellness Retreats | Kareena Islam & Armaan Islam",
     description:
       "Nursing experience, yoga and sound baths, and 25+ years of travel planning.",
     url: "https://kaiwellnessretreats.com/about",
@@ -52,7 +52,7 @@ export default function AboutLayout({
       {
         "@type": "ListItem",
         position: 2,
-        name: "About Us & Founders",
+        name: "The Hearts Behind KAI",
         item: "https://kaiwellnessretreats.com/about",
       },
     ],
@@ -61,10 +61,10 @@ export default function AboutLayout({
   const aboutPageJsonLd = {
     "@context": "https://schema.org",
     "@type": "AboutPage",
-    name: "About KAI Wellness Retreats & Founders",
+    name: "The Hearts Behind KAI Wellness Retreats",
     url: "https://kaiwellnessretreats.com/about",
     description:
-      "Biography, clinical background, and travel lineage of founders Kareena Islam, BSN, RN and Armaan Islam.",
+      "Biography, clinical background, and wellness philosophy of Kareena Islam, BSN, RN and Armaan Islam—the hearts behind KAI.",
     mainEntity: [
       {
         "@type": "Person",

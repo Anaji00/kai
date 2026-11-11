@@ -143,8 +143,17 @@ def _init_db_schema():
         "ground_transfer_records": [
             ("chauffeur_notes", _ddl(Text())),
         ],
+        "crm_clients": [
+            ("activity_log", f"{_ddl(JSON())} DEFAULT '[]'"),
+            ("waiver_status", f"{_ddl(String(32))} DEFAULT 'PENDING'"),
+            ("waiver_signed_at", _ddl(DateTime())),
+            ("medical_clearance_status", f"{_ddl(String(32))} DEFAULT 'PENDING_REVIEW'"),
+            ("companion_id", _ddl(String(36))),
+            ("companion_name", _ddl(String(128))),
+        ],
         "crm_trips": [
             ("activity_timeline", f"{_ddl(JSON())} DEFAULT '[]'"),
+            ("companion_trip_id", _ddl(String(36))),
         ],
     }
 
@@ -192,6 +201,79 @@ def _init_db_schema():
                 logger.info(f"Auto-migrated missing column: {table_name}.{column.name}")
             except Exception as e:
                 logger.warning(f"Auto-migration column notice for {table_name}.{column.name}: {e}")
+
+    # 3a. Reconcile and drop obsolete legacy columns (e.g. tern_sync_status NOT NULL constraint)
+    legacy_copy_pairs = [
+        ("crm_clients", "tern_contact_id", "crm_contact_id"),
+        ("crm_trips", "tern_trip_id", "crm_trip_id"),
+        ("vendor_supplier_records", "tern_supplier_id", "supplier_code"),
+        ("vendor_supplier_records", "tern_deep_link", "dossier_url"),
+        ("staged_voucher_diffs", "tern_cohort_count", "crm_cohort_count"),
+        ("staging_intakes", "tern_trip_id", "crm_trip_id"),
+        ("staging_intakes", "tern_contact_id", "crm_contact_id"),
+        ("staging_intakes", "tern_sub_trip_id", "sub_trip_id"),
+        ("staging_intakes", "tern_group_trip_id", "group_cohort_id"),
+    ]
+    inspector = inspect(engine)
+    for tbl_name, old_col, new_col in legacy_copy_pairs:
+        if tbl_name not in tables:
+            continue
+        col_names = {c["name"] for c in inspector.get_columns(tbl_name)}
+        if old_col in col_names and new_col in col_names:
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(f"UPDATE {tbl_name} SET {new_col} = {old_col} WHERE {new_col} IS NULL AND {old_col} IS NOT NULL"))
+            except Exception as e:
+                logger.debug(f"Legacy column copy skipped for {tbl_name}.{old_col}: {e}")
+
+    inspector = inspect(engine)
+    for table_name, table_obj in Base.metadata.tables.items():
+        if table_name not in tables:
+            continue
+        model_cols = [c.name for c in table_obj.columns]
+        model_col_set = set(model_cols)
+        db_cols = inspector.get_columns(table_name)
+        extra_cols = [c["name"] for c in db_cols if c["name"] not in model_col_set]
+        if not extra_cols:
+            continue
+
+        # Drop any indexes referencing obsolete columns first
+        try:
+            for idx in inspector.get_indexes(table_name):
+                idx_name = idx.get("name")
+                idx_cols = idx.get("column_names") or []
+                if idx_name and any(ic in extra_cols for ic in idx_cols):
+                    with engine.begin() as conn:
+                        conn.execute(text(f"DROP INDEX IF EXISTS {idx_name}"))
+        except Exception as e:
+            logger.debug(f"Index cleanup notice on {table_name}: {e}")
+
+        rebuild_needed = False
+        for extra_col in extra_cols:
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(f"ALTER TABLE {table_name} DROP COLUMN {extra_col}"))
+                logger.info(f"Dropped obsolete column: {table_name}.{extra_col}")
+            except Exception as e:
+                logger.warning(f"Direct DROP COLUMN failed for {table_name}.{extra_col} ({e}); scheduling table rebuild.")
+                rebuild_needed = True
+                break
+
+        if rebuild_needed and engine.dialect.name == "sqlite":
+            try:
+                temp_table = f"{table_name}__rebuild_tmp"
+                cols_csv = ", ".join(model_cols)
+                with engine.begin() as conn:
+                    conn.execute(text("PRAGMA foreign_keys=OFF"))
+                    conn.execute(text(f"ALTER TABLE {table_name} RENAME TO {temp_table}"))
+                table_obj.create(bind=engine, checkfirst=True)
+                with engine.begin() as conn:
+                    conn.execute(text(f"INSERT INTO {table_name} ({cols_csv}) SELECT {cols_csv} FROM {temp_table}"))
+                    conn.execute(text(f"DROP TABLE {temp_table}"))
+                    conn.execute(text("PRAGMA foreign_keys=ON"))
+                logger.info(f"Rebuilt SQLite table {table_name} without obsolete columns {extra_cols}")
+            except Exception as e:
+                logger.error(f"SQLite table rebuild failed for {table_name}: {e}")
 
     # 3b. Ensure critical unique and search indexes exist
     pending_indexes = [

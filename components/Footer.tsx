@@ -118,7 +118,7 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Founder & Clinical Pillars */}
+          {/* The Hearts Behind KAI & Philosophy */}
           <div className="md:col-span-2 space-y-3">
             <h4 className="text-xs uppercase tracking-[0.2em] font-semibold text-olive">
               Foundation
@@ -126,17 +126,17 @@ export default function Footer() {
             <ul className="space-y-2 text-xs text-sage/80">
               <li>
                 <Link href="/about" className="hover:text-terracotta transition-colors">
-                  Meet Kareena Islam
+                  The Hearts Behind KAI
                 </Link>
               </li>
               <li>
-                <Link href="/about#clinical-science" className="hover:text-terracotta transition-colors">
-                  Clinical Restorative Science
+                <Link href="/about#our-philosophy" className="hover:text-terracotta transition-colors">
+                  Living BIG — Be In Gratitude
                 </Link>
               </li>
               <li>
-                <Link href="/about#triad-of-care" className="hover:text-terracotta transition-colors">
-                  The Triad of Care
+                <Link href="/about#cultural-integrations" className="hover:text-terracotta transition-colors">
+                  Cultural Integrations &amp; Promise
                 </Link>
               </li>
               <li>
@@ -218,12 +218,13 @@ export default function Footer() {
               </div>
 
               {/* Grand Travel Logo */}
-              <div className="pt-2 border-t border-sand-border/60">
+              <div className="pt-3 border-t border-sand-border/60">
                 <a
                   href="https://grandtravelcruise.com/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="block group"
+                  className="inline-block group rounded-xl bg-white/80 p-2.5 border border-sand-border/60 shadow-2xs hover:border-terracotta/50 hover:bg-white transition-all"
+                  title="Visit Grand Travel & Cruise Official Agency"
                 >
                   <img
                     src="/grand-travel-logo.png"

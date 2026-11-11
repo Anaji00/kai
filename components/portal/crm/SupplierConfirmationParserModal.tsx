@@ -14,15 +14,19 @@ import {
 } from "lucide-react";
 
 export interface ParsedSupplierData {
+  passenger_name?: string;
   airline?: string;
   flight_number?: string;
   departure_airport?: string;
   arrival_airport?: string;
+  arrival_time?: string;
   cabin_class?: string;
   confirmation_code?: string;
   property_name?: string;
   room_tier?: string;
   dates_summary?: string;
+  total_price?: number;
+  sanctuary_slug?: string;
   generated_blocks: Array<{
     day: number;
     time: string;
@@ -68,6 +72,17 @@ export default function SupplierConfirmationParserModal({
 
   if (!isOpen) return null;
 
+  const handlePasteFromClipboard = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text && text.trim()) {
+        setRawText(text.trim());
+      }
+    } catch (err) {
+      console.warn("Clipboard access not available:", err);
+    }
+  };
+
   const handleParse = () => {
     if (!rawText.trim()) return;
     setIsParsing(true);
@@ -75,6 +90,13 @@ export default function SupplierConfirmationParserModal({
     // Deterministic extraction rules for travel confirmations
     const text = rawText;
     
+    // Passenger / Guest Name extraction
+    let passenger_name = undefined;
+    const nameMatch = text.match(/(?:Passenger(?:\s*Name)?|Guest(?:\s*Name)?|Traveler|Name)[:\s]+([A-Za-z\s'.-]+?)(?:\r?\n|$)/i);
+    if (nameMatch && nameMatch[1].trim().length > 2) {
+      passenger_name = nameMatch[1].trim();
+    }
+
     // Flight Number extraction (e.g. DL-842, UA 1042, AA 492, DL842)
     const flightMatch = text.match(/\b([A-Z]{2})\s*[-#]?\s*(\d{3,4})\b/i);
     const flight_number = flightMatch ? `${flightMatch[1].toUpperCase()}-${flightMatch[2]}` : undefined;
@@ -87,38 +109,89 @@ export default function SupplierConfirmationParserModal({
     else if (/aeromexico/i.test(text)) airline = "Aeromexico";
     else if (/air\s*france/i.test(text)) airline = "Air France";
     else if (/british\s*airways/i.test(text)) airline = "British Airways";
+    else if (/emirates/i.test(text)) airline = "Emirates";
+    else if (/qatar/i.test(text)) airline = "Qatar Airways";
+    else if (/lufthansa/i.test(text)) airline = "Lufthansa";
+    else if (/singapore/i.test(text)) airline = "Singapore Airlines";
+    else if (/alaska/i.test(text)) airline = "Alaska Airlines";
+    else if (/jetblue/i.test(text)) airline = "JetBlue";
+    else if (/southwest/i.test(text)) airline = "Southwest Airlines";
+    else if (/virgin/i.test(text)) airline = "Virgin Atlantic";
+    else if (/swiss/i.test(text)) airline = "Swiss International";
 
     // Cabin class
     let cabin_class = undefined;
-    if (/lie-flat|first class|delta one|polaris/i.test(text)) cabin_class = "Lie-Flat / First Class";
+    if (/lie-flat|first class|delta one|polaris|mint suite/i.test(text)) cabin_class = "Lie-Flat / First Class";
     else if (/business/i.test(text)) cabin_class = "Business Class";
     else if (/premium/i.test(text)) cabin_class = "Premium Select";
 
-    // Airport codes (e.g. JFK, PVR, SJO, NAP, LAX, ORD, MIA)
+    // Airport codes (e.g. JFK, PVR, SJO, NAP, LAX, ORD, MIA, LIR, DPS)
     const airportMatches = text.match(/\b([A-Z]{3})\b/g) || [];
     const validCodes = airportMatches.filter((c) =>
-      ["JFK", "PVR", "SJO", "NAP", "LAX", "ORD", "MIA", "DFW", "SFO", "EWR", "CUN"].includes(c.toUpperCase())
+      ["JFK", "PVR", "SJO", "NAP", "LAX", "ORD", "MIA", "DFW", "SFO", "EWR", "CUN", "LIR", "DPS", "FCO", "LHR"].includes(c.toUpperCase())
     );
     const departure_airport = validCodes.length > 0 ? validCodes[0].toUpperCase() : undefined;
     const arrival_airport = validCodes.length > 1 ? validCodes[1].toUpperCase() : undefined;
+
+    // Arrival Time extraction (e.g. at 12:45 PM, 14:20, ETA: 15:30)
+    let arrival_time = undefined;
+    const timeMatch = text.match(/(?:Arrival|Arrives|ETA|Landing)[:\s]+.*?(?:at\s+)?(\d{1,2}:\d{2}\s*(?:AM|PM)?)/i);
+    if (timeMatch) {
+      arrival_time = timeMatch[1].trim();
+    }
 
     // Confirmation Code / PNR
     const pnrMatch = text.match(/(?:Record Locator|Booking Ref|Confirmation|PNR)[:\s]+([A-Z0-9]{5,10})/i);
     const confirmation_code = pnrMatch ? pnrMatch[1].toUpperCase() : undefined;
 
-    // Property / Villa Name
+    // Dates extraction (e.g. Check-in: Oct 10, 2027 ... Check-out: Oct 15, 2027)
+    let dates_summary = undefined;
+    const checkInOutMatch = text.match(/Check-in[:\s]+([A-Za-z0-9,\s]+?)(?:\s*\(|\r?\n)[\s\S]*?Check-out[:\s]+([A-Za-z0-9,\s]+?)(?:\s*\(|\r?\n|$)/i);
+    if (checkInOutMatch) {
+      const inDate = checkInOutMatch[1].trim().replace(/,\s*\d{4}/, "");
+      const outDate = checkInOutMatch[2].trim();
+      dates_summary = `${inDate}–${outDate}`;
+    } else {
+      const datesFieldMatch = text.match(/Dates?[:\s]+([A-Za-z0-9–\-,\s]+?)(?:\r?\n|$)/i);
+      if (datesFieldMatch) {
+        dates_summary = datesFieldMatch[1].trim();
+      }
+    }
+
+    // Total Investment / Price extraction
+    let total_price = undefined;
+    const priceMatch = text.match(/(?:Total(?:\s*Amount|\s*Investment|\s*Price)?|Amount\s*Paid|Rate)[:\s]+\$?([0-9,]+(?:\.[0-9]{2})?)/i);
+    if (priceMatch) {
+      total_price = Number(priceMatch[1].replace(/,/g, ""));
+    }
+
+    // Sanctuary Slug & Property Name
     let property_name = undefined;
-    if (/marival/i.test(text)) property_name = "Marival Armony Sanctuary";
-    else if (/el dorado/i.test(text)) property_name = "El Dorado Seaside Palms";
-    else if (/nosara/i.test(text)) property_name = "Nosara Sacred Canopy Villa";
-    else if (/amalfi/i.test(text)) property_name = "Amalfi Cliffside Sanctuary";
-    else if (/bali/i.test(text)) property_name = "Sacred Springs Bali Sanctuary";
+    let sanctuary_slug = undefined;
+    if (/marival|puerto vallarta/i.test(text)) {
+      property_name = "Marival Armony Sanctuary";
+      sanctuary_slug = "puerto-vallarta-2027";
+    } else if (/el dorado|riviera maya/i.test(text)) {
+      property_name = "El Dorado Seaside Palms";
+      sanctuary_slug = "riviera-maya";
+    } else if (/nosara|costa rica|guanacaste/i.test(text)) {
+      property_name = "Nosara Sacred Canopy Villa";
+      sanctuary_slug = "nosara";
+    } else if (/amalfi|ravello|positano|italy/i.test(text)) {
+      property_name = "Amalfi Cliffside Sanctuary";
+      sanctuary_slug = "amalfi";
+    } else if (/bali|ubud/i.test(text)) {
+      property_name = "Sacred Springs Bali Sanctuary";
+      sanctuary_slug = "bali";
+    }
 
     // Suite Tier
     let room_tier = undefined;
     if (/cliffside plunge/i.test(text)) room_tier = "Private Cliffside Plunge Villa";
     else if (/penthouse/i.test(text)) room_tier = "Master Penthouse Sanctuary";
-    else if (/oceanfront/i.test(text)) room_tier = "Oceanfront King Suite";
+    else if (/oceanfront|king suite/i.test(text)) room_tier = "Oceanfront King Suite";
+    else if (/garden/i.test(text)) room_tier = "Garden Wellness Suite";
+    else if (/pavilion/i.test(text)) room_tier = "Shared Ocean View Pavilion";
 
     // Auto-generate itinerary blocks based on parsed data
     const blocks: ParsedSupplierData["generated_blocks"] = [];
@@ -129,7 +202,7 @@ export default function SupplierConfirmationParserModal({
       time: "08:30 AM",
       title: flight_number ? `Inbound Transcontinental Flight (${flight_number})` : "Arrival Transit & Flight",
       description: `Flight confirmed on ${airline || "Private Air"}${flight_number ? ` (${flight_number})` : ""}${departure_airport && arrival_airport ? ` from ${departure_airport} to ${arrival_airport}` : ""}. Cabin: ${cabin_class || "First Class / Lie-Flat"}. Ground chaperone on standby.`,
-      activity_type: "✈️ Cirium Aviation",
+      activity_type: "Cirium Aviation",
     });
 
     blocks.push({
@@ -137,7 +210,7 @@ export default function SupplierConfirmationParserModal({
       time: "01:30 PM",
       title: "Private Tarmac SUV Transfer & Villa Check-in",
       description: `VIP high-clearance SUV escort to ${property_name || "the sanctuary estate"}. Seamless private suite orientation in your ${room_tier || "Private Luxury Suite"}.`,
-      activity_type: "🚗 Chauffeur",
+      activity_type: "Chauffeur",
     });
 
     blocks.push({
@@ -145,7 +218,7 @@ export default function SupplierConfirmationParserModal({
       time: "05:30 PM",
       title: "Sunset Circadian Realignment & Acoustic Sound Bath",
       description: "Gentle 432Hz quartz crystal sound bath and restorative grounding movement led by Nurse Kareena Islam to reset cortisol after transcontinental travel.",
-      activity_type: "🧘 Somatic Reformer",
+      activity_type: "Somatic Reformer",
     });
 
     // Day 2: First full restorative sanctuary day
@@ -154,7 +227,7 @@ export default function SupplierConfirmationParserModal({
       time: "07:30 AM",
       title: "Sunrise Coastal Movement & Breathwork",
       description: "Anatomically guided vinyasa and gentle parasympathetic breathwork overlooking the ocean shala, followed by fresh organic cold-pressed botanicals.",
-      activity_type: "🧘 Somatic Reformer",
+      activity_type: "Somatic Reformer",
     });
 
     blocks.push({
@@ -162,18 +235,23 @@ export default function SupplierConfirmationParserModal({
       time: "12:30 PM",
       title: "Executive Chef Blue Zone Gastronomy",
       description: "Anti-inflammatory coastal harvest lunch featuring local heirloom produce, wild catch, and polyphenol-rich cold-pressed olive oils.",
-      activity_type: "🍽️ Blue Zone Dining",
+      activity_type: "Blue Zone Dining",
     });
 
     setParsedResult({
+      passenger_name,
       airline,
       flight_number,
       departure_airport,
       arrival_airport,
+      arrival_time,
       cabin_class,
       confirmation_code,
       property_name,
       room_tier,
+      dates_summary,
+      total_price,
+      sanctuary_slug,
       generated_blocks: blocks,
     });
 
@@ -220,7 +298,16 @@ export default function SupplierConfirmationParserModal({
             <span className="text-[11px] font-semibold text-[#5C6B5E] uppercase tracking-wider">
               Paste Raw Supplier Confirmation Text:
             </span>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={handlePasteFromClipboard}
+                className="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1 transition-colors cursor-pointer"
+                title="Paste confirmation from system clipboard"
+              >
+                <Copy className="w-3 h-3 text-emerald-700" />
+                <span>Paste from Clipboard</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setRawText(SAMPLE_AIRLINE_EMAIL)}
@@ -278,9 +365,21 @@ export default function SupplierConfirmationParserModal({
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] pt-1">
                   <div>
+                    <span className="text-[#5C6B5E] block text-[10px] uppercase">Guest / Passenger</span>
+                    <span className="font-semibold text-[#2D3E35]">
+                      {parsedResult.passenger_name || "Auto-Detected Guest"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[#5C6B5E] block text-[10px] uppercase">Dates / Stay</span>
+                    <span className="font-medium text-[#2D3E35]">
+                      {parsedResult.dates_summary || "Default Sanctuary Dates"}
+                    </span>
+                  </div>
+                  <div>
                     <span className="text-[#5C6B5E] block text-[10px] uppercase">Airline &amp; Flight</span>
                     <span className="font-medium text-[#2D3E35]">
-                      {parsedResult.airline || "Private Air"} {parsedResult.flight_number || "DL-842"}
+                      {parsedResult.airline || "Private Air"} {parsedResult.flight_number || "DL-842"}{parsedResult.arrival_time ? ` (${parsedResult.arrival_time})` : ""}
                     </span>
                   </div>
                   <div>
@@ -299,6 +398,18 @@ export default function SupplierConfirmationParserModal({
                     <span className="text-[#5C6B5E] block text-[10px] uppercase">Property / Villa</span>
                     <span className="font-medium text-[#2D3E35]">
                       {parsedResult.property_name || "Marival Armony"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[#5C6B5E] block text-[10px] uppercase">Suite Tier</span>
+                    <span className="font-medium text-[#2D3E35]">
+                      {parsedResult.room_tier || "Private Luxury Suite"}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[#5C6B5E] block text-[10px] uppercase">Total Investment</span>
+                    <span className="font-medium text-[#2D3E35]">
+                      {parsedResult.total_price ? `$${parsedResult.total_price.toLocaleString()} USD` : "Standard Tier Rate"}
                     </span>
                   </div>
                 </div>
@@ -355,4 +466,3 @@ export default function SupplierConfirmationParserModal({
     </div>
   );
 }
-

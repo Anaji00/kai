@@ -17,7 +17,7 @@ export const RETREATS: Retreat[] = [
     spotsTotal: 16,
     spotsRemaining: 16,
     investmentStarting: "$2,450",
-    tagline: "The inaugural 2027 KAI retreat at Marival Harmony — where your peace within blends with the pieces around on the Sierra Madre coast.",
+    tagline: "The inaugural 2027 KAI retreat at Marival Armony — where your peace within blends with the pieces around on the Sierra Madre coast.",
     description: "Our flagship First Retreat of 2027 at Marival Armony (Harmony) in Puerto Vallarta / Punta de Mita. Set where the emerald Sierra Madre Occidental mountains meet the tranquil sapphire waters of Banderas Bay, this 4-day sanctuary blends Kareena Islam's clinical somatic restoration and 432Hz crystal bowl acoustics with Armaan Islam's endurance recovery protocols and deep Jalisco cultural integration.",
     clinicalFocus: [
       "A winter break with morning sunshine and time by the Pacific",
@@ -239,7 +239,7 @@ export const RETREATS: Retreat[] = [
         highlights: ["Gentle closing meditation", "Nourishing farewell breakfast", "Private airport transfers"]
       }
     ],
-    featured: true,
+    featured: false,
     status: "coming-soon"
   },
   {
@@ -356,7 +356,7 @@ export const RETREATS: Retreat[] = [
         highlights: ["Gentle terrace meditation", "Al fresco breakfast with fresh figs and espresso", "Private chauffeur transfers to Naples airport"]
       }
     ],
-    featured: true,
+    featured: false,
     status: "coming-soon"
   },
   {
@@ -491,18 +491,18 @@ export const RETREATS: Retreat[] = [
     title: "KAI Fall Retreat: Oceanfront Autonomic Reset",
     destination: "Riviera Maya, Quintana Roo",
     country: "Mexico",
-    locationDetails: "El Dorado Seaside Palms Adults-Only Sanctuary (Past Cohort / Future Dates TBA)",
-    dates: "Coming Soon • Future Cohort TBA",
-    startDate: "2026-11-12",
-    endDate: "2026-11-16",
-    year: 2026,
+    locationDetails: "El Dorado Seaside Palms Adults-Only Sanctuary • Previously Completed Retreat",
+    dates: "Previously Completed Sanctuary",
+    startDate: "2024-10-01",
+    endDate: "2024-10-04",
+    year: 2024,
     season: "Autumn",
     duration: "4 Days / 3 Nights",
     spotsTotal: 16,
-    spotsRemaining: 16,
+    spotsRemaining: 0,
     investmentStarting: "$1,850",
     tagline: "Adults-only oceanfront luxury, nervous system decompression, crystal sound healing, and turquoise calm.",
-    description: "Our signature Caribbean coast retreat at the secluded palms of El Dorado Seaside Palms. Designed as an intimate long-weekend restorative sanctuary blending Mayan coastal botanicals with clinical sound healing.",
+    description: "Our completed Caribbean coast retreat at the secluded palms of El Dorado Seaside Palms. Held as an intimate restorative sanctuary blending Mayan coastal botanicals with clinical sound healing, morning vinyasa, and nervous system renewal.",
     clinicalFocus: [
       "Rapid acute nervous system reset before end-of-year burnout",
       "Restoration of natural circadian sleep markers via oceanfront sunrise exposure",
@@ -580,8 +580,8 @@ export const RETREATS: Retreat[] = [
         highlights: ["Closing gratitude circle on the sand", "Oceanfront breakfast", "Transfers to Cancun airport"]
       }
     ],
-    featured: false,
-    status: "coming-soon"
+    featured: true,
+    status: "completed"
   }
 ];
 

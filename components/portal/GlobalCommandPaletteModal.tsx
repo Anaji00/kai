@@ -347,7 +347,7 @@ export default function GlobalCommandPaletteModal({
           flightStatus: "Flight Booked & Chauffeur Set",
           flightDetails: `Flight ${dg.flight}`,
           dietaryNotes: "Plant-forward, seed-oil-free",
-          clinicalSafety: "Cleared by Nurse",
+          wellnessClearance: "Confirmed",
         });
       }
     });

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Layers,
   CloudRain,
@@ -13,13 +13,19 @@ import {
   Users,
   Calendar,
   Sparkles,
-  RefreshCw,
   Printer,
   ShieldCheck,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  UserCheck,
+  User,
+  Compass,
 } from "lucide-react";
 import { printCohortManifest } from "@/lib/print-export";
 import {
   CRMTripItem,
+  CRMClientItem,
   fetchSanctuaryDietaryManifest,
   pivotCohortWeatherItinerary,
   resequenceCohortFlightDisruptions,
@@ -33,6 +39,9 @@ interface CohortCommandTabProps {
   trips: CRMTripItem[];
   onRefresh: () => void;
   onNotify: (msg: string) => void;
+  clients?: CRMClientItem[];
+  onInspectGuest?: (clientId: string) => void;
+  onInspectTrip?: (tripId: string) => void;
 }
 
 const SANCTUARY_COHORTS = [
@@ -42,6 +51,7 @@ const SANCTUARY_COHORTS = [
     dates: "Oct 10–15, 2027",
     capacity: 12,
     location: "Puerto Vallarta, Mexico (PVR)",
+    defaultDate: "2027-10-12",
   },
   {
     slug: "nosara",
@@ -49,6 +59,7 @@ const SANCTUARY_COHORTS = [
     dates: "Nov 14–19, 2026",
     capacity: 12,
     location: "Guanacaste, Costa Rica (LIR)",
+    defaultDate: "2026-11-16",
   },
   {
     slug: "amalfi",
@@ -56,6 +67,7 @@ const SANCTUARY_COHORTS = [
     dates: "May 18–23, 2027",
     capacity: 12,
     location: "Ravello, Italy (NAP)",
+    defaultDate: "2027-05-20",
   },
   {
     slug: "bali",
@@ -63,6 +75,7 @@ const SANCTUARY_COHORTS = [
     dates: "Sep 08–13, 2027",
     capacity: 12,
     location: "Ubud, Bali (DPS)",
+    defaultDate: "2027-09-10",
   },
 ];
 
@@ -70,9 +83,13 @@ export default function CohortCommandTab({
   trips,
   onRefresh,
   onNotify,
+  clients = [],
+  onInspectGuest,
+  onInspectTrip,
 }: CohortCommandTabProps) {
   const [selectedSlug, setSelectedSlug] = useState<string>("puerto-vallarta-2027");
   const [busyAction, setBusyAction] = useState<string | null>(null);
+  const [showOperationsDrawer, setShowOperationsDrawer] = useState<boolean>(true);
 
   // Result states for live visual inspection
   const [dietaryManifest, setDietaryManifest] = useState<{
@@ -111,16 +128,61 @@ export default function CohortCommandTab({
     high_risk_guests: Array<{ guest_name: string; room_tier: string; dietary_notes: string }>;
   } | null>(null);
 
-  // Bodywork scheduler inputs
-  const [bodyworkGuestName, setBodyworkGuestName] = useState("Elena Vance");
-  const [bodyworkGuestEmail, setBodyworkGuestEmail] = useState("elena.vance@example.com");
-  const [bodyworkPractitioner, setBodyworkPractitioner] = useState("Mateo Silva (Master Craniosacral)");
-  const [bodyworkTimeSlot, setBodyworkTimeSlot] = useState("14:00");
-  const [bodyworkDate, setBodyworkDate] = useState("2027-10-12");
+  const [bodyworkFeedback, setBodyworkFeedback] = useState<{
+    success: boolean;
+    message: string;
+  } | null>(null);
 
   const cohortTrips = trips.filter((t) => t.sanctuary_slug === selectedSlug);
   const currentCohortMeta =
     SANCTUARY_COHORTS.find((c) => c.slug === selectedSlug) || SANCTUARY_COHORTS[0];
+
+  // Bodywork scheduler inputs (Idiot-proofed: auto-binds to first guest or selected guest)
+  const [selectedGuestId, setSelectedGuestId] = useState<string>("");
+  const [bodyworkGuestName, setBodyworkGuestName] = useState("");
+  const [bodyworkGuestEmail, setBodyworkGuestEmail] = useState("");
+  const [bodyworkPractitioner, setBodyworkPractitioner] = useState("Mateo Silva (Master Craniosacral)");
+  const [bodyworkTimeSlot, setBodyworkTimeSlot] = useState("14:00");
+  const [bodyworkDate, setBodyworkDate] = useState(currentCohortMeta.defaultDate);
+
+  // Synchronize bodywork guest defaults when cohort changes
+  useEffect(() => {
+    setBodyworkDate(currentCohortMeta.defaultDate);
+    if (cohortTrips.length > 0) {
+      setSelectedGuestId(cohortTrips[0].id);
+      setBodyworkGuestName(cohortTrips[0].client_name);
+      setBodyworkGuestEmail(cohortTrips[0].client_email);
+    } else {
+      setSelectedGuestId("custom");
+      setBodyworkGuestName("");
+      setBodyworkGuestEmail("");
+    }
+  }, [selectedSlug, trips.length]);
+
+  const handleGuestSelectChange = (id: string) => {
+    setSelectedGuestId(id);
+    if (id === "custom") {
+      setBodyworkGuestName("");
+      setBodyworkGuestEmail("");
+    } else {
+      const match = cohortTrips.find((t) => t.id === id);
+      if (match) {
+        setBodyworkGuestName(match.client_name);
+        setBodyworkGuestEmail(match.client_email);
+      }
+    }
+  };
+
+  const handleQuickBookGuest = (trip: CRMTripItem) => {
+    setSelectedGuestId(trip.id);
+    setBodyworkGuestName(trip.client_name);
+    setBodyworkGuestEmail(trip.client_email);
+    // Smooth scroll down to scheduler
+    const el = document.getElementById("bodywork-scheduler-section");
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
 
   const notifyDraftUpdate = (msg: string) => {
     onNotify(msg);
@@ -142,7 +204,7 @@ export default function CohortCommandTab({
         operator_name: "Kareena Islam",
       });
       notifyDraftUpdate(
-        `Weather Pivot Executed for ${selectedSlug}: ${res.updated_trips_count} guest sub-trips shifted indoors to Geodesic Sound Domes & Magnesium Flotation (Draft #${res.draft_id} staged).`
+        `Weather Pivot Executed for ${currentCohortMeta.title}: ${res.updated_trips_count} guests shifted indoors to Geodesic Sound Domes & Magnesium Flotation (Draft #${res.draft_id}).`
       );
       onRefresh();
     } catch (err: unknown) {
@@ -157,18 +219,26 @@ export default function CohortCommandTab({
     setBusyAction("fleet");
     try {
       const sampleDisruptions =
-        cohortTrips.length >= 2
-          ? cohortTrips.slice(0, 4).map((t, idx) => ({
-              client_name: t.client_name,
-              client_email: t.client_email,
-              flight_number: idx % 2 === 0 ? `AA-${1040 + idx}` : `UA-${882 + idx}`,
-              original_arrival_time: "14:15",
-              updated_arrival_time: idx === 0 ? "15:40" : idx === 1 ? "15:55" : "17:20",
-              delay_minutes: idx === 0 ? 85 : idx === 1 ? 100 : 185,
-              status: "DELAYED",
-              connecting_airport: "DFW",
-              terminal: "Terminal 2 VIP Gate",
-            }))
+        cohortTrips.length > 0
+          ? cohortTrips.slice(0, 4).map((t, idx) => {
+              const matchedCode =
+                t.smart_flight?.flight_number ||
+                (t.flight_details
+                  ? t.flight_details.match(/([A-Z]{2,}\s*[-]?\s*\d{1,4})/i)?.[0]?.replace(/\s+/g, "-")
+                  : null) ||
+                (idx % 2 === 0 ? "AA-1040" : "UA-882");
+              return {
+                client_name: t.client_name,
+                client_email: t.client_email,
+                flight_number: matchedCode,
+                original_arrival_time: "14:15",
+                updated_arrival_time: idx === 0 ? "15:40" : idx === 1 ? "15:55" : "17:20",
+                delay_minutes: idx === 0 ? 85 : idx === 1 ? 100 : 185,
+                status: "DELAYED",
+                connecting_airport: "DFW",
+                terminal: "Terminal 2 VIP Gate",
+              };
+            })
           : [
               {
                 client_name: "Clara Vance",
@@ -191,17 +261,6 @@ export default function CohortCommandTab({
                 status: "DELAYED",
                 connecting_airport: "IAH",
                 terminal: "T2",
-              },
-              {
-                client_name: "Marcus Sterling",
-                client_email: "marcus.sterling@example.com",
-                flight_number: "DL-908",
-                original_arrival_time: "15:00",
-                updated_arrival_time: "CANCELLED",
-                delay_minutes: 720,
-                status: "CANCELLED",
-                connecting_airport: "ATL",
-                terminal: "T1",
               },
             ];
 
@@ -306,7 +365,12 @@ export default function CohortCommandTab({
   // 7. 1:1 Bodywork Slot Scheduler
   const handleScheduleBodywork = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!bodyworkGuestName.trim() || !bodyworkGuestEmail.trim()) {
+      onNotify("Please select or enter a guest name and email.");
+      return;
+    }
     setBusyAction("bodywork");
+    setBodyworkFeedback(null);
     try {
       const res = await scheduleBodyworkSession(selectedSlug, {
         practitioner_name: bodyworkPractitioner,
@@ -318,12 +382,20 @@ export default function CohortCommandTab({
         duration_minutes: 90,
       });
       if (res.allocated) {
+        setBodyworkFeedback({
+          success: true,
+          message: `Slot Locked: ${bodyworkGuestName} confirmed with ${res.practitioner} at ${res.time} on ${res.date}.`,
+        });
         notifyDraftUpdate(
           `Locked 1:1 Bodywork Slot: ${bodyworkGuestName} with ${res.practitioner} at ${res.time} on ${res.date} (Draft #${res.draft_id}).`
         );
       } else {
+        setBodyworkFeedback({
+          success: false,
+          message: `Slot Conflict: ${bodyworkTimeSlot} is reserved. Auto-offered adjacent opening at ${res.offered_adjacent_slot} for ${bodyworkGuestName}.`,
+        });
         notifyDraftUpdate(
-          `Slot Collision Guard: ${bodyworkTimeSlot} is occupied by ${res.slot_occupied_by}. Auto-offered adjacent slot ${res.offered_adjacent_slot} to ${bodyworkGuestName} (Draft #${res.draft_id}).`
+          `Slot Conflict Resolved: ${bodyworkTimeSlot} already booked. Automatically reserved ${res.offered_adjacent_slot} for ${bodyworkGuestName} (Draft #${res.draft_id}).`
         );
       }
     } catch (err: unknown) {
@@ -335,7 +407,7 @@ export default function CohortCommandTab({
 
   return (
     <div className="space-y-6">
-      {/* Cohort Selector Cards (Master Group Cohorts Architecture) */}
+      {/* 1. Cohort Selector Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {SANCTUARY_COHORTS.map((cohort) => {
           const count = trips.filter((t) => t.sanctuary_slug === cohort.slug).length;
@@ -348,21 +420,21 @@ export default function CohortCommandTab({
               onClick={() => setSelectedSlug(cohort.slug)}
               className={`text-left p-4 rounded-xl border transition-all cursor-pointer ${
                 isSelected
-                  ? "bg-[#2D3E35] text-[#FAF7F2] border-[#2D3E35] shadow-md"
-                  : "bg-white text-[#2D3E35] border-[#E5DDD0] hover:border-[#2D3E35]/50"
+                  ? "bg-[#2D3E35] text-[#FAF7F2] border-[#2D3E35] shadow-md ring-2 ring-[#C07D63]/30"
+                  : "bg-white text-[#2D3E35] border-[#E5DDD0] hover:border-[#2D3E35]/40"
               }`}
             >
               <div className="flex items-center justify-between text-[10px] font-mono uppercase tracking-wider opacity-80">
-                <span>{cohort.slug}</span>
-                <span>
-                  {count}/{cohort.capacity} Sub-Trips
+                <span className="font-semibold">{cohort.slug}</span>
+                <span className="px-1.5 py-0.5 rounded bg-black/10 font-bold">
+                  {count} / {cohort.capacity} Guests
                 </span>
               </div>
-              <div className="font-serif font-bold text-sm mt-1 line-clamp-1">{cohort.title}</div>
+              <div className="font-serif font-bold text-sm mt-1.5 line-clamp-1">{cohort.title}</div>
               <div className="text-[11px] opacity-80 mt-0.5">{cohort.dates}</div>
               <div className="mt-3 w-full h-1.5 rounded-full bg-black/15 overflow-hidden">
                 <div
-                  className={`h-full rounded-full ${
+                  className={`h-full rounded-full transition-all duration-300 ${
                     isSelected ? "bg-[#C07D63]" : "bg-[#2D3E35]"
                   }`}
                   style={{ width: `${Math.max(8, pct)}%` }}
@@ -373,13 +445,13 @@ export default function CohortCommandTab({
         })}
       </div>
 
-      {/* Master Group Cohort Command Bar */}
+      {/* 2. Master Cohort Command & Manifest Header */}
       <div className="bg-white p-5 rounded-xl border border-[#E5DDD0] shadow-xs space-y-5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[#E5DDD0] pb-4">
           <div>
             <div className="flex items-center space-x-2">
               <span className="px-2 py-0.5 text-[10px] font-mono uppercase font-bold bg-[#C07D63]/15 text-[#C07D63] border border-[#C07D63]/30 rounded">
-                Sanctuary Retreat Group (Max 12–14 Guests)
+                Sanctuary Retreat Cohort
               </span>
               <h2 className="font-serif text-xl font-bold text-[#2D3E35]">
                 {currentCohortMeta.title}
@@ -387,13 +459,13 @@ export default function CohortCommandTab({
             </div>
             <p className="text-xs text-[#5C6B5E] mt-1">
               {currentCohortMeta.location} &middot; {currentCohortMeta.dates} &middot;{" "}
-              <strong>{cohortTrips.length}</strong> Registered Guests
+              <strong>{cohortTrips.length}</strong> Registered Guests ({currentCohortMeta.capacity} Max)
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <div className="hidden sm:inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-mono">
               <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Sanctuary Database Synced</span>
+              <span>Sanctuary Synced</span>
             </div>
             <button
               onClick={() => {
@@ -408,16 +480,18 @@ export default function CohortCommandTab({
                     dietary_notes: t.dietary_notes || "Standard Anti-inflammatory",
                     clinical_flags: t.clinical_flags || [],
                     flight: t.flight_details || "Arriving Private/Commercial PVR",
-                    arrival: "Scheduled"
+                    arrival: "Scheduled",
                   })),
-                  kitchen_protocols: dietaryManifest?.kitchen_manifest?.map(k => `${k.guest_name}: ${k.chef_kitchen_protocol.join("; ")}`)
+                  kitchen_protocols: dietaryManifest?.kitchen_manifest?.map(
+                    (k) => `${k.guest_name}: ${k.chef_kitchen_protocol.join("; ")}`
+                  ),
                 });
               }}
               className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#FAF7F2] hover:bg-[#F2ECE4] text-[#2D3E35] border border-[#E5DDD0] transition-colors cursor-pointer"
-              title="Print or export rooming, transit and kitchen manifest"
+              title="Print rooming and guest manifest"
             >
               <Printer className="w-3.5 h-3.5 text-[#2D3E35]" />
-              <span>Print Rooming &amp; Guest List</span>
+              <span>Print Rooming List</span>
             </button>
             <button
               onClick={handleLoadDietaryManifest}
@@ -430,114 +504,243 @@ export default function CohortCommandTab({
           </div>
         </div>
 
-        {/* 1-Click Cohort Crisis & Logistics Automations */}
+        {/* 3. Confirmed Cohort Guest Roster (Actual Visibility of Cohort Members) */}
         <div>
-          <div className="text-xs font-bold uppercase tracking-wider text-[#2D3E35] mb-3 flex items-center space-x-1.5">
-            <Sparkles className="w-3.5 h-3.5 text-[#C07D63]" />
-            <span>Quick Actions: Weather, Flight Delays &amp; Group Care</span>
+          <div className="flex items-center justify-between mb-2.5">
+            <h3 className="font-serif text-sm font-bold text-[#2D3E35] flex items-center space-x-2">
+              <Users className="w-4 h-4 text-[#C07D63]" />
+              <span>Cohort Guest &amp; Villa Roster ({cohortTrips.length} Guests)</span>
+            </h3>
+            <span className="text-[11px] text-[#5C6B5E]">
+              1-click to schedule 1:1 bodywork sessions
+            </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
-            {/* Weather Pivot */}
-            <div className="p-3.5 rounded-xl bg-[#FAF7F2] border border-[#E5DDD0] flex flex-col justify-between space-y-3">
-              <div>
-                <div className="flex items-center space-x-1.5 font-semibold text-xs text-[#2D3E35]">
-                  <CloudRain className="w-4 h-4 text-blue-700 shrink-0" />
-                  <span>Move Activities Indoors (Weather Advisory)</span>
-                </div>
-                <p className="text-[11px] text-[#5C6B5E] mt-1">
-                  Shifts outdoor beach sessions to indoor Geodesic Sound Domes &amp; warm sound baths for all guests.
-                </p>
+          {cohortTrips.length === 0 ? (
+            <div className="p-6 rounded-xl bg-[#FAF7F2] border border-[#E5DDD0] text-center space-y-1">
+              <Users className="w-6 h-6 text-[#5C6B5E]/50 mx-auto" />
+              <div className="font-serif font-bold text-sm text-[#2D3E35]">
+                No guests registered in this cohort yet
               </div>
-              <button
-                onClick={handleWeatherPivot}
-                disabled={busyAction !== null}
-                className="w-full py-1.5 px-2.5 rounded-md bg-[#2D3E35] hover:bg-[#1f2c25] text-[#FAF7F2] text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {busyAction === "weather" ? "Moving Group Indoors..." : "Move Group Indoors"}
-              </button>
+              <p className="text-xs text-[#5C6B5E]">
+                Use the &quot;+ New Reservation&quot; modal in the top header to assign a guest to {currentCohortMeta.title}.
+              </p>
             </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {cohortTrips.map((trip) => (
+                <div
+                  key={trip.id}
+                  className="p-3.5 rounded-xl bg-[#FAF7F2] border border-[#E5DDD0] flex flex-col justify-between space-y-2 hover:border-[#2D3E35]/30 transition-all"
+                >
+                  <div>
+                    <div className="flex items-start justify-between gap-1">
+                      <div>
+                        {onInspectGuest ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (trip.client_id) {
+                                onInspectGuest(trip.client_id);
+                              } else {
+                                const matched = clients.find(
+                                  (c) =>
+                                    c.email.toLowerCase() === trip.client_email.toLowerCase() ||
+                                    c.full_name.toLowerCase() === trip.client_name.toLowerCase()
+                                );
+                                if (matched) onInspectGuest(matched.id);
+                              }
+                            }}
+                            className="font-serif font-bold text-sm text-[#2D3E35] hover:text-emerald-800 text-left transition-colors cursor-pointer"
+                            title="Inspect Guest Dossier & Clearance"
+                          >
+                            {trip.client_name}
+                          </button>
+                        ) : (
+                          <div className="font-serif font-bold text-sm text-[#2D3E35]">
+                            {trip.client_name}
+                          </div>
+                        )}
+                        <div className="text-[11px] text-[#5C6B5E]">{trip.client_email}</div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-white border border-[#E5DDD0] text-[#2D3E35]">
+                        {trip.status}
+                      </span>
+                    </div>
 
-            {/* Batch Flight Disruption */}
-            <div className="p-3.5 rounded-xl bg-[#FAF7F2] border border-[#E5DDD0] flex flex-col justify-between space-y-3">
-              <div>
-                <div className="flex items-center space-x-1.5 font-semibold text-xs text-[#2D3E35]">
-                  <Plane className="w-4 h-4 text-indigo-700 shrink-0" />
-                  <span>Organize Airport Chauffeur Waves</span>
-                </div>
-                <p className="text-[11px] text-[#5C6B5E] mt-1">
-                  Groups flight delays into coordinated chauffeur cars (≤35m wait) so guests never wait alone.
-                </p>
-              </div>
-              <button
-                onClick={handleBatchFlightResequence}
-                disabled={busyAction !== null}
-                className="w-full py-1.5 px-2.5 rounded-md bg-[#2D3E35] hover:bg-[#1f2c25] text-[#FAF7F2] text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {busyAction === "fleet" ? "Organizing Chauffeurs..." : "Group Delayed Flights into Chauffeurs"}
-              </button>
-            </div>
+                    {onInspectTrip ? (
+                      <button
+                        type="button"
+                        onClick={() => onInspectTrip(trip.id)}
+                        className="mt-2 text-xs font-semibold text-[#2D3E35] hover:text-emerald-800 flex items-center space-x-1.5 text-left transition-colors cursor-pointer"
+                        title="Click to view or edit reservation itinerary"
+                      >
+                        <BedDouble className="w-3.5 h-3.5 text-[#C07D63] shrink-0" />
+                        <span className="line-clamp-1">{trip.room_tier || "Sanctuary Master Villa"}</span>
+                      </button>
+                    ) : (
+                      <div className="mt-2 text-xs font-semibold text-[#2D3E35] flex items-center space-x-1.5">
+                        <BedDouble className="w-3.5 h-3.5 text-[#C07D63] shrink-0" />
+                        <span className="line-clamp-1">{trip.room_tier || "Sanctuary Master Villa"}</span>
+                      </div>
+                    )}
 
-            {/* Allergen Quarantine */}
-            <div className="p-3.5 rounded-xl bg-[#FAF7F2] border border-[#E5DDD0] flex flex-col justify-between space-y-3">
-              <div>
-                <div className="flex items-center space-x-1.5 font-semibold text-xs text-[#2D3E35]">
-                  <ShieldAlert className="w-4 h-4 text-amber-700 shrink-0" />
-                  <span>Allergen Recall Quarantine</span>
-                </div>
-                <p className="text-[11px] text-[#5C6B5E] mt-1">
-                  Audits cohort for tree-nut/peanut anaphylaxis, quarantines contaminated supplier batch, and substitutes seed ganache.
-                </p>
-              </div>
-              <button
-                onClick={handleAllergenQuarantine}
-                disabled={busyAction !== null}
-                className="w-full py-1.5 px-2.5 rounded-md bg-amber-800 hover:bg-amber-900 text-white text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {busyAction === "allergen" ? "Auditing Kitchen..." : "Trigger Recall Quarantine"}
-              </button>
-            </div>
+                    {trip.dietary_notes && (
+                      <div className="mt-1 text-[11px] text-[#5C6B5E] flex items-center space-x-1">
+                        <Utensils className="w-3 h-3 text-amber-700 shrink-0" />
+                        <span className="line-clamp-1">{trip.dietary_notes}</span>
+                      </div>
+                    )}
+                  </div>
 
-            {/* Suite Conflict Resolver */}
-            <div className="p-3.5 rounded-xl bg-[#FAF7F2] border border-[#E5DDD0] flex flex-col justify-between space-y-3">
-              <div>
-                <div className="flex items-center space-x-1.5 font-semibold text-xs text-[#2D3E35]">
-                  <BedDouble className="w-4 h-4 text-emerald-800 shrink-0" />
-                  <span>Suite Conflict Arbitrator</span>
+                  <div className="pt-2 border-t border-[#E5DDD0]/70 flex items-center justify-between">
+                    <span className="text-[10px] font-mono text-[#5C6B5E]">
+                      Paid: ${(trip.paid_amount || 0).toLocaleString()} / ${trip.total_investment.toLocaleString()}
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {onInspectGuest && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (trip.client_id) {
+                              onInspectGuest(trip.client_id);
+                            } else {
+                              const matched = clients.find(
+                                (c) =>
+                                  c.email.toLowerCase() === trip.client_email.toLowerCase() ||
+                                  c.full_name.toLowerCase() === trip.client_name.toLowerCase()
+                              );
+                              if (matched) onInspectGuest(matched.id);
+                            }
+                          }}
+                          className="px-2 py-1 rounded text-[11px] font-semibold bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-200 transition-colors cursor-pointer flex items-center space-x-1"
+                          title="Open Guest Dossier"
+                        >
+                          <User className="w-3 h-3 text-emerald-700" />
+                          <span>Dossier</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleQuickBookGuest(trip)}
+                        className="px-2.5 py-1 rounded text-[11px] font-semibold bg-white hover:bg-[#2D3E35] text-[#2D3E35] hover:text-[#FAF7F2] border border-[#E5DDD0] transition-colors cursor-pointer flex items-center space-x-1"
+                        title="Schedule 1:1 Somatic Bodywork"
+                      >
+                        <Calendar className="w-3 h-3 text-[#C07D63]" />
+                        <span>Book 1:1</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <p className="text-[11px] text-[#5C6B5E] mt-1">
-                  Arbitrates double-booked suites by lifetime spend; awards secondary guest $0 Cliffside Villa upgrade + $500 spa folio credit.
-                </p>
-              </div>
-              <button
-                onClick={handleResolveRoomConflict}
-                disabled={busyAction !== null}
-                className="w-full py-1.5 px-2.5 rounded-md bg-[#2D3E35] hover:bg-[#1f2c25] text-[#FAF7F2] text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {busyAction === "conflict" ? "Arbitrating..." : "Resolve Suite Overlap"}
-              </button>
+              ))}
             </div>
+          )}
+        </div>
 
-            {/* Force Majeure Postponement */}
-            <div className="p-3.5 rounded-xl bg-rose-50/70 border border-rose-200 flex flex-col justify-between space-y-3">
-              <div>
-                <div className="flex items-center space-x-1.5 font-semibold text-xs text-rose-950">
-                  <AlertTriangle className="w-4 h-4 text-rose-700 shrink-0" />
-                  <span>Force Majeure Freeze</span>
-                </div>
-                <p className="text-[11px] text-rose-900/80 mt-1">
-                  Mass-postpones cohort for hurricane/airspace closure with 100% transferable 18-month vouchers and 0% forfeiture penalty.
-                </p>
-              </div>
-              <button
-                onClick={handleForceMajeure}
-                disabled={busyAction !== null}
-                className="w-full py-1.5 px-2.5 rounded-md bg-rose-800 hover:bg-rose-900 text-white text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {busyAction === "forcemajeure" ? "Issuing Vouchers..." : "Postpone & Protect 100%"}
-              </button>
+        {/* 4. Streamlined Operations & Group Logistics (Clean, 3-Pillar Architecture) */}
+        <div className="border-t border-[#E5DDD0] pt-4">
+          <div className="flex items-center justify-between mb-3">
+            <div className="text-xs font-bold uppercase tracking-wider text-[#2D3E35] flex items-center space-x-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-[#C07D63]" />
+              <span>Sanctuary Operations &amp; Group Contingency Protocols</span>
             </div>
+            <button
+              type="button"
+              onClick={() => setShowOperationsDrawer(!showOperationsDrawer)}
+              className="text-xs text-[#5C6B5E] hover:text-[#2D3E35] flex items-center space-x-1 font-semibold cursor-pointer"
+            >
+              <span>{showOperationsDrawer ? "Collapse Protocols" : "Expand Protocols"}</span>
+              {showOperationsDrawer ? (
+                <ChevronUp className="w-3.5 h-3.5" />
+              ) : (
+                <ChevronDown className="w-3.5 h-3.5" />
+              )}
+            </button>
           </div>
+
+          {showOperationsDrawer && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 animate-in fade-in">
+              {/* Pillar A: Logistics & Weather */}
+              <div className="p-3.5 rounded-xl bg-[#FAF7F2] border border-[#E5DDD0] space-y-3 flex flex-col justify-between">
+                <div>
+                  <div className="font-serif font-bold text-xs text-[#2D3E35] flex items-center space-x-1.5">
+                    <CloudRain className="w-4 h-4 text-blue-700" />
+                    <span>Weather &amp; Aviation Logistics</span>
+                  </div>
+                  <p className="text-[11px] text-[#5C6B5E] mt-1 leading-relaxed">
+                    Automated group pivots for rainfall squalls and luxury chauffeur re-sequencing for delayed flights.
+                  </p>
+                </div>
+                <div className="space-y-2 pt-2">
+                  <button
+                    onClick={handleWeatherPivot}
+                    disabled={busyAction !== null}
+                    className="w-full py-1.5 px-2.5 rounded-md bg-[#2D3E35] hover:bg-[#1f2c25] text-[#FAF7F2] text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {busyAction === "weather" ? "Moving Indoors..." : "Move Activities Indoors (Rain)"}
+                  </button>
+                  <button
+                    onClick={handleBatchFlightResequence}
+                    disabled={busyAction !== null}
+                    className="w-full py-1.5 px-2.5 rounded-md bg-white hover:bg-slate-50 text-[#2D3E35] border border-[#E5DDD0] text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {busyAction === "fleet" ? "Re-Sequencing Cars..." : "Group Delayed Airport Pickups"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Pillar B: Accommodations & Food Safety */}
+              <div className="p-3.5 rounded-xl bg-[#FAF7F2] border border-[#E5DDD0] space-y-3 flex flex-col justify-between">
+                <div>
+                  <div className="font-serif font-bold text-xs text-[#2D3E35] flex items-center space-x-1.5">
+                    <ShieldAlert className="w-4 h-4 text-amber-700" />
+                    <span>Safety &amp; Villa Arbitration</span>
+                  </div>
+                  <p className="text-[11px] text-[#5C6B5E] mt-1 leading-relaxed">
+                    Instantly quarantine allergen-contaminated ingredients and arbitrate double-booked suites by lifetime spend.
+                  </p>
+                </div>
+                <div className="space-y-2 pt-2">
+                  <button
+                    onClick={handleResolveRoomConflict}
+                    disabled={busyAction !== null}
+                    className="w-full py-1.5 px-2.5 rounded-md bg-[#2D3E35] hover:bg-[#1f2c25] text-[#FAF7F2] text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {busyAction === "conflict" ? "Resolving Overlap..." : "Arbitrate Suite Overlap"}
+                  </button>
+                  <button
+                    onClick={handleAllergenQuarantine}
+                    disabled={busyAction !== null}
+                    className="w-full py-1.5 px-2.5 rounded-md bg-amber-800 hover:bg-amber-900 text-white text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {busyAction === "allergen" ? "Quarantining..." : "Trigger Allergen Quarantine"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Pillar C: Force Majeure Contingency */}
+              <div className="p-3.5 rounded-xl bg-rose-50/70 border border-rose-200 space-y-3 flex flex-col justify-between">
+                <div>
+                  <div className="font-serif font-bold text-xs text-rose-950 flex items-center space-x-1.5">
+                    <AlertTriangle className="w-4 h-4 text-rose-700" />
+                    <span>Contingency &amp; Force Majeure</span>
+                  </div>
+                  <p className="text-[11px] text-rose-900/80 mt-1 leading-relaxed">
+                    Protects the entire cohort with 100% transferable 18-month retreat credits in severe weather or civil stop events.
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <button
+                    onClick={handleForceMajeure}
+                    disabled={busyAction !== null}
+                    className="w-full py-2 px-2.5 rounded-md bg-rose-800 hover:bg-rose-900 text-white text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {busyAction === "forcemajeure" ? "Issuing Credits..." : "Issue 100% Transferable Credits"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Live Output Drawers (Dietary Matrix / Fleet Clustering / Allergen Audit) */}
@@ -545,11 +748,11 @@ export default function CohortCommandTab({
           <div className="p-4 rounded-xl bg-[#FAF7F2] border border-[#E5DDD0] space-y-3 animate-in fade-in">
             <div className="flex items-center justify-between">
               <div className="font-serif font-bold text-sm text-[#2D3E35]">
-                Executive Chef Allergen &amp; Clinical Dietary Matrix ({dietaryManifest.sanctuary_slug})
+                Executive Chef Dietary Matrix ({dietaryManifest.sanctuary_slug})
               </div>
               <button
                 onClick={() => setDietaryManifest(null)}
-                className="text-xs text-[#5C6B5E] hover:text-[#2D3E35] font-semibold"
+                className="text-xs text-[#5C6B5E] hover:text-[#2D3E35] font-semibold cursor-pointer"
               >
                 Close Matrix
               </button>
@@ -596,7 +799,7 @@ export default function CohortCommandTab({
               </div>
               <button
                 onClick={() => setFleetRunsResult(null)}
-                className="text-xs text-blue-800 hover:underline font-semibold"
+                className="text-xs text-blue-800 hover:underline font-semibold cursor-pointer"
               >
                 Dismiss
               </button>
@@ -637,7 +840,7 @@ export default function CohortCommandTab({
               </span>
               <button
                 onClick={() => setAllergenAlertResult(null)}
-                className="text-xs text-amber-900 font-semibold"
+                className="text-xs text-amber-900 font-semibold cursor-pointer"
               >
                 Dismiss
               </button>
@@ -650,53 +853,116 @@ export default function CohortCommandTab({
         )}
       </div>
 
-      {/* Atomic 1:1 Master Bodywork & Practitioner Slot Scheduler */}
-      <div className="bg-white p-5 rounded-xl border border-[#E5DDD0] shadow-xs">
-        <div className="flex items-center justify-between mb-3">
+      {/* 5. 1:1 Master Bodywork & Somatic Practitioner Scheduling (Idiot-Proofed) */}
+      <div id="bodywork-scheduler-section" className="bg-white p-5 rounded-xl border border-[#E5DDD0] shadow-xs space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E5DDD0] pb-3">
           <div>
             <h3 className="font-serif text-base font-bold text-[#2D3E35] flex items-center space-x-2">
               <Calendar className="w-4 h-4 text-[#C07D63]" />
-              <span>1:1 Master Bodywork &amp; Somatic Practitioner Slot Scheduler (Mutex Collision Guard)</span>
+              <span>1:1 Master Bodywork &amp; Somatic Practitioner Scheduling</span>
             </h3>
-            <p className="text-xs text-[#5C6B5E]">
-              Prevents concurrent double-booking of scarce 1:1 clinical practitioners and automatically proposes adjacent 15:30 slots on collision.
+            <p className="text-xs text-[#5C6B5E] mt-0.5">
+              Prevents concurrent double-booking of scarce 1:1 clinical practitioners and automatically proposes adjacent slots on collision.
             </p>
           </div>
         </div>
 
+        {bodyworkFeedback && (
+          <div
+            className={`p-3 rounded-lg text-xs flex items-center justify-between ${
+              bodyworkFeedback.success
+                ? "bg-emerald-50 text-emerald-950 border border-emerald-200"
+                : "bg-amber-50 text-amber-950 border border-amber-200"
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              {bodyworkFeedback.success ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+              ) : (
+                <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+              )}
+              <span>{bodyworkFeedback.message}</span>
+            </div>
+            <button
+              onClick={() => setBodyworkFeedback(null)}
+              className="text-[10px] font-bold underline cursor-pointer ml-2"
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
         <form onSubmit={handleScheduleBodywork} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+          {/* Guest Selector Dropdown */}
           <div>
-            <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">Guest Name</label>
-            <input
-              type="text"
-              value={bodyworkGuestName}
-              onChange={(e) => setBodyworkGuestName(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs rounded-lg border border-[#E5DDD0] bg-[#FAF7F2]"
-              required
-            />
+            <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">
+              Select Guest
+            </label>
+            <select
+              value={selectedGuestId}
+              onChange={(e) => handleGuestSelectChange(e.target.value)}
+              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#E5DDD0] bg-[#FAF7F2] font-semibold text-[#2D3E35]"
+            >
+              {cohortTrips.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.client_name}
+                </option>
+              ))}
+              <option value="custom">+ Manual / Other Guest</option>
+            </select>
           </div>
+
+          {/* Guest Email or Manual Name */}
           <div>
-            <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">Guest Email</label>
-            <input
-              type="email"
-              value={bodyworkGuestEmail}
-              onChange={(e) => setBodyworkGuestEmail(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs rounded-lg border border-[#E5DDD0] bg-[#FAF7F2]"
-              required
-            />
+            <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">
+              {selectedGuestId === "custom" ? "Guest Name & Email" : "Guest Email"}
+            </label>
+            {selectedGuestId === "custom" ? (
+              <div className="grid grid-cols-2 gap-1.5">
+                <input
+                  type="text"
+                  placeholder="Name"
+                  value={bodyworkGuestName}
+                  onChange={(e) => setBodyworkGuestName(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs rounded-lg border border-[#E5DDD0] bg-[#FAF7F2]"
+                  required
+                />
+                <input
+                  type="email"
+                  placeholder="Email"
+                  value={bodyworkGuestEmail}
+                  onChange={(e) => setBodyworkGuestEmail(e.target.value)}
+                  className="w-full px-2 py-1.5 text-xs rounded-lg border border-[#E5DDD0] bg-[#FAF7F2]"
+                  required
+                />
+              </div>
+            ) : (
+              <input
+                type="email"
+                value={bodyworkGuestEmail}
+                readOnly
+                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#E5DDD0] bg-[#FAF7F2] text-[#5C6B5E]"
+              />
+            )}
           </div>
+
+          {/* Practitioner */}
           <div>
-            <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">Practitioner</label>
+            <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">
+              Practitioner &amp; Modality
+            </label>
             <select
               value={bodyworkPractitioner}
               onChange={(e) => setBodyworkPractitioner(e.target.value)}
-              className="w-full px-3 py-1.5 text-xs rounded-lg border border-[#E5DDD0] bg-[#FAF7F2]"
+              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#E5DDD0] bg-[#FAF7F2] text-[#2D3E35]"
             >
               <option value="Mateo Silva (Master Craniosacral)">Mateo Silva (Craniosacral)</option>
               <option value="Dr. Sofia Mendez (Vagal Acupuncture)">Dr. Sofia Mendez (Acupuncture)</option>
               <option value="Kareena Islam, BSN, RN (Somatic Consultation)">Kareena Islam, RN (Clinical)</option>
             </select>
           </div>
+
+          {/* Date & Slot */}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">Date</label>
@@ -704,33 +970,34 @@ export default function CohortCommandTab({
                 type="date"
                 value={bodyworkDate}
                 onChange={(e) => setBodyworkDate(e.target.value)}
-                className="w-full px-2 py-1.5 text-xs rounded-lg border border-[#E5DDD0] bg-[#FAF7F2]"
+                className="w-full px-2 py-1.5 text-xs rounded-lg border border-[#E5DDD0] bg-[#FAF7F2] text-[#2D3E35]"
               />
             </div>
             <div>
-              <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">Slot</label>
+              <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">Time Slot</label>
               <select
                 value={bodyworkTimeSlot}
                 onChange={(e) => setBodyworkTimeSlot(e.target.value)}
-                className="w-full px-2 py-1.5 text-xs rounded-lg border border-[#E5DDD0] bg-[#FAF7F2]"
+                className="w-full px-2 py-1.5 text-xs rounded-lg border border-[#E5DDD0] bg-[#FAF7F2] font-semibold text-[#2D3E35]"
               >
-                <option value="10:00">10:00</option>
-                <option value="14:00">14:00</option>
-                <option value="15:30">15:30</option>
-                <option value="17:00">17:00</option>
+                <option value="10:00">10:00 AM</option>
+                <option value="14:00">2:00 PM</option>
+                <option value="15:30">3:30 PM</option>
+                <option value="17:00">5:00 PM</option>
               </select>
             </div>
           </div>
+
           <button
             type="submit"
             disabled={busyAction !== null}
-            className="px-4 py-2 rounded-lg bg-[#2D3E35] hover:bg-[#1f2c25] text-[#FAF7F2] text-xs font-semibold transition-colors cursor-pointer"
+            className="w-full py-2 px-3 rounded-lg bg-[#2D3E35] hover:bg-[#1f2c25] text-[#FAF7F2] text-xs font-semibold transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center space-x-1.5"
           >
-            {busyAction === "bodywork" ? "Locking Slot..." : "Reserve 1:1 Session"}
+            <UserCheck className="w-3.5 h-3.5 text-[#C07D63]" />
+            <span>{busyAction === "bodywork" ? "Locking Slot..." : "Lock 1:1 Session"}</span>
           </button>
         </form>
       </div>
     </div>
   );
 }
-

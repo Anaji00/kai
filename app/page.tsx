@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import { ArrowRight, Sparkles, Wind, ShieldCheck, Compass, Award, Globe, Plane } from "lucide-react";
+import { ArrowRight, Sparkles, Wind, ShieldCheck, Compass, Award, Globe, Plane, CheckCircle, Heart, Users } from "lucide-react";
 import { RETREATS } from "@/lib/retreats";
 import RetreatGrid from "@/components/RetreatGrid";
 import SoundAndBreathModal from "@/components/SoundAndBreathModal";
@@ -14,8 +14,8 @@ import FAQSection from "@/components/FAQSection";
 export default function HomePage() {
   const [somaticModalOpen, setSomaticModalOpen] = useState(false);
 
-  // Take the 3 flagship 2027 retreats + Riviera Maya highlight
-  const featuredRetreats = RETREATS.filter((r) => r.year === 2027);
+  // Featured Sanctuaries: Marival Armony (January 2027) + completed retreat at El Dorado Seaside Palms
+  const featuredRetreats = RETREATS.filter((r) => r.featured);
 
   return (
     <div className="relative overflow-hidden">
@@ -118,18 +118,18 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 2. 2027 RETREAT HIGHLIGHTS */}
+      {/* 2. FEATURED SANCTUARIES */}
       <section className="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-14 gap-6">
           <div>
             <span className="text-xs uppercase tracking-[0.25em] text-olive font-semibold">
-              The 2027 Calendar
+              Curated Escapes &amp; Sanctuary History
             </span>
             <h2 className="font-serif text-3xl sm:text-5xl text-sage font-light mt-2">
               Featured Sanctuaries
             </h2>
             <p className="text-sm text-sage/75 mt-2 max-w-xl">
-              Thoughtfully curated sanctuary destinations designed for an unhurried, personalized restorative journey and deep cultural discovery.
+              Explore our upcoming 2027 flagship retreat at Marival Armony and discover reflections from our previously completed sanctuary at El Dorado Seaside Palms.
             </p>
           </div>
 
@@ -137,160 +137,161 @@ export default function HomePage() {
             href="/retreats"
             className="inline-flex items-center gap-2 text-xs uppercase tracking-widest text-olive font-semibold hover:text-terracotta transition-colors self-start md:self-auto"
           >
-            <span>View All Destinations & Schedules</span>
+            <span>View All Destinations &amp; Schedules</span>
             <ArrowRight className="h-4 w-4" />
           </Link>
         </div>
 
-        {/* 3 Flagship Cards */}
-        <RetreatGrid retreats={featuredRetreats} className="grid grid-flow-row-dense grid-cols-1 md:grid-cols-3 gap-8" />
+        {/* Featured Cards: Marival Armony & El Dorado Seaside Palms */}
+        <RetreatGrid retreats={featuredRetreats} className="grid grid-flow-row-dense grid-cols-1 md:grid-cols-2 gap-8" />
 
-        {/* Fall 2026 Sneak Peek Banner */}
+        {/* Previously Completed Sanctuary Banner */}
         <div className="mt-14 rounded-3xl border border-sand-border bg-sand/60 p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="space-y-1 text-center sm:text-left">
-            <span className="rounded-full bg-terracotta/10 text-terracotta border border-terracotta/30 px-3 py-0.5 text-[10px] uppercase tracking-wider font-semibold">
-              Upcoming 2026 Opportunity
+            <span className="rounded-full bg-olive/15 text-olive border border-olive/30 px-3 py-0.5 text-[10px] uppercase tracking-wider font-semibold">
+              Previously Completed Sanctuary
             </span>
             <h3 className="font-serif text-2xl text-sage font-normal">
-              KAI Fall Retreat • Riviera Maya, Mexico
+              Past Retreat • El Dorado Seaside Palms, Riviera Maya
             </h3>
             <p className="text-xs text-sage/75 max-w-2xl">
-              October 1 – 4, 2026 at luxury adults-only El Dorado Seaside Palms. Rapid pre-holiday nervous system reset and renewal with oceanfront crystal bowl healing.
+              Our inaugural adult sanctuary at El Dorado Seaside Palms brought guests together for restorative oceanfront vinyasa, crystal singing bowls, and nervous-system renewal. Explore attendee reflections and testimonials.
             </p>
           </div>
 
           <Link
-            href="/book?retreat=riviera-2026"
+            href="/testimonials"
             className="shrink-0 rounded-full bg-sage px-6 py-3 text-xs uppercase tracking-widest text-linen hover:bg-sage-dark transition-all font-medium shadow"
           >
-            View 2026 Details
+            View Guest Stories
           </Link>
         </div>
       </section>
 
-      {/* THE TRAVEL INSIDER ADVANTAGE */}
+      {/* 3. WHY KAI WELLNESS RETREATS? */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto border-t border-sand-border/80">
         <div className="text-center max-w-3xl mx-auto space-y-3 mb-14">
           <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.25em] text-terracotta font-semibold">
-            <Award className="h-3.5 w-3.5 text-terracotta" />
-            The Travel Insider Advantage
+            <Heart className="h-3.5 w-3.5 text-terracotta" />
+            Why KAI Wellness Retreats?
           </span>
           <h2 className="font-serif text-3xl sm:text-5xl text-sage font-light">
-            Strong Travel Partnerships and Real Local Connections
+            Where Wellness Meets Heart, Connection &amp; Discovery
           </h2>
           <p className="text-xs sm:text-sm text-sage/80 leading-relaxed font-light">
-            A truly restorative sanctuary cannot exist inside an isolated tourist bubble or an overpriced package. Backed by Grand Travel & Cruise and recognized by <em>Future Leaders in Travel</em>, Kareena Islam brings the luxury travel industry’s most coveted relationships directly to your retreat.
+            At KAI Wellness Retreats, we believe the most beautiful journeys are the ones that touch your heart, nourish your soul, and bring people together. Rooted in family values, genuine hospitality, and a passion for mindful living, our retreats are thoughtfully created to help you reconnect with yourself, discover new cultures, and build meaningful friendships. More than a retreat, KAI is a community where everyone belongs.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Advantage 1: Best Deals & Estate Buyouts */}
-          <div className="rounded-3xl border border-sand-border bg-linen p-6 sm:p-7 space-y-4 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
-            <div className="space-y-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sand text-sage border border-sand-border">
-                <ShieldCheck className="h-6 w-6 text-sage" />
-              </div>
-              <h3 className="font-serif text-xl text-sage font-normal">
-                Best Deals in the Industry
-              </h3>
-              <p className="text-xs text-olive font-medium">
-                25+ Years Host Agency Volume
-              </p>
-              <p className="text-xs text-sage/80 leading-relaxed">
-                Grand Travel & Cruise’s premier host agency standing secures private villa estate buyouts, preferred group air contracts, and complimentary suite upgrades unavailable to ordinary travelers or boutique retreat hosts.
-              </p>
-            </div>
-            <div className="pt-3 border-t border-sand-border/60 text-[11px] text-sage/70 font-medium">
-              ✓ Exclusive wholesale contract leverage
-            </div>
-          </div>
-
-          {/* Advantage 2: Deep Knowledge of Locals & Sacred Customs */}
+          {/* Pillar 1: Wellness With Heart */}
           <div className="rounded-3xl border border-sand-border bg-linen p-6 sm:p-7 space-y-4 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
             <div className="space-y-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-terracotta-soft text-terracotta border border-terracotta/20">
-                <Globe className="h-6 w-6" />
+                <Heart className="h-6 w-6" />
               </div>
               <h3 className="font-serif text-xl text-sage font-normal">
-                Locals & Sacred Customs
+                Wellness With Heart
               </h3>
               <p className="text-xs text-terracotta font-medium">
-                Authentic Immersion, Zero Tourist Traps
+                Nurturing Mind, Body &amp; Spirit
               </p>
               <p className="text-xs text-sage/80 leading-relaxed">
-                Kareena’s on-the-ground relationships welcome you into authentic cultural traditions—from sacred Melukat water blessings with Balinese high priests to generational olive harvest tables in Ravello and Blue Zone botanical medicine in Costa Rica.
+                Wellness is personal, and every journey is unique. We create a welcoming space where you can relax, recharge, and rediscover your inner balance.
               </p>
             </div>
-            <div className="pt-3 border-t border-sand-border/60 text-[11px] text-sage/70 font-medium">
-              ✓ Intimate cultural reverence & local artisans
+            <div className="pt-3 border-t border-sand-border/60 text-[11px] text-sage/70 font-medium flex items-center gap-1.5">
+              <CheckCircle className="h-3.5 w-3.5 text-olive shrink-0" aria-hidden="true" />
+              <span>Nurturing Mind, Body &amp; Spirit</span>
             </div>
           </div>
 
-          {/* Advantage 3: Zero-Friction VIP Logistics */}
+          {/* Pillar 2: Meaningful Connections */}
           <div className="rounded-3xl border border-sand-border bg-linen p-6 sm:p-7 space-y-4 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
             <div className="space-y-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-olive-soft text-olive border border-olive/20">
-                <Plane className="h-6 w-6" />
+                <Users className="h-6 w-6" />
               </div>
               <h3 className="font-serif text-xl text-sage font-normal">
-                Zero-Friction Logistics
+                Meaningful Connections
               </h3>
               <p className="text-xs text-olive font-medium">
-                White-Glove Airport & Flight Desk
+                Arrive as Guests. Leave as Family.
               </p>
               <p className="text-xs text-sage/80 leading-relaxed">
-                Travel can be stressful, and that stress can follow you to the retreat. Our concierge manages flight routing, schedule change protections, tarmac meet-and-greets, and private chauffeured transfers straight to sanctuary gates.
+                The heart of KAI is human connection. We believe shared experiences, genuine conversations, laughter, and kindness create lasting friendships. Our intimate retreats bring people together in an environment where everyone feels welcomed, valued, and cared for.
               </p>
             </div>
-            <div className="pt-3 border-t border-sand-border/60 text-[11px] text-sage/70 font-medium">
-              ✓ 24/7 dedicated flight monitoring & VIP transit
+            <div className="pt-3 border-t border-sand-border/60 text-[11px] text-sage/70 font-medium flex items-center gap-1.5">
+              <CheckCircle className="h-3.5 w-3.5 text-olive shrink-0" aria-hidden="true" />
+              <span>Arrive as Guests. Leave as Family.</span>
             </div>
           </div>
 
-          {/* Advantage 4: Future Leaders in Travel Honoree */}
+          {/* Pillar 3: Authentic Cultural Experiences */}
+          <div className="rounded-3xl border border-sand-border bg-linen p-6 sm:p-7 space-y-4 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
+            <div className="space-y-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sand text-sage border border-sand-border">
+                <Globe className="h-6 w-6" />
+              </div>
+              <h3 className="font-serif text-xl text-sage font-normal">
+                Authentic Cultural Experiences
+              </h3>
+              <p className="text-xs text-olive font-medium">
+                Explore Beyond the Ordinary
+              </p>
+              <p className="text-xs text-sage/80 leading-relaxed">
+                Every destination has a story worth discovering. From local traditions and cultural encounters to breathtaking natural wonders, we thoughtfully blend wellness with authentic travel experiences that inspire curiosity, appreciation, and unforgettable memories.
+              </p>
+            </div>
+            <div className="pt-3 border-t border-sand-border/60 text-[11px] text-sage/70 font-medium flex items-center gap-1.5">
+              <CheckCircle className="h-3.5 w-3.5 text-olive shrink-0" aria-hidden="true" />
+              <span>Explore Beyond the Ordinary</span>
+            </div>
+          </div>
+
+          {/* Pillar 4: Travel Expertise With a Personal Touch */}
           <div className="rounded-3xl border border-sand-border bg-linen p-6 sm:p-7 space-y-4 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
             <div className="space-y-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sand text-terracotta border border-sand-border">
                 <Compass className="h-6 w-6 text-terracotta" />
               </div>
               <h3 className="font-serif text-xl text-sage font-normal">
-                Future Leaders Honoree
+                Travel Expertise With a Personal Touch
               </h3>
               <p className="text-xs text-sage font-medium">
-                National Luxury Travel Recognition
+                Decades of Experience. A Lifetime of Care.
               </p>
               <p className="text-xs text-sage/80 leading-relaxed">
-                Hand-picked among the country’s top next-generation travel innovators, Kareena pairs clinical nursing precision with experiential luxury and the #LivingBIG philosophy pioneered alongside Jay Islam.
+                Supported by Grand Travel &amp; Cruise and more than 30 years of trusted travel industry relationships, KAI brings together exceptional destinations, thoughtful planning, and unreasonable hospitality. Our family takes pride in caring for the details so you can fully embrace the experience.
               </p>
             </div>
-            <div className="pt-3 border-t border-sand-border/60 text-[11px] text-sage/70 font-medium">
-              ✓ Elite supplier access & VIP concierge care
+            <div className="pt-3 border-t border-sand-border/60 text-[11px] text-sage/70 font-medium flex items-center gap-1.5">
+              <CheckCircle className="h-3.5 w-3.5 text-olive shrink-0" aria-hidden="true" />
+              <span>Decades of Experience. A Lifetime of Care.</span>
             </div>
           </div>
         </div>
 
-        {/* Clout Trust Banner */}
-        <div className="mt-10 rounded-2xl border border-sand-border bg-sand/50 p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-linen text-sage font-serif text-sm border border-sand-border">
-              GT
-            </div>
-            <div>
-              <p className="font-serif text-sm text-sage font-medium">
-                Grand Travel & Cruise • 25+ Years Host Agency Legacy
-              </p>
-              <p className="text-[11px] text-sage/75">
-                Premier Host Agency Standing • Future Leaders in Travel Honoree • Dedicated Flight & VIP Ground Desk
-              </p>
-            </div>
+        {/* The KAI Promise Callout Banner */}
+        <div className="mt-12 rounded-3xl border border-sand-border bg-sand/60 p-7 sm:p-10 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
+          <div className="space-y-2 text-center md:text-left max-w-2xl">
+            <span className="rounded-full bg-terracotta/15 text-terracotta border border-terracotta/30 px-3 py-0.5 text-[10px] uppercase tracking-wider font-semibold">
+              The KAI Promise
+            </span>
+            <h3 className="font-serif text-2xl sm:text-3xl text-sage font-normal">
+              &ldquo;Come as you are. Connect with others. Rediscover yourself.&rdquo;
+            </h3>
+            <p className="text-xs sm:text-sm text-sage/80 leading-relaxed font-light">
+              At KAI, we don’t simply create wellness retreats. We create a sense of belonging, a journey of discovery, and memories that stay in your heart long after you return home.
+            </p>
           </div>
 
           <Link
-            href="/about#triad-of-care"
-            className="shrink-0 text-xs font-semibold text-terracotta hover:text-terracotta-dark uppercase tracking-wider inline-flex items-center gap-1.5"
+            href="/about"
+            className="shrink-0 rounded-full bg-sage px-6 py-3.5 text-xs uppercase tracking-widest text-linen hover:bg-sage-dark transition-all font-medium shadow"
           >
-            <span>Read The Founder’s Heritage</span>
-            <ArrowRight className="h-3.5 w-3.5" />
+            Meet The Hearts Behind KAI
           </Link>
         </div>
       </section>

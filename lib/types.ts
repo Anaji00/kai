@@ -55,7 +55,7 @@ export interface Retreat {
   gallery: string[];
   schedule: RetreatItineraryDay[];
   featured?: boolean;
-  status: "open" | "waitlist" | "few-spots" | "coming-soon";
+  status: "open" | "waitlist" | "few-spots" | "coming-soon" | "completed";
 }
 
 export type RoomTier = "private-suite" | "shared-luxury" | "flexible";

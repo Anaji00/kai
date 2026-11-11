@@ -618,13 +618,13 @@ export async function fetchWhatsAppCard(intakeId: string): Promise<WhatsAppSimul
         interactive: {
           type: "button",
           body: {
-            text: `🌿 *KAI CONCIERGE DISPATCH*\n*Guest:* Sarah Jenkins (Burnout Score: 9/10)\n*Sanctuary:* Nosara Rainforest Reset\n*Room:* Private Villa Sanctuary | *VIP Air:* Business (MIA)\n\n📋 *PRE-CALL CLINICAL THESIS:*\n• Sympathetic hyperarousal with insomnia & elevated evening cortisol.\n• Health Notes: Chronic exhaustion, waking at 3:00 AM.\n\n🏷️ *Tags:* CORTISOL_RESET, VAGAL_DYSREGULATION, BLUE_ZONE_DIET\n\n⚡ *Quick Operator Actions:*`
+            text: `*KAI CONCIERGE DISPATCH*\n*Guest:* Sarah Jenkins (Burnout Score: 9/10)\n*Sanctuary:* Nosara Rainforest Reset\n*Room:* Private Villa Sanctuary | *VIP Air:* Business (MIA)\n\n*PRE-CALL CLINICAL THESIS:*\n• Sympathetic hyperarousal with insomnia & elevated evening cortisol.\n• Health Notes: Chronic exhaustion, waking at 3:00 AM.\n\n*Tags:* CORTISOL_RESET, VAGAL_DYSREGULATION, BLUE_ZONE_DIET\n\n*Quick Operator Actions:*`
           },
           action: {
             buttons: [
-              { type: "reply", reply: { id: `approve_sync_${intakeId}`, title: "⚡ Approve & Sync" } },
-              { type: "reply", reply: { id: `view_dossier_${intakeId}`, title: "📝 View Dossier" } },
-              { type: "reply", reply: { id: `route_flights_${intakeId}`, title: "✈️ Route Flights" } }
+              { type: "reply", reply: { id: `approve_sync_${intakeId}`, title: "Approve & Sync" } },
+              { type: "reply", reply: { id: `view_dossier_${intakeId}`, title: "View Dossier" } },
+              { type: "reply", reply: { id: `route_flights_${intakeId}`, title: "Route Flights" } }
             ]
           }
         },
@@ -667,7 +667,7 @@ export async function executeWhatsAppButtonAction(
         action: "APPROVE_AND_SYNC",
         intake_id: intakeId,
         crm_trip_id: crmTripId,
-        reply_text: `✅ *AUTHORIZED & COMMITTED TO KAI SANCTUARY CRM*\n*Guest:* Eleanor Vance\n*Trip ID:* \`${crmTripId}\`\n*Contact ID:* \`${crmContactId}\`\n*Clinical Tags:* CORTISOL_RESET, VAGAL_DYSREGULATION, BLUE_ZONE_DIET\n\n💳 *Payments & Invoicing:* 100% Native KAI Card Vault\n🔗 Proposal: /my-retreat?ref=${crmTripId}\n🔗 Payments: /portal?tab=crm&section=payments&trip_id=${crmTripId}`
+        reply_text: `*AUTHORIZED & COMMITTED TO KAI SANCTUARY CRM*\n*Guest:* Eleanor Vance\n*Trip ID:* \`${crmTripId}\`\n*Contact ID:* \`${crmContactId}\`\n*Clinical Tags:* CORTISOL_RESET, VAGAL_DYSREGULATION, BLUE_ZONE_DIET\n\n*Payments & Invoicing:* 100% Native KAI Card Vault\nProposal: /my-retreat?ref=${crmTripId}\nPayments: /portal?tab=crm&section=payments&trip_id=${crmTripId}`
       },
       updated_intake: {
         id: intakeId,
@@ -710,7 +710,7 @@ export async function sendWhatsAppReplyText(
         `Room tier set to '${newTier}'`,
         "VIP Priority flag applied"
       ],
-      reply_receipt: `📱 *KAI SYSTEM ACKNOWLEDGEMENT*\nParsed operator instruction: *UPDATE_ROOM_TIER*\nChanges applied to intake:\n• Room tier set to '${newTier}'\n• VIP Priority flag applied`,
+      reply_receipt: `*KAI SYSTEM ACKNOWLEDGEMENT*\nParsed operator instruction: *UPDATE_ROOM_TIER*\nChanges applied to intake:\n• Room tier set to '${newTier}'\n• VIP Priority flag applied`,
       updated_intake: {
         id: intakeId,
         room_tier: newTier
@@ -874,7 +874,7 @@ export async function chatWithCopilot(
   } catch (err) {
     console.error("Clinical Copilot connection failed:", err);
     return {
-      response_text: `⚠️ **Unable to Connect to KAI Backend Sidecar**\n\nCould not communicate with the sidecar API at \`${getBaseUrl()}/copilot/chat\`.\n\n**Diagnosis / Recovery**:\n* Ensure the FastAPI server is running with \`uvicorn main:app --reload\` (port 8972).\n* Error details: *${err instanceof Error ? err.message : String(err)}*`,
+      response_text: `**Unable to Connect to KAI Backend Sidecar**\n\nCould not communicate with the sidecar API at \`${getBaseUrl()}/copilot/chat\`.\n\n**Diagnosis / Recovery**:\n* Ensure the FastAPI server is running with \`uvicorn main:app --reload\` (port 8972).\n* Error details: *${err instanceof Error ? err.message : String(err)}*`,
       mode,
       safety_level: undefined,
       safety_screened: false,
@@ -958,6 +958,103 @@ export async function chatWithCopilotStream(
   } catch (err) {
     console.error("Clinical Copilot SSE Streaming failed:", err);
     callbacks?.onError?.(err instanceof Error ? err : new Error(String(err)));
+  }
+}
+
+export interface CopilotExecuteActionResult {
+  success: boolean;
+  entity_type?: string;
+  record_id?: string;
+  title?: string;
+  summary?: string;
+  changes?: Record<string, unknown>;
+  error?: string;
+}
+
+export async function executeCopilotCrmAction(payload: {
+  form_type?: string;
+  action_type?: string;
+  target_id?: string;
+  sanctuary_slug?: string;
+  fields?: Record<string, unknown>;
+  payload?: Record<string, unknown>;
+}): Promise<CopilotExecuteActionResult> {
+  const res = await authFetch(`${getBaseUrl()}/copilot/execute-action`, {
+    method: "POST",
+    headers: getAuthHeaders({ "Content-Type": "application/json" }),
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || `CRM action failed (${res.status})`);
+  }
+  const data = await res.json();
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent("crm-updated", { detail: data }));
+    window.dispatchEvent(new CustomEvent("intakes-updated", { detail: data }));
+  }
+  return data;
+}
+
+export interface CopilotCrmSnapshot {
+  counts: {
+    clients: number;
+    trips: number;
+    cohorts: number;
+    vendors: number;
+    pending_drafts: number;
+    intakes: number;
+  };
+  clients: Array<{
+    id: string;
+    crm_contact_id: string;
+    full_name: string;
+    email: string;
+    phone: string;
+    vip_tier: string;
+    lifetime_value: number;
+    dietary_requirements: string;
+    health_notes: string;
+    passport_status: string;
+  }>;
+  trips: Array<{
+    id: string;
+    crm_trip_id: string;
+    client_id: string;
+    client_name: string;
+    sanctuary_slug: string;
+    retreat_Impression_name: string;
+    room_tier: string;
+    status: string;
+    total_investment: number;
+    amount_paid: number;
+    balance_due: number;
+    flight_airline: string;
+    flight_number: string;
+    clinical_clearance_status: string;
+  }>;
+  cohorts: Array<{
+    id: string;
+    cohort_code: string;
+    sanctuary_slug: string;
+    title: string;
+    check_in_date: string;
+    check_out_date: string;
+    max_capacity: number;
+    booked_guests: number;
+    status: string;
+  }>;
+}
+
+export async function fetchCopilotCrmSnapshot(sanctuarySlug?: string): Promise<CopilotCrmSnapshot | null> {
+  try {
+    const qs = sanctuarySlug && sanctuarySlug !== "ALL" ? `?sanctuary_slug=${encodeURIComponent(sanctuarySlug)}` : "";
+    const res = await authFetch(`${getBaseUrl()}/copilot/crm-snapshot${qs}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch (err) {
+    console.warn("Failed to fetch copilot CRM snapshot:", err);
+    return null;
   }
 }
 
@@ -2659,10 +2756,21 @@ export async function generateStaffRetreatPlan(intakeId: string): Promise<StaffG
 // KAI Native Travel CRM (Client Database & Folio Engine)
 // ----------------------------------------------------------------------------
 
+export interface CRMActivityItem {
+  id: string;
+  category: "CALL" | "WHATSAPP" | "EMAIL" | "NOTE" | "CLINICAL" | "SYSTEM_EVENT" | string;
+  summary: string;
+  details?: string;
+  operator_name: string;
+  timestamp: string;
+  trip_title?: string;
+  trip_id?: string;
+}
+
 export interface CRMClientItem {
   id: string;
   crm_contact_id: string;
-    full_name: string;
+  full_name: string;
   email: string;
   phone?: string;
   tags: string[];
@@ -2671,6 +2779,11 @@ export interface CRMClientItem {
   movement_experience?: string;
   intentions?: string;
   passport_valid_6mo?: boolean;
+  waiver_status?: "PENDING" | "SIGNED" | "EXEMPT";
+  waiver_signed_at?: string;
+  medical_clearance_status?: "PENDING_REVIEW" | "CLEARED" | "ACTION_REQUIRED";
+  companion_id?: string;
+  companion_name?: string;
   total_lifetime_spend: number;
   total_trips_count: number;
   source?: string;
@@ -2681,6 +2794,8 @@ export interface CRMClientItem {
 export interface CRMTripItem {
   id: string;
   crm_trip_id: string;
+  client_id?: string;
+  companion_trip_id?: string;
   client_name: string;
   client_email: string;
   client_phone?: string;
@@ -2716,7 +2831,9 @@ export interface CRMClientDetailResponse {
   client: CRMClientItem & {
     loyalty_programs?: Record<string, any>;
     notes?: string;
+    activity_log?: CRMActivityItem[];
   };
+  activities?: CRMActivityItem[];
   trips: CRMTripItem[];
   intakes_count: number;
   bookings_count: number;
@@ -2830,7 +2947,7 @@ export async function createCrmClient(
 
 export async function updateCrmClient(
   clientId: string,
-  payload: Partial<CRMClientCreatePayload>
+  payload: Partial<CRMClientCreatePayload> & Record<string, any>
 ): Promise<{ success: boolean; client_id: string; [key: string]: any }> {
   const res = await sidecarFetch(`/crm/clients/${encodeURIComponent(clientId)}`, {
     method: "PATCH",
@@ -2842,6 +2959,39 @@ export async function updateCrmClient(
     throw new Error(err.detail || "Failed to update CRM client");
   }
   return await res.json();
+}
+
+export async function logCrmClientActivity(
+  clientId: string,
+  payload: {
+    category: "CALL" | "WHATSAPP" | "EMAIL" | "NOTE" | "CLINICAL" | string;
+    summary: string;
+    details?: string;
+    operator_name?: string;
+  }
+): Promise<{ success: boolean; activity: CRMActivityItem; activity_log: CRMActivityItem[] }> {
+  const res = await sidecarFetch(`/crm/clients/${encodeURIComponent(clientId)}/activities`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.detail || "Failed to log activity for client");
+  }
+  return await res.json();
+}
+
+export async function updateCrmClientCompliance(
+  clientId: string,
+  payload: {
+    waiver_status?: "PENDING" | "SIGNED" | "EXEMPT";
+    medical_clearance_status?: "PENDING_REVIEW" | "CLEARED" | "ACTION_REQUIRED";
+    companion_id?: string;
+    companion_name?: string;
+  }
+): Promise<{ success: boolean; [key: string]: any }> {
+  return updateCrmClient(clientId, payload);
 }
 
 export async function createCrmTrip(

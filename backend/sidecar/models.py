@@ -442,6 +442,12 @@ class CRMClient(Base):
     total_trips_count = Column(Integer, default=0, nullable=False)
     source = Column(String(64), default="DIRECT_WEBSITE", nullable=False)
     notes = Column(Text, nullable=True)
+    activity_log = Column(JSON, nullable=False, default=list)  # Chronological audit stream of guest calls, emails, WhatsApp, notes
+    waiver_status = Column(String(32), default="PENDING", nullable=False)  # PENDING, SIGNED, EXEMPT
+    waiver_signed_at = Column(DateTime, nullable=True)
+    medical_clearance_status = Column(String(32), default="PENDING_REVIEW", nullable=False)  # PENDING_REVIEW, CLEARED, ACTION_REQUIRED
+    companion_id = Column(String(36), nullable=True)
+    companion_name = Column(String(128), nullable=True)
     created_at = Column(DateTime, default=_utc_now, nullable=False)
     updated_at = Column(DateTime, default=_utc_now, onupdate=_utc_now, nullable=False)
 
@@ -478,6 +484,7 @@ class CRMTrip(Base):
     suggested_plan = Column(JSON, nullable=True)  # Somatic & endurance restoration itinerary
     itinerary_blocks = Column(JSON, nullable=False, default=list)  # Day-by-day scheduled activities
     activity_timeline = Column(JSON, nullable=False, default=list)  # Chronological audit stream of guest & operator milestones
+    companion_trip_id = Column(String(36), nullable=True)
     proposal_url = Column(String(256), nullable=True)
     deep_link = Column(String(256), nullable=True)
     created_by = Column(String(64), default="Kareena Islam", nullable=False)

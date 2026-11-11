@@ -107,7 +107,7 @@ const INITIAL_REVIEWS: GuestReviewItem[] = [
     author: "Dr. Sophia Martinez, MD",
     role: "Emergency Medicine Physician",
     location: "Houston, TX",
-    retreat: "Mexico Coastal Sanctuary",
+    retreat: "Riviera Maya Sanctuary",
     date: "Verified Alumni",
     category: "somatic",
     rating: 5,
@@ -123,7 +123,7 @@ const INITIAL_REVIEWS: GuestReviewItem[] = [
     author: "David Chen",
     role: "Private Equity Partner & Marathoner",
     location: "Austin, TX",
-    retreat: "Banderas Bay Preview Cohort",
+    retreat: "Riviera Maya Sanctuary",
     date: "Verified Alumni",
     category: "endurance",
     rating: 5,
@@ -171,7 +171,7 @@ const INITIAL_REVIEWS: GuestReviewItem[] = [
     author: "Amara Patel, BSN, RN",
     role: "Surgical ICU Nurse Leader",
     location: "Dallas, TX",
-    retreat: "Mexico Coastal Sanctuary",
+    retreat: "Riviera Maya Sanctuary",
     date: "Verified Alumni",
     category: "somatic",
     rating: 5,
@@ -187,7 +187,7 @@ const INITIAL_REVIEWS: GuestReviewItem[] = [
     author: "Hannah & Liam Sterling",
     role: "Founders, Sterling Design Studio",
     location: "San Francisco, CA",
-    retreat: "Coastal Couples Cohort",
+    retreat: "Riviera Maya Sanctuary",
     date: "Verified Alumni",
     category: "cultural",
     rating: 5,
@@ -353,41 +353,37 @@ export default function TestimonialsPage() {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => setActiveCategory("all")}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${
-                activeCategory === "all"
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors ${activeCategory === "all"
                   ? "bg-sage text-linen"
                   : "bg-sand text-sage hover:bg-sand-muted border border-sand-border"
-              }`}
+                }`}
             >
               All Reviews ({reviews.length})
             </button>
             <button
               onClick={() => setActiveCategory("somatic")}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                activeCategory === "somatic"
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${activeCategory === "somatic"
                   ? "bg-sage text-linen"
                   : "bg-sand text-sage hover:bg-sand-muted border border-sand-border"
-              }`}
+                }`}
             >
               <Activity className="h-3 w-3" /> Clinical &amp; Somatic
             </button>
             <button
               onClick={() => setActiveCategory("endurance")}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                activeCategory === "endurance"
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${activeCategory === "endurance"
                   ? "bg-sage text-linen"
                   : "bg-sand text-sage hover:bg-sand-muted border border-sand-border"
-              }`}
+                }`}
             >
               <Trophy className="h-3 w-3" /> Endurance &amp; Executive
             </button>
             <button
               onClick={() => setActiveCategory("cultural")}
-              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                activeCategory === "cultural"
+              className={`rounded-full px-4 py-1.5 text-xs font-medium transition-colors flex items-center gap-1.5 ${activeCategory === "cultural"
                   ? "bg-sage text-linen"
                   : "bg-sand text-sage hover:bg-sand-muted border border-sand-border"
-              }`}
+                }`}
             >
               <Compass className="h-3 w-3" /> Cultural &amp; Travel
             </button>

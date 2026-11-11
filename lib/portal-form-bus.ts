@@ -21,7 +21,10 @@ export type FormFillType =
   | "sovereign_sync_preview"
   | "attendee_row"
   | "partner_lead"
-  | "billing_folio";
+  | "billing_folio"
+  | "crm_mutation"
+  | "calendar_event"
+  | "cohort_update";
 
 export interface FormFillProposal {
   correlation_id?: string;
@@ -32,11 +35,17 @@ export interface FormFillProposal {
   target_tab?: string; // "vendors", "routes", "dining", "reviews", "destination", "messaging", "founder_studio", "crm"
   target_url?: string; // "/portal", "/portal/crm", "/portal/vendors", "/portal/travel-logistics?tab=dining"
   action_title?: string;
+  action_type?: string;
+  target_id?: string;
   fields: Record<string, unknown>;
   payload?: Record<string, unknown>;
   summary: string;
   requires_approval?: boolean;
   approval_required?: boolean;
+  executed?: boolean;
+  entity_type?: string;
+  record_id?: string;
+  changes?: Record<string, unknown>;
 }
 
 export const FORM_FILL_EVENT = "kai:portal:form-fill";

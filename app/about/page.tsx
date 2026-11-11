@@ -21,26 +21,52 @@ import InstagramIcon from "@/components/icons/InstagramIcon";
 export default function AboutPage() {
   return (
     <div className="py-12 sm:py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-24">
-      {/* 1. PHILOSOPHY & FOUNDERS HERO */}
+      {/* 1. THE HEARTS BEHIND KAI: SIBLING STORY & HERITAGE */}
       <section className="space-y-12">
-        <div className="text-center max-w-4xl mx-auto space-y-5">
+        <div className="text-center max-w-4xl mx-auto space-y-6">
           <div className="inline-flex items-center gap-2 rounded-full bg-sand border border-sand-border px-4 py-1.5 text-xs uppercase tracking-[0.22em] text-olive font-semibold">
             <Sparkles className="h-3.5 w-3.5 text-terracotta" />
-            <span>The Founders of KAI Wellness Retreats • Grand Travel & Cruise</span>
+            <span>The Hearts Behind KAI</span>
           </div>
 
-          <h1 className="font-serif text-4xl sm:text-6xl lg:text-7xl text-sage font-light leading-[1.08] tracking-tight">
-            &ldquo;KAI Wellness Retreats is a place where your peace within can blend with the pieces around.&rdquo;
-          </h1>
+          <div className="space-y-2">
+            <h1 className="font-serif text-4xl sm:text-6xl lg:text-7xl text-sage font-light leading-[1.08] tracking-tight">
+              Two Siblings. One Shared Passion.
+            </h1>
+            <p className="font-serif text-2xl sm:text-3xl text-sage/80 italic font-normal">
+              A Journey Rooted in Gratitude.
+            </p>
+          </div>
 
-          <p className="text-sm sm:text-base text-sage/85 leading-relaxed font-light max-w-3xl mx-auto">
-            Co-founded by <strong>Kareena Islam, BSN, RN</strong> and <strong>Armaan Islam</strong>, KAI unites evidence-based clinical nursing science, 432Hz somatic sound restoration, Ironman endurance discipline, and strategic business execution—all anchored by 25+ years of global luxury travel mastery at <strong>Grand Travel & Cruise</strong> and deep cultural integrations.
-          </p>
+          <div className="max-w-3xl mx-auto text-sm sm:text-base text-sage/85 leading-relaxed font-light space-y-4">
+            <p>
+              For Kareena and Armaan Islam, KAI Wellness Retreats is an extension of the values they grew up with &mdash; family, kindness, gratitude, and a genuine love for bringing people together.
+            </p>
+            <p>
+              Raised in a family where travel was more than visiting destinations, they learned early that the most meaningful journeys are built around relationships, shared experiences, and caring for others.
+            </p>
+            <p>
+              Their individual paths &mdash; Kareena’s in healthcare and mindful healing, and Armaan’s in athletics, adventure, and personal growth &mdash; eventually came together through their shared love for yoga, wellness, and travel.
+            </p>
+          </div>
 
-          {/* Direct Founder Inquiry Routing Pill */}
+          {/* Heartfelt Purpose Callout Card */}
+          <div className="rounded-3xl border border-sand-border bg-linen p-6 sm:p-8 max-w-2xl mx-auto shadow-sm space-y-3">
+            <span className="text-[10px] uppercase tracking-widest font-semibold text-terracotta block">
+              Our Heartfelt Purpose
+            </span>
+            <p className="font-serif text-xl sm:text-2xl text-sage font-normal leading-snug">
+              &ldquo;To create a welcoming community where people arrive as strangers, connect as friends, and leave feeling like family.&rdquo;
+            </p>
+            <p className="text-xs text-sage/75 pt-1">
+              Inspired by their family’s philosophy of <em>Living BIG &mdash; Be In Gratitude</em>, Kareena and Armaan invite you to experience wellness not simply as a retreat, but as a beautiful way of living.
+            </p>
+          </div>
+
+          {/* Direct Inquiry Routing Pill */}
           <div className="inline-flex flex-wrap items-center justify-center gap-3 rounded-2xl border border-sand-border bg-linen px-5 py-3 text-xs text-sage shadow-sm">
             <span className="font-semibold text-olive uppercase tracking-wider flex items-center gap-1.5">
-              <Mail className="h-3.5 w-3.5 text-terracotta" /> Direct Founders Inquiry Desk:
+              <Mail className="h-3.5 w-3.5 text-terracotta" /> Direct Inquiry Desk:
             </span>
             <a
               href="mailto:kareena@grandtravelcruise.com"
@@ -61,15 +87,15 @@ export default function AboutPage() {
           </div>
         </div>
 
-        {/* 2. DENSE DUAL FOUNDER DOSSIERS: KAREENA ISLAM & ARMAAN ISLAM */}
+        {/* 2. THE HEARTS BEHIND KAI: KAREENA ISLAM & ARMAAN ISLAM */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-stretch">
-          {/* FOUNDER 1: KAREENA ISLAM */}
+          {/* DOSSIER 1: KAREENA ISLAM */}
           <article className="rounded-3xl border border-sand-border bg-linen overflow-hidden shadow-md flex flex-col justify-between">
             <div>
               <div className="relative h-80 w-full overflow-hidden bg-sand">
                 <Image
                   src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1200&q=85"
-                  alt="Kareena Islam, BSN, RN — Co-Founder of KAI Wellness Retreats"
+                  alt="Kareena Islam, BSN, RN — Founder of KAI Wellness Retreats"
                   fill
                   priority
                   className="object-cover"
@@ -80,64 +106,96 @@ export default function AboutPage() {
                     Founder
                   </span>
                   <span className="rounded-full bg-terracotta px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-linen">
-                    BSN, RN • 432Hz Sound
+                    BSN, RN • Certified Yoga
                   </span>
                 </div>
                 <div className="absolute bottom-5 left-6 right-6 text-linen">
                   <h2 className="font-serif text-3xl sm:text-4xl font-light">
                     Kareena Islam, BSN, RN
                   </h2>
-                  <p className="text-xs text-sand-muted mt-0.5">
-                    Registered Nurse • Somatic &amp; Crystal Sound Healer • National Future Leaders in Travel Honoree
+                  <p className="text-xs text-sand-muted mt-1 leading-snug">
+                    Founder | Registered Nurse | Certified Yoga Instructor | Wellness &amp; Travel Specialist
                   </p>
                 </div>
               </div>
 
-              <div className="p-6 sm:p-8 space-y-6">
+              <div className="p-6 sm:p-8 space-y-5">
+                <div className="border-b border-sand-border/70 pb-4">
+                  <h3 className="font-serif text-xl sm:text-2xl text-sage font-normal">
+                    A Passion for Caring. A Heart for Healing.
+                  </h3>
+                </div>
+
                 <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
-                  <strong>Kareena Islam</strong> created KAI Wellness Retreats from a clear conviction formed over years in acute hospital care: modern work schedules are burning people out, and a typical vacation rarely gives their nervous system the physiological rest it needs. A proud graduate of <strong>Texas A&amp;M University (BSN, RN)</strong> with intensive clinical experience in acute surgical and hospital care across premier Texas medical centers (including <strong>Memorial Hermann</strong> and <strong>HCA Healthcare</strong>), Kareena spent years caring for patients at their most vulnerable—observing firsthand how chronic sympathetic stress, broken circadian sleep, and unexpressed somatic tension erode cardiovascular and immune health.
+                  For Kareena Islam, caring for others has always been more than a profession &mdash; it’s a way of life.
                 </p>
 
                 <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
-                  Raised inside <strong>Grand Travel &amp; Cruise</strong>—a 25+ year premier host agency founded alongside Jay Islam—and hand-selected nationally as a <strong><em>Future Leaders in Travel</em> Honoree</strong>, Kareena bridges evidence-based clinical restoration with anatomical yoga, crystal singing bowl sound baths, and authentic cultural reverence through her signature <strong>Triad of Care</strong> and interdisciplinary synergy.
+                  As a registered nurse with years of experience caring for patients during some of their most vulnerable moments, Kareena developed a deep appreciation for the connection between physical health, emotional well-being, and the importance of slowing down.
                 </p>
+
+                <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
+                  Her passion for wellness eventually led her beyond traditional healthcare and into the world of yoga, meditation, sound healing, and mindful travel.
+                </p>
+
+                <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
+                  Growing up in a family deeply rooted in travel and hospitality, Kareena discovered that some of life’s most meaningful experiences happen when we step outside our everyday routines, embrace new cultures, and connect with others.
+                </p>
+
+                <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
+                  Recognized as one of the travel industry’s rising stars by Travel Age West, Kareena brings together her healthcare background, love for wellness, and passion for exploring the world.
+                </p>
+
+                <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
+                  Through KAI Wellness Retreats, she hopes to create a welcoming space where people from all walks of life can pause, breathe, reconnect, and simply be themselves.
+                </p>
+
+                {/* Philosophy Box */}
+                <div className="rounded-2xl bg-sand/60 border border-sand-border p-4">
+                  <span className="text-[10px] uppercase tracking-wider font-semibold text-terracotta block">
+                    Her Philosophy
+                  </span>
+                  <p className="font-serif text-base sm:text-lg text-sage italic mt-1">
+                    &ldquo;Come as you are. Leave feeling renewed, inspired, and connected.&rdquo;
+                  </p>
+                </div>
 
                 {/* Dense Credential Matrix */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                   <div className="rounded-2xl bg-sand/50 border border-sand-border p-3.5 space-y-1">
                     <span className="text-[10px] uppercase tracking-wider font-semibold text-olive flex items-center gap-1">
-                      <Activity className="h-3.5 w-3.5 text-terracotta" /> Clinical Medicine
+                      <Activity className="h-3.5 w-3.5 text-terracotta" /> Clinical Care
                     </span>
-                    <p className="text-xs text-sage font-medium">Texas A&amp;M BSN, RN</p>
+                    <p className="text-xs text-sage font-medium">Registered Nurse (BSN, RN)</p>
                     <p className="text-[11px] text-sage/75">
-                      Acute &amp; Surgical Nursing (Memorial Hermann, HCA); stress and recovery education.
+                      Compassionate acute care, patient advocacy &amp; holistic mind-body well-being.
                     </p>
                   </div>
                   <div className="rounded-2xl bg-sand/50 border border-sand-border p-3.5 space-y-1">
                     <span className="text-[10px] uppercase tracking-wider font-semibold text-olive flex items-center gap-1">
                       <Sparkles className="h-3.5 w-3.5 text-terracotta" /> Somatic &amp; Acoustic
                     </span>
-                    <p className="text-xs text-sage font-medium">RYT Yoga &amp; 432Hz Sound</p>
+                    <p className="text-xs text-sage font-medium">Certified Yoga &amp; Sound Healing</p>
                     <p className="text-[11px] text-sage/75">
-                      Orthopedic alignment vinyasa, myofascial Yin release, 4-7-8 breathwork &amp; crystal bowl sound baths.
+                      Mindful yoga, meditation, 432Hz crystal sound healing &amp; slow somatic pacing.
                     </p>
                   </div>
                   <div className="rounded-2xl bg-sand/50 border border-sand-border p-3.5 space-y-1">
                     <span className="text-[10px] uppercase tracking-wider font-semibold text-olive flex items-center gap-1">
                       <Award className="h-3.5 w-3.5 text-terracotta" /> Industry Recognition
                     </span>
-                    <p className="text-xs text-sage font-medium">Future Leaders in Travel</p>
+                    <p className="text-xs text-sage font-medium">Travel Age West Rising Star</p>
                     <p className="text-[11px] text-sage/75">
-                      National luxury advisor honoree commanding preferred resort contracts &amp; private sanctuary buyouts.
+                      Honored travel industry talent with generational roots in luxury hospitality.
                     </p>
                   </div>
                   <div className="rounded-2xl bg-sand/50 border border-sand-border p-3.5 space-y-1">
                     <span className="text-[10px] uppercase tracking-wider font-semibold text-olive flex items-center gap-1">
-                      <Heart className="h-3.5 w-3.5 text-terracotta" /> Holistic Guest Care
+                      <Heart className="h-3.5 w-3.5 text-terracotta" /> Welcoming Space
                     </span>
-                    <p className="text-xs text-sage font-medium">Personalized Somatic Support</p>
+                    <p className="text-xs text-sage font-medium">A Sanctuary for All</p>
                     <p className="text-[11px] text-sage/75">
-                      Personal pre-retreat consultation to honor dietary preferences, physical comfort, and restorative goals.
+                      A welcoming space where guests pause, breathe, reconnect, and simply be themselves.
                     </p>
                   </div>
                 </div>
@@ -165,13 +223,13 @@ export default function AboutPage() {
             </div>
           </article>
 
-          {/* FOUNDER 2: ARMAAN ISLAM */}
+          {/* DOSSIER 2: ARMAAN ISLAM */}
           <article className="rounded-3xl border border-sand-border bg-linen overflow-hidden shadow-md flex flex-col justify-between">
             <div>
               <div className="relative h-80 w-full overflow-hidden bg-sand">
                 <Image
                   src="https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=1200&q=85"
-                  alt="Armaan Islam — Co-Founder, Ironman Athlete & Chief Business Officer of KAI Wellness Retreats"
+                  alt="Armaan Islam — Co-Founder, Certified Yoga Instructor & Ironman Finisher"
                   fill
                   priority
                   className="object-cover"
@@ -179,67 +237,107 @@ export default function AboutPage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-sage-dark/90 via-sage-dark/35 to-transparent" />
                 <div className="absolute top-4 left-4 flex flex-wrap gap-2">
                   <span className="rounded-full bg-linen/95 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-olive">
-                    Co-Founder &amp; Chief Business Officer
+                    Co-Founder
                   </span>
                   <span className="rounded-full bg-terracotta px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-linen">
-                    Ironman Triathlete • Business Strategy
+                    Ironman Finisher • Certified Yoga
                   </span>
                 </div>
                 <div className="absolute bottom-5 left-6 right-6 text-linen">
                   <h2 className="font-serif text-3xl sm:text-4xl font-light">
                     Armaan Islam
                   </h2>
-                  <p className="text-xs text-sand-muted mt-0.5">
-                    Ironman Endurance Athlete • Business Operations &amp; Strategy • Grand Travel &amp; Cruise Executive
+                  <p className="text-xs text-sand-muted mt-1 leading-snug">
+                    Co-Founder | Certified Yoga Instructor | Ironman Finisher | Wellness &amp; Adventure Enthusiast
                   </p>
                 </div>
               </div>
 
-              <div className="p-6 sm:p-8 space-y-6">
+              <div className="p-6 sm:p-8 space-y-5">
+                <div className="border-b border-sand-border/70 pb-4">
+                  <h3 className="font-serif text-xl sm:text-2xl text-sage font-normal">
+                    A Passion for Movement. A Heart for Connection.
+                  </h3>
+                </div>
+
                 <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
-                  <strong>Armaan Islam</strong> brings the relentless discipline of an <strong>Ironman endurance athlete</strong> and the analytical rigor of a seasoned business architect to KAI Wellness Retreats. Having trained for and conquered the grueling 140.6-mile Ironman triathlon distance (2.4-mile open-water swim, 112-mile bike, and 26.2-mile marathon run), Armaan understands at a physiological level that peak human output is impossible without structured, science-backed recovery.
+                  For Armaan Islam, wellness is about discovering what we’re capable of while appreciating the beauty of the journey.
                 </p>
 
                 <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
-                  Leading business strategy, commercial partnerships, and executive retreat operations across KAI and <strong>Grand Travel &amp; Cruise</strong>, Armaan bridges the gap between high-stakes business leadership and physical longevity. He co-architects KAI’s endurance recovery tracks, metabolic conditioning protocols, resort contract negotiations (including our flagship 2027 launch at <strong>Marival Harmony in Puerto Vallarta</strong>), and personalized concierge itineraries.
+                  A lifelong athlete with a passion for soccer, endurance sports, and adventure, Armaan understands the dedication, discipline, and determination it takes to challenge both body and mind.
                 </p>
+
+                <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
+                  Completing an Ironman triathlon was more than an athletic achievement. It reinforced his belief in perseverance, mental strength, balance, and the importance of recovery.
+                </p>
+
+                <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
+                  But Armaan also believes that true wellness goes beyond physical performance.
+                </p>
+
+                <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
+                  Through yoga, mindful movement, travel, and meaningful human connections, he has discovered the importance of slowing down, being present, and finding joy in life’s simplest moments.
+                </p>
+
+                <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
+                  Growing up surrounded by the world of travel and hospitality, Armaan developed a genuine appreciation for different cultures, new experiences, and the friendships that make every journey memorable.
+                </p>
+
+                <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
+                  Today, he combines his passion for wellness and adventure with his experience in business and travel to help create thoughtfully designed retreats that inspire personal growth, connection, and discovery.
+                </p>
+
+                <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
+                  At KAI Wellness Retreats, Armaan hopes every guest feels comfortable stepping outside their routine, embracing new possibilities, and celebrating their own unique journey.
+                </p>
+
+                {/* Philosophy Box */}
+                <div className="rounded-2xl bg-sand/60 border border-sand-border p-4">
+                  <span className="text-[10px] uppercase tracking-wider font-semibold text-terracotta block">
+                    His Philosophy
+                  </span>
+                  <p className="font-serif text-base sm:text-lg text-sage italic mt-1">
+                    &ldquo;Challenge yourself. Embrace the moment. Find gratitude in every step.&rdquo;
+                  </p>
+                </div>
 
                 {/* Dense Credential Matrix */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                   <div className="rounded-2xl bg-sand/50 border border-sand-border p-3.5 space-y-1">
                     <span className="text-[10px] uppercase tracking-wider font-semibold text-olive flex items-center gap-1">
-                      <Trophy className="h-3.5 w-3.5 text-terracotta" /> Endurance Athletics
+                      <Trophy className="h-3.5 w-3.5 text-terracotta" /> Endurance &amp; Discipline
                     </span>
-                    <p className="text-xs text-sage font-medium">Ironman Triathlete (140.6)</p>
+                    <p className="text-xs text-sage font-medium">Ironman Finisher &amp; Lifelong Athlete</p>
                     <p className="text-[11px] text-sage/75">
-                      Aerobic base conditioning, HRV-guided recovery, electrolyte &amp; thermal adaptation, mental grit under fatigue.
+                      Soccer, endurance sports, perseverance, mental strength &amp; structured recovery.
                     </p>
                   </div>
                   <div className="rounded-2xl bg-sand/50 border border-sand-border p-3.5 space-y-1">
                     <span className="text-[10px] uppercase tracking-wider font-semibold text-olive flex items-center gap-1">
-                      <Briefcase className="h-3.5 w-3.5 text-terracotta" /> Business Focus
+                      <Sparkles className="h-3.5 w-3.5 text-terracotta" /> Mindful Movement
                     </span>
-                    <p className="text-xs text-sage font-medium">Operations &amp; Growth Lead</p>
+                    <p className="text-xs text-sage font-medium">Certified Yoga Instructor</p>
                     <p className="text-[11px] text-sage/75">
-                      Executive leadership retreats, corporate wellness underwriting, wholesale resort contracting &amp; unit economics.
+                      Mindful movement, presence, slowing down &amp; finding joy in life&rsquo;s simplest moments.
                     </p>
                   </div>
                   <div className="rounded-2xl bg-sand/50 border border-sand-border p-3.5 space-y-1">
                     <span className="text-[10px] uppercase tracking-wider font-semibold text-olive flex items-center gap-1">
-                      <Compass className="h-3.5 w-3.5 text-terracotta" /> Travel Infrastructure
+                      <Compass className="h-3.5 w-3.5 text-terracotta" /> Travel &amp; Hospitality
                     </span>
-                    <p className="text-xs text-sage font-medium">Grand Travel &amp; Cruise</p>
+                    <p className="text-xs text-sage font-medium">Cross-Cultural Lineage</p>
                     <p className="text-[11px] text-sage/75">
-                      Global supplier negotiations, group air desk coordination, and VIP ground logistics across Mexico, Costa Rica &amp; Europe.
+                      Hospitality heritage, appreciation for diverse cultures &amp; friendships that last.
                     </p>
                   </div>
                   <div className="rounded-2xl bg-sand/50 border border-sand-border p-3.5 space-y-1">
                     <span className="text-[10px] uppercase tracking-wider font-semibold text-olive flex items-center gap-1">
-                      <ShieldCheck className="h-3.5 w-3.5 text-terracotta" /> White-Glove Hospitality
+                      <Briefcase className="h-3.5 w-3.5 text-terracotta" /> Retreat Architecture
                     </span>
-                    <p className="text-xs text-sage font-medium">Door-to-Door Chauffeur &amp; Flight Logistics</p>
+                    <p className="text-xs text-sage font-medium">Business &amp; Travel Synthesis</p>
                     <p className="text-[11px] text-sage/75">
-                      End-to-end itinerary coordination, private ground transfers, and dedicated founder attention.
+                      Thoughtfully designed retreats inspiring personal growth, connection &amp; discovery.
                     </p>
                   </div>
                 </div>
@@ -268,202 +366,88 @@ export default function AboutPage() {
           </article>
         </div>
 
-        {/* FOUNDERS' INTERDISCIPLINARY SYNERGY & THE TRIAD OF CARE */}
-        <div id="triad-of-care" className="rounded-3xl border border-sand-border bg-sand/40 p-8 sm:p-14 space-y-10">
-          <div className="max-w-3xl space-y-4">
-            <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.25em] text-olive font-semibold">
-              <Sparkles className="h-4 w-4 text-terracotta" />
-              Founder Philosophy • Kareena Islam
-            </span>
-            <h2 className="font-serif text-3xl sm:text-5xl text-sage font-light">
-              Founders’ Interdisciplinary Synergy &amp; The Triad of Care
-            </h2>
-            <p className="text-sm sm:text-base text-sage/85 leading-relaxed font-light">
-              Most retreats force you to choose between sterile clinical wellness clinics and ungrounded esoteric getaways. Through Kareena Islam, KAI unifies three distinct disciplines into one cohesive philosophy: clinical knowledge to safeguard your health, somatic practices to release physical tension, and world-class travel infrastructure powered by Grand Travel to remove every friction of travel.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Pillar 1: Clinical Knowledge & Restorative Science */}
-            <div className="rounded-2xl border border-sand-border bg-linen p-8 shadow-sm flex flex-col justify-between">
-              <div className="space-y-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-olive-soft text-olive border border-olive/20">
-                  <Activity className="h-6 w-6" />
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase tracking-widest text-olive font-semibold">
-                    Pillar 01
-                  </span>
-                  <h3 className="font-serif text-2xl text-sage font-normal mt-1">
-                    Clinical Knowledge
-                  </h3>
-                  <p className="text-xs text-olive font-medium mt-0.5">
-                    Restorative Science &amp; Health Triage
-                  </p>
-                </div>
-                <p className="text-xs leading-relaxed text-sage/80">
-                  Drawing from acute and surgical nursing across Texas medical centers (Memorial Hermann, HCA Healthcare, Texas A&amp;M BSN, RN), Kareena understands human physiology under stress. Retreat schedules, pacing, circadian daylight exposure, and anti-inflammatory meals are designed to help lower stress, ease tension, and restore restorative sleep.
-                </p>
-              </div>
-
-              <div className="mt-6 pt-4 border-t border-sand-border/70 text-xs text-sage/75 space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-olive" />
-                  <span>Autonomic nervous system recovery</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-olive" />
-                  <span>Circadian rhythm sleep support</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-olive" />
-                  <span>Personalized health considerations</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Pillar 2: Somatic Movement & Crystal Sound */}
-            <div className="rounded-2xl border border-sand-border bg-linen p-8 shadow-sm flex flex-col justify-between">
-              <div className="space-y-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-terracotta-soft text-terracotta border border-terracotta/20">
-                  <Sparkles className="h-6 w-6" />
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase tracking-widest text-terracotta font-semibold">
-                    Pillar 02
-                  </span>
-                  <h3 className="font-serif text-2xl text-sage font-normal mt-1">
-                    Movement &amp; Sound
-                  </h3>
-                  <p className="text-xs text-terracotta font-medium mt-0.5">
-                    Anatomical Yoga &amp; 432Hz Sound Baths
-                  </p>
-                </div>
-                <p className="text-xs leading-relaxed text-sage/80">
-                  Certified in yoga and somatic breathwork, Kareena applies anatomical alignment to gentle Vinyasa and restorative Yin. Evenings culminate in 432Hz acoustic crystal singing bowl sound baths, which quiet mental chatter, release somatic holding patterns, and guide the body into deep stillness.
-                </p>
-              </div>
-
-              <div className="mt-6 pt-4 border-t border-sand-border/70 text-xs text-sage/75 space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-terracotta" />
-                  <span>Anatomically safe yoga for every body</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-terracotta" />
-                  <span>Acoustic crystal singing bowl baths</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-terracotta" />
-                  <span>Myofascial tension de-escalation</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Pillar 3: Luxury Travel Powered by Grand Travel */}
-            <div className="rounded-2xl border border-sand-border bg-linen p-8 shadow-sm flex flex-col justify-between">
-              <div className="space-y-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-sand text-sage border border-sand-border">
-                  <Compass className="h-6 w-6 text-sage" />
-                </div>
-                <div>
-                  <span className="text-[10px] uppercase tracking-widest text-olive font-semibold">
-                    Pillar 03
-                  </span>
-                  <h3 className="font-serif text-2xl text-sage font-normal mt-1">
-                    Travel Mastery
-                  </h3>
-                  <p className="text-xs text-sage font-medium mt-0.5">
-                    Powered by Grand Travel &amp; Cruise
-                  </p>
-                </div>
-                <p className="text-xs leading-relaxed text-sage/80">
-                  Backed by 25+ years of host agency excellence and recognized nationally as a <em>Future Leaders in Travel</em> Honoree, Kareena leverages premier industry buying power to secure private estate buyouts, preferred air contracts, door-to-door flight and chauffeur logistics, and authentic access to sacred local customs.
-                </p>
-              </div>
-
-              <div className="mt-6 pt-4 border-t border-sand-border/70 text-xs text-sage/75 space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-sage" />
-                  <span>Private estate buyouts &amp; preferred rates</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-sage" />
-                  <span>Direct cultural access &amp; local customs</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="h-1.5 w-1.5 rounded-full bg-sage" />
-                  <span>Frictionless VIP air &amp; chauffeur transit</span>
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* OUR PHILOSOPHY: LIVING BIG — BE IN GRATITUDE */}
+        <div id="our-philosophy" className="rounded-3xl border border-sand-border bg-sand/40 p-8 sm:p-14 space-y-4 max-w-4xl mx-auto text-center">
+          <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.25em] text-terracotta font-semibold">
+            <Heart className="h-4 w-4 text-terracotta" />
+            Our Philosophy
+          </span>
+          <h2 className="font-serif text-3xl sm:text-5xl text-sage font-light">
+            Living BIG &mdash; Be In Gratitude
+          </h2>
+          <p className="text-sm sm:text-base text-sage/85 leading-relaxed font-light max-w-2xl mx-auto">
+            Led by Kareena and Armaan Islam, KAI Wellness Retreats is inspired by a family belief that life’s greatest blessings are found in gratitude, kindness, meaningful relationships, and shared experiences.
+          </p>
+          <p className="text-sm sm:text-base text-sage/85 leading-relaxed font-light max-w-2xl mx-auto">
+            We believe wellness isn’t just something you practice during a retreat. It’s something you carry home and share with the world.
+          </p>
         </div>
       </section>
 
-      {/* 3. CULTURAL INTEGRATIONS: PEACE WITHIN BLENDING WITH THE PIECES AROUND */}
+      {/* 3. CULTURAL INTEGRATIONS • CORE PHILOSOPHY & THE KAI PROMISE */}
       <section id="cultural-integrations" className="rounded-3xl border border-sand-border bg-sand/50 p-8 sm:p-14 space-y-10">
-        <div className="max-w-3xl space-y-3">
-          <span className="inline-flex items-center gap-1.5 text-xs uppercase tracking-[0.25em] text-terracotta font-semibold">
+        <div className="max-w-3xl mx-auto text-center space-y-3">
+          <span className="inline-flex items-center justify-center gap-1.5 text-xs uppercase tracking-[0.25em] text-terracotta font-semibold">
             <Globe className="h-4 w-4 text-terracotta" />
             Cultural Integrations • Core Philosophy
           </span>
           <h2 className="font-serif text-3xl sm:text-5xl text-sage font-light">
-            Where Your Peace Within Can Blend With The Pieces Around
+            Where Your Peace Within Blends With The Pieces Around
           </h2>
-          <p className="text-sm text-sage/85 leading-relaxed">
-            True restoration does not happen behind closed resort walls detached from the soul of a destination. Kareena and Armaan design every KAI sanctuary so your internal nervous system stillness (<em>your peace within</em>) harmonizes with the living traditions, ecology, cuisine, and artisans of our host communities (<em>the pieces around</em>).
+          <p className="text-sm sm:text-base text-sage/85 leading-relaxed font-light max-w-2xl mx-auto">
+            True renewal happens when we step outside the everyday resort walls. Kareena and Armaan thoughtfully design each KAI sanctuary to blend mindful movement and quiet rest with the genuine warmth, coastal beauty, and authentic culture of our host destinations.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div className="rounded-2xl border border-sand-border bg-linen p-6 space-y-3">
-            <span className="rounded-full bg-terracotta/15 text-terracotta px-3 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
-              Puerto Vallarta • Jan 28–31, 2027
-            </span>
-            <h3 className="font-serif text-xl text-sage font-normal">
-              Wixárika Art &amp; Coastal Jalisco Heritage
-            </h3>
-            <p className="text-xs text-sage/80 leading-relaxed">
-              At <strong>Marival Harmony (Armony)</strong>, guests engage in authentic Wixárika (Huichol) yarn and beadwork dialogues, sacred coastal cacao &amp; copal intention ceremonies, Sierra Madre herbal steam hydrotherapy, and Banderas Bay whale migration ecology.
-            </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Sanctuary 1: Marival Armony (Upcoming January 2027) */}
+          <div className="rounded-2xl border border-sand-border bg-linen p-6 sm:p-7 space-y-3 flex flex-col justify-between shadow-sm">
+            <div className="space-y-3">
+              <span className="rounded-full bg-terracotta/15 text-terracotta border border-terracotta/30 px-3 py-0.5 text-[10px] font-semibold uppercase tracking-wider inline-block">
+                Upcoming Sanctuary • January 28–31, 2027
+              </span>
+              <h3 className="font-serif text-2xl text-sage font-normal">
+                Marival Armony • Puerto Vallarta
+              </h3>
+              <p className="text-xs sm:text-sm text-sage/80 leading-relaxed font-light">
+                Set where the lush Sierra Madre mountains meet the quiet Pacific waters of Banderas Bay. Guests enjoy sunrise oceanfront yoga, evening crystal sound baths, fresh local Mexican cuisine, and the warm hospitality of coastal Jalisco.
+              </p>
+            </div>
+            <div className="pt-3 border-t border-sand-border/60 text-[11px] text-olive font-medium">
+              Banderas Bay &amp; Sierra Madre Coastline
+            </div>
           </div>
 
-          <div className="rounded-2xl border border-sand-border bg-linen p-6 space-y-3">
-            <span className="rounded-full bg-sand text-olive px-3 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
-              Nosara, Costa Rica • Coming Soon
-            </span>
-            <h3 className="font-serif text-xl text-sage font-normal">
-              Nicoya Blue Zone &amp; Chorotega Wisdom
-            </h3>
-            <p className="text-xs text-sage/80 leading-relaxed">
-              Immersing in one of the world’s five official Blue Zones—learning longevity nutrition, ancestral Chorotega clay traditions, and medicinal rainforest ethnobotany with local Guanacaste healers.
-            </p>
+          {/* Sanctuary 2: Riviera Maya (Previously Completed Retreat) */}
+          <div className="rounded-2xl border border-sand-border bg-linen p-6 sm:p-7 space-y-3 flex flex-col justify-between shadow-sm">
+            <div className="space-y-3">
+              <span className="rounded-full bg-olive/15 text-olive border border-olive/30 px-3 py-0.5 text-[10px] font-semibold uppercase tracking-wider inline-block">
+                Previously Completed Sanctuary
+              </span>
+              <h3 className="font-serif text-2xl text-sage font-normal">
+                El Dorado Seaside Palms • Riviera Maya
+              </h3>
+              <p className="text-xs sm:text-sm text-sage/80 leading-relaxed font-light">
+                Our intimate adults-only gathering on the turquoise shores of the Riviera Maya brought guests together for gentle oceanfront movement, sunset sound healing under the palms, nourishing regional cuisine, and lifelong friendships.
+              </p>
+            </div>
+            <div className="pt-3 border-t border-sand-border/60 text-[11px] text-olive font-medium">
+              Adults-Only Caribbean Sanctuary • Past Cohort Reflections
+            </div>
           </div>
+        </div>
 
-          <div className="rounded-2xl border border-sand-border bg-linen p-6 space-y-3">
-            <span className="rounded-full bg-sand text-olive px-3 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
-              Amalfi Coast, Italy • Coming Soon
-            </span>
-            <h3 className="font-serif text-xl text-sage font-normal">
-              Campanian Harvest &amp; Maritime Heritage
-            </h3>
-            <p className="text-xs text-sage/80 leading-relaxed">
-              Walking terraced Sfusato lemon groves in Ravello, cold-pressing single-estate olive oil with multi-generational Italian families, and sailing traditional wooden gozzo boats into quiet sea grottos.
-            </p>
-          </div>
-
-          <div className="rounded-2xl border border-sand-border bg-linen p-6 space-y-3">
-            <span className="rounded-full bg-sand text-olive px-3 py-0.5 text-[10px] font-semibold uppercase tracking-wider">
-              Ubud &amp; Sidemen, Bali • Coming Soon
-            </span>
-            <h3 className="font-serif text-xl text-sage font-normal">
-              Tri Hita Karana &amp; Melukat Blessings
-            </h3>
-            <p className="text-xs text-sage/80 leading-relaxed">
-              Honoring the Balinese philosophy of harmony between spirit, people, and nature through private Melukat holy water purification rituals led by hereditary priests and village Jamu apothecaries.
-            </p>
-          </div>
+        {/* The KAI Promise */}
+        <div className="rounded-3xl border border-sand-border bg-linen p-8 sm:p-10 shadow-sm text-center max-w-3xl mx-auto space-y-3 mt-4">
+          <span className="rounded-full bg-terracotta/15 text-terracotta border border-terracotta/30 px-3.5 py-1 text-[10px] uppercase tracking-wider font-semibold inline-block">
+            The KAI Promise
+          </span>
+          <h3 className="font-serif text-2xl sm:text-3xl text-sage font-normal">
+            &ldquo;Come as you are. Connect with others. Rediscover yourself.&rdquo;
+          </h3>
+          <p className="text-xs sm:text-sm text-sage/80 leading-relaxed font-light max-w-xl mx-auto">
+            At KAI, we don’t simply create wellness retreats. We create a sense of belonging, a journey of discovery, and memories that stay in your heart long after you return home.
+          </p>
         </div>
       </section>
 

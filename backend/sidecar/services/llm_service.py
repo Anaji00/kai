@@ -139,7 +139,7 @@ def query_llm_chat(
     )
     url = f"{settings.GROQ_BASE_URL.rstrip('/')}/chat/completions"
     try:
-        with httpx.Client(timeout=settings.LLM_TIMEOUT_SECONDS) as client:
+        with httpx.Client(timeout=httpx.Timeout(settings.LLM_TIMEOUT_SECONDS, connect=4.0)) as client:
             response = _post_with_retries(client, url, json=payload, headers=headers)
     except httpx.TimeoutException:
         raise LLMServiceError(
@@ -180,7 +180,7 @@ def query_llm_chat_stream(
     )
     url = f"{settings.GROQ_BASE_URL.rstrip('/')}/chat/completions"
     try:
-        with httpx.Client(timeout=settings.LLM_TIMEOUT_SECONDS) as client:
+        with httpx.Client(timeout=httpx.Timeout(settings.LLM_TIMEOUT_SECONDS, connect=4.0)) as client:
             with client.stream("POST", url, json=payload, headers=headers) as response:
                 if response.status_code != 200:
                     response.read()

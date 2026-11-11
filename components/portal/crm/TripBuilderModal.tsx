@@ -64,13 +64,13 @@ const ROOM_TIERS = [
 ];
 
 const ACTIVITY_TYPES = [
-  { value: "somatic_wellness", label: "🧘 Somatic Reformer & Recovery" },
-  { value: "lodging_sanctuary", label: "🏨 Sanctuary Lodging & Villa" },
-  { value: "aviation_arrival", label: "✈️ Cirium Aviation & Flights" },
-  { value: "ground_chauffeur", label: "🚗 Private Tarmac Chauffeur" },
-  { value: "blue_zone_dining", label: "🍽️ Organic Blue Zone Dining" },
-  { value: "clinical_screening", label: "🩺 Nurse Health & Safety Check" },
-  { value: "custom", label: "✨ Bespoke Guest Modality" },
+  { value: "somatic_wellness", label: "Somatic Reformer & Recovery" },
+  { value: "lodging_sanctuary", label: "Sanctuary Lodging & Villa" },
+  { value: "aviation_arrival", label: "Cirium Aviation & Flights" },
+  { value: "ground_chauffeur", label: "Private Tarmac Chauffeur" },
+  { value: "blue_zone_dining", label: "Organic Blue Zone Dining" },
+  { value: "clinical_screening", label: "Nurse Health & Safety Check" },
+  { value: "custom", label: "Bespoke Guest Modality" },
 ];
 
 const DEFAULT_BLOCKS: ItineraryBlockItem[] = [
@@ -148,6 +148,18 @@ export default function TripBuilderModal({
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [isBlockLibraryOpen, setIsBlockLibraryOpen] = useState<boolean>(false);
   const [isParserOpen, setIsParserOpen] = useState<boolean>(false);
+  const [showItinerarySection, setShowItinerarySection] = useState<boolean>(false);
+
+  // Keyboard Escape listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
 
   const handleInsertCuratedBlock = (curated: CuratedActivityBlock) => {
     const nextDay = itineraryBlocks.length + 1;
@@ -164,15 +176,49 @@ export default function TripBuilderModal({
   };
 
   const handleApplyParsedSupplierData = (data: ParsedSupplierData) => {
+    // 1. Client auto-matching or prefill
+    if (data.passenger_name) {
+      const cleanTarget = data.passenger_name.toLowerCase().trim();
+      const matched = clients.find(
+        (c) =>
+          c.full_name.toLowerCase().includes(cleanTarget) ||
+          cleanTarget.includes(c.full_name.toLowerCase())
+      );
+      if (matched) {
+        setSelectedClientId(matched.id);
+      } else {
+        setSelectedClientId("NEW");
+        setCustomClientName(data.passenger_name);
+      }
+    }
+
+    // 2. Sanctuary & Dates alignment
+    if (data.sanctuary_slug) {
+      handleSanctuaryChange(data.sanctuary_slug);
+    }
+    if (data.dates_summary) {
+      setDates(data.dates_summary);
+    }
+
+    // 3. Aviation & Accommodations
     if (data.airline) setAirline(data.airline);
     if (data.flight_number) setFlightNumber(data.flight_number);
     if (data.arrival_airport) setArrivalAirport(data.arrival_airport);
-    if (data.cabin_class) setIsLieFlat(data.cabin_class.toLowerCase().includes("lie-flat") || data.cabin_class.toLowerCase().includes("first"));
+    if (data.arrival_time) setArrivalTime(data.arrival_time);
+    if (data.cabin_class) {
+      setIsLieFlat(
+        data.cabin_class.toLowerCase().includes("lie-flat") ||
+          data.cabin_class.toLowerCase().includes("first")
+      );
+    }
     if (data.room_tier) setRoomTier(data.room_tier);
+    if (data.total_price) setTotalInvestment(data.total_price);
+
+    // 4. Somatic & Logistics Itinerary Blocks
     if (data.generated_blocks && data.generated_blocks.length > 0) {
       setItineraryBlocks((prev) => [
         ...prev,
-        ...data.generated_blocks.map((b, idx) => ({
+        ...data.generated_blocks.map((b: any, idx: number) => ({
           ...b,
           day: prev.length + idx + 1,
         })),
@@ -266,6 +312,44 @@ export default function TripBuilderModal({
     ]);
   };
 
+  const handleAddDayTemplate = (type: "arrival" | "immersion" | "departure") => {
+    const nextDay = itineraryBlocks.length + 1;
+    if (type === "arrival") {
+      setItineraryBlocks([
+        ...itineraryBlocks,
+        {
+          day: nextDay,
+          time: "14:00 - 18:30",
+          title: "VIP Gateway Arrival, Tarmac Chauffeur & Sunset Sound Bath",
+          description: "Private SUV gateway transfer, adaptogenic herbal welcome tonic, suite settling, and grounding oceanfront acoustic bowl immersion.",
+          activity_type: "aviation_arrival",
+        },
+      ]);
+    } else if (type === "immersion") {
+      setItineraryBlocks([
+        ...itineraryBlocks,
+        {
+          day: nextDay,
+          time: "08:00 - 13:00",
+          title: "Sunrise Coastal Movement, Hydrotherapy & Blue Zone Dining",
+          description: "Anatomical vinyasa, cold plunge contrast therapy circuit, and anti-inflammatory organic harvest brunch with Nurse consultation.",
+          activity_type: "somatic_wellness",
+        },
+      ]);
+    } else if (type === "departure") {
+      setItineraryBlocks([
+        ...itineraryBlocks,
+        {
+          day: nextDay,
+          time: "09:00 - 12:30",
+          title: "Closing Integration Circle, Biomarker Review & Airport Escort",
+          description: "Vagal nerve integration check, customized take-home botanical protocol, and private chauffeured transfer to the airport departure lounge.",
+          activity_type: "ground_chauffeur",
+        },
+      ]);
+    }
+  };
+
   const handleRemoveBlock = (idx: number) => {
     setItineraryBlocks(itineraryBlocks.filter((_, i) => i !== idx));
   };
@@ -306,7 +390,7 @@ export default function TripBuilderModal({
           room_tier: roomTier,
           smart_flight: flightData,
         });
-        onSuccess(`Updated itinerary & details for trip #${tripToEdit.crm_trip_id}.`);
+        onSuccess(`Updated reservation & itinerary for ${tripToEdit.client_name}.`);
       } else {
         // Create new trip proposal
         let clientId = selectedClientId;
@@ -344,19 +428,24 @@ export default function TripBuilderModal({
 
         const res = await createCrmTrip(payload);
         onSuccess(
-          `Created trip proposal #${res.trip.crm_trip_id} for ${clientName} ($${totalInvestment.toLocaleString()} USD · 30% Deposit: $${depositPreview.toLocaleString()}).`
+          `Created reservation for ${clientName} ($${totalInvestment.toLocaleString()} USD · 30% Deposit: $${depositPreview.toLocaleString()}).`
         );
       }
       onClose();
     } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : "Failed to save trip proposal");
+      setErrorMsg(err instanceof Error ? err.message : "Failed to save reservation");
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+    <div
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in"
+    >
       <div className="bg-[#FAF7F2] text-[#2D3E35] w-full max-w-4xl rounded-2xl border border-[#E5DDD0] shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Modal Header */}
         <div className="px-6 py-4 bg-white border-b border-[#E5DDD0] flex items-center justify-between">
@@ -366,23 +455,24 @@ export default function TripBuilderModal({
             </span>
             <div>
               <h2 className="font-serif text-lg font-bold text-[#2D3E35]">
-                {isEditing ? `Edit Trip & Itinerary: ${tripToEdit?.title}` : "Build Sanctuary Trip Proposal"}
+                {isEditing ? `Edit Reservation: ${tripToEdit?.title}` : "New Sanctuary Reservation"}
               </h2>
               <p className="text-xs text-[#5C6B5E]">
-                KAI Sanctuary Travel Proposal Builder · 30% Deposit / 70% Balance Schedule, Day-by-Day Blocks &amp; Cirium Flight Link
+                KAI Sanctuary Reservation Builder · 30% Deposit / 70% Balance Schedule
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
             className="p-1.5 rounded-lg text-[#5C6B5E] hover:text-[#2D3E35] hover:bg-[#F2ECE4] transition-colors cursor-pointer"
+            title="Close (Esc)"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 text-xs">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5 text-xs">
           {errorMsg && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-900 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
@@ -394,7 +484,7 @@ export default function TripBuilderModal({
           <div className="bg-white p-4 rounded-xl border border-[#E5DDD0] space-y-4">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-[#2D3E35]">
-                {isEditing ? "Trip Status & Core Parameters" : "Select Guest Dossier"}
+                {isEditing ? "Reservation Status & Details" : "Select Guest from Directory"}
               </span>
               {isEditing && (
                 <span className="font-mono text-[10px] bg-[#FAF7F2] px-2 py-0.5 rounded border border-[#E5DDD0] text-[#5C6B5E]">
@@ -407,18 +497,20 @@ export default function TripBuilderModal({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">
-                    Select Existing CRM Contact
+                    Select Guest from Directory
                   </label>
                   <select
                     value={selectedClientId}
                     onChange={(e) => setSelectedClientId(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:outline-none"
                   >
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.full_name} ({c.email})
-                      </option>
-                    ))}
+                    {clients
+                      .filter((c) => c.full_name && !c.full_name.includes("DROP TABLE") && !c.full_name.startsWith("Stress "))
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.full_name} ({c.email || "No email"})
+                        </option>
+                      ))}
                     <option value="NEW">+ Enter New Guest Contact</option>
                   </select>
                 </div>
@@ -590,7 +682,7 @@ export default function TripBuilderModal({
                   <div className="font-serif font-bold text-base text-emerald-800">
                     ${depositPreview.toLocaleString()} {currency}
                   </div>
-                  <span className="text-[10px] text-[#5C6B5E]">Upon Proposal Approval</span>
+                  <span className="text-[10px] text-[#5C6B5E]">Held upon reservation</span>
                 </div>
                 <div>
                   <span className="text-[10px] text-[#5C6B5E] uppercase block font-semibold">
@@ -599,29 +691,7 @@ export default function TripBuilderModal({
                   <div className="font-serif font-bold text-base text-[#2D3E35]">
                     ${balancePreview.toLocaleString()} {currency}
                   </div>
-                  <span className="text-[10px] text-[#5C6B5E]">Due 60 Days Prior</span>
-                </div>
-              </div>
-
-              {/* Host Agency Back-Office: Grand Travel Commission Estimator */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 bg-stone-50 rounded-xl border border-stone-200 text-stone-800">
-                <div>
-                  <div className="flex items-center space-x-1.5 text-[10px] text-stone-600 uppercase font-bold">
-                    <BadgePercent className="w-3.5 h-3.5 text-emerald-700" />
-                    <span>Grand Travel Host Agency</span>
-                  </div>
-                  <div className="font-bold text-xs text-[#2D3E35] mt-1">Funjet 500 Club (14% Tier)</div>
-                  <span className="text-[11px] text-emerald-800 font-bold">+${expectedCommission.toLocaleString()} Commission</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-stone-600 uppercase block font-bold">Net Supplier Remittance</span>
-                  <div className="font-bold text-xs text-[#2D3E35] mt-1">${netSupplierRemittance.toLocaleString()} USD</div>
-                  <span className="text-[10px] text-stone-500">Sanctuary Villa &amp; Ground Escort</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-stone-600 uppercase block font-bold">Advisor Split (90/10)</span>
-                  <div className="font-bold text-xs text-[#C07D63] mt-1">${advisorSplit.toLocaleString()} USD</div>
-                  <span className="text-[10px] text-stone-500">Kareena Islam Net Payout</span>
+                  <span className="text-[10px] text-[#5C6B5E]">Due 45–60 days prior</span>
                 </div>
               </div>
             </div>
@@ -632,7 +702,7 @@ export default function TripBuilderModal({
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-[#2D3E35]">
                 <Plane className="w-4 h-4 text-blue-700" />
-                <span>Cirium Aviation Desk &amp; Chauffeur Coordination</span>
+                <span>Aviation Desk &amp; Airport Chauffeur</span>
               </div>
               <label className="flex items-center space-x-2 text-xs cursor-pointer">
                 <input
@@ -698,52 +768,91 @@ export default function TripBuilderModal({
                         : "bg-[#FAF7F2] text-[#5C6B5E] border-[#E5DDD0]"
                     }`}
                   >
-                    {isLieFlat ? "✓ Confirmed" : "Standard"}
+                    {isLieFlat ? "Confirmed" : "Standard"}
                   </button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Section 4: Day-by-Day Itinerary Blocks */}
-          <div className="bg-white p-4 rounded-xl border border-[#E5DDD0] space-y-4">
-            <div className="flex items-center justify-between">
+          {/* Section 4: Day-by-Day Itinerary Blocks (Collapsible Progressive Disclosure) */}
+          <div className="bg-white rounded-xl border border-[#E5DDD0] overflow-hidden">
+            <div className="p-4 flex items-center justify-between">
               <div className="flex items-center space-x-2 text-xs font-bold uppercase tracking-wider text-[#2D3E35]">
                 <FileText className="w-4 h-4 text-emerald-700" />
-                <span>Day-by-Day Itinerary Blocks ({itineraryBlocks.length} Days)</span>
+                <span>Daily Somatic Schedule ({itineraryBlocks.length} Days)</span>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsParserOpen(true)}
-                  className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold text-[#2D3E35] bg-[#FAF7F2] hover:bg-[#F2ECE4] border border-[#D9D0C2] rounded-lg transition-colors cursor-pointer"
-                  title="Paste raw airline confirmation email or villa voucher to auto-generate day blocks"
+                  onClick={() => setShowItinerarySection(!showItinerarySection)}
+                  className="px-2.5 py-1 text-xs font-semibold text-[#2D3E35] bg-[#FAF7F2] hover:bg-[#F2ECE4] border border-[#E5DDD0] rounded-lg transition-colors cursor-pointer"
                 >
-                  <FileText className="w-3.5 h-3.5 text-[#C07D63]" />
-                  <span>Paste Confirmation</span>
+                  {showItinerarySection ? "Collapse Schedule" : "Customize Daily Schedule"}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setIsBlockLibraryOpen(true)}
-                  className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg transition-colors cursor-pointer"
-                  title="Open Tern-style Reusable Activity Block Library"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
-                  <span>Curated Library</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={handleAddBlock}
-                  className="inline-flex items-center space-x-1 px-3 py-1 text-xs font-bold text-[#2D3E35] bg-[#FAF7F2] hover:bg-[#F2ECE4] border border-[#E5DDD0] rounded-lg transition-colors cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Day Block</span>
-                </button>
+                {showItinerarySection && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setIsParserOpen(true)}
+                      className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold text-[#2D3E35] bg-[#FAF7F2] hover:bg-[#F2ECE4] border border-[#D9D0C2] rounded-lg transition-colors cursor-pointer"
+                      title="Paste raw airline confirmation email or villa voucher to auto-generate day blocks"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-[#C07D63]" />
+                      <span>Paste Voucher</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsBlockLibraryOpen(true)}
+                      className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg transition-colors cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>Curated Library</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleAddBlock}
+                      className="inline-flex items-center space-x-1 px-3 py-1 text-xs font-bold text-[#2D3E35] bg-[#FAF7F2] hover:bg-[#F2ECE4] border border-[#E5DDD0] rounded-lg transition-colors cursor-pointer"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add Day</span>
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
-            <div className="space-y-3">
-              {itineraryBlocks.map((block, idx) => (
+            {showItinerarySection && (
+              <div className="p-4 pt-0 border-t border-[#E5DDD0]/60 space-y-3 animate-in fade-in">
+                {/* 1-Click Day Templates Quick Bar */}
+                <div className="flex items-center gap-1.5 flex-wrap p-2.5 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-xs">
+                  <span className="text-[10px] uppercase font-bold text-[#5C6B5E] mr-1">
+                    1-Click Day Presets:
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleAddDayTemplate("arrival")}
+                    className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-white text-[#2D3E35] border border-[#E5DDD0] hover:bg-[#F2ECE4] transition-colors cursor-pointer"
+                  >
+                    + Arrival Day (Chauffeur &amp; Sound Bath)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddDayTemplate("immersion")}
+                    className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-white text-emerald-900 border border-emerald-200 hover:bg-emerald-50 transition-colors cursor-pointer"
+                  >
+                    + Immersion Day (Movement &amp; Blue Zone Dining)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleAddDayTemplate("departure")}
+                    className="px-2.5 py-1 rounded-md text-[11px] font-semibold bg-white text-blue-900 border border-blue-200 hover:bg-blue-50 transition-colors cursor-pointer"
+                  >
+                    + Departure Day (Integration &amp; Airport Escort)
+                  </button>
+                </div>
+
+                {itineraryBlocks.map((block, idx) => (
                 <div
                   key={idx}
                   className="p-3 rounded-xl bg-[#FAF7F2] border border-[#E5DDD0] space-y-2 relative"
@@ -803,7 +912,8 @@ export default function TripBuilderModal({
                 </div>
               ))}
             </div>
-          </div>
+          )}
+        </div>
 
           {/* Section 5: Client Interactive Sanctuary Proposal & Authorization Link */}
           {isEditing && tripToEdit && (
@@ -884,11 +994,11 @@ export default function TripBuilderModal({
               className="px-5 py-2.5 rounded-lg bg-[#2D3E35] hover:bg-[#1f2c25] text-[#FAF7F2] text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center space-x-1.5"
             >
               {saving ? (
-                <span>Writing to Database...</span>
+                <span>Saving Reservation...</span>
               ) : (
                 <>
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  <span>{isEditing ? "Save Itinerary Changes" : "Create Trip Proposal"}</span>
+                  <span>{isEditing ? "Save Reservation Changes" : "Create Reservation"}</span>
                 </>
               )}
             </button>
