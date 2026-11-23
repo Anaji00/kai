@@ -1,3 +1,4 @@
+import html
 import re
 import logging
 from typing import Dict, Any
@@ -7,6 +8,18 @@ from backend.models import ActionDraft
 from backend.sidecar.services.thesis_rag import generate_pre_call_thesis
 
 logger = logging.getLogger("kai_email_agent")
+
+_INTERNAL_EMAIL_DOMAINS = ("grandtravelcruise.com", "kaiwellnessretreats.com")
+
+
+def _strip_html_email(raw: str) -> str:
+    if not raw:
+        return ""
+    text = re.sub(r"(?is)<(script|style)[^>]*>.*?</\1>", " ", raw)
+    text = re.sub(r"(?i)<br\s*/?>|</p>|</div>|</tr>|</li>", "\n", text)
+    text = re.sub(r"<[^>]+>", " ", text)
+    text = html.unescape(text)
+    return re.sub(r"[ \t]{2,}", " ", text).strip()
 
 
 def parse_and_stage_email(
@@ -29,16 +42,24 @@ def parse_and_stage_email(
         IngestionChannel,
     )
 
-    # 0. Prompt-Injection Spotlighting and Control Character Sanitization
-    cleaned_body = UntrustedInputSanitizer.sanitize_text(raw_body)
+    # 0. HTML Normalization, Prompt-Injection Spotlighting and Control Character Sanitization
+    plain_body = _strip_html_email(raw_body or "")
+    cleaned_body = UntrustedInputSanitizer.sanitize_text(plain_body)
     has_injection, injection_markers = UntrustedInputSanitizer.detect_prompt_injection(cleaned_body)
 
     body_lower = cleaned_body.lower()
-    subject_lower = subject.lower()
+    subject_lower = (subject or "").lower()
 
     # 1. Intent Classification
     intent = "GUEST_INQUIRY"
-    if any(k in body_lower or k in subject_lower for k in ["voucher", "booking confirmation", "room block", "folio"]):
+    if any(
+        k in body_lower or k in subject_lower
+        for k in [
+            "voucher", "booking confirmation", "room block", "folio",
+            "vax", "vacationaccess", "algv", "funjet", "apple vacations",
+            "wire transfer", "payment receipt", "deposit paid",
+        ]
+    ):
         intent = "VOUCHER_CONFIRMATION"
     elif any(k in body_lower or k in subject_lower for k in ["flight", "cabin", "pnr", "airline", "itinerary", "transfer", "airport"]):
         intent = "FLIGHT_TRANSFER_UPDATE"
@@ -54,12 +75,20 @@ def parse_and_stage_email(
         "armaan@grandtravelcruise.com",
     ]
 
-    # Email extraction
-    email_match = re.search(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", raw_body)
-    entities["extracted_email"] = email_match.group(0) if email_match else sender
+    # Email extraction — skip internal founder / automated noreply addresses in forwarded headers
+    found_emails = re.findall(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", cleaned_body)
+    guest_email = next(
+        (
+            e for e in found_emails
+            if not any(e.lower().endswith(f"@{d}") for d in _INTERNAL_EMAIL_DOMAINS)
+            and not e.lower().startswith(("noreply@", "no-reply@", "donotreply@"))
+        ),
+        None,
+    )
+    entities["extracted_email"] = guest_email or (found_emails[0] if found_emails else sender)
 
     # Phone extraction
-    phone_match = re.search(r"(\+?\d{1,3}[-.\s]?)?(\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}", raw_body)
+    phone_match = re.search(r"(\+?\d{1,3}[-.\s]?)?(\(?\d{3}\)?[-.\s]?)?\d{3}[-.\s]?\d{4}", cleaned_body)
     if phone_match:
         entities["extracted_phone"] = phone_match.group(0).strip()
 
@@ -77,19 +106,26 @@ def parse_and_stage_email(
         sanctuary_slug = "riviera-maya"
     entities["matched_sanctuary"] = sanctuary_slug
 
-    # Guest Name Extraction heuristic
-    name_match = re.search(r"(?:name|from|guest|regards|sincerely|best,)\s*:?\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)", raw_body)
-    extracted_name = name_match.group(1) if name_match else None
-    if not extracted_name and "@" in sender:
+    # Guest Name Extraction heuristic — prioritize explicit Passenger/Traveler/Guest labels over forwarded From: headers
+    _name_pat = r"([A-Z\u00C0-\u024F][a-zA-Z\u00C0-\u024F'\-]+(?:\s+[A-Z\u00C0-\u024F][a-zA-Z\u00C0-\u024F'\-]+){0,3})"
+    explicit_name_match = re.search(rf"(?:passenger|traveler|guest|client)\s*(?:name)?\s*[:\-]\s*{_name_pat}", cleaned_body, re.IGNORECASE)
+    extracted_name = explicit_name_match.group(1).strip() if explicit_name_match else None
+    if not extracted_name:
+        for m in re.finditer(rf"(?:name|from|regards|sincerely|best,)\s*:?\s*{_name_pat}", cleaned_body):
+            cand = m.group(1).strip()
+            if not any(f in cand.lower() for f in ("kareena", "armaan", "grand travel", "kai wellness", "noreply")):
+                extracted_name = cand
+                break
+    if not extracted_name and "@" in sender and not any(sender.lower().endswith(f"@{d}") for d in _INTERNAL_EMAIL_DOMAINS):
         extracted_name = sender.split("@")[0].replace(".", " ").title()
     entities["extracted_name"] = extracted_name or "Valued Guest"
 
     # Flight / Cabin Class extraction
-    flight_match = re.search(r"\b([A-Z]{2,3}\s?\d{2,4})\b", raw_body)
+    flight_match = re.search(r"\b([A-Z]{2,3}[-\s]?\d{2,4})\b", cleaned_body)
     if flight_match:
         entities["flight_number"] = flight_match.group(1).upper()
 
-    airline_match = re.search(r"\b(Delta|United|American|Lufthansa|Swiss|Singapore|Air France|Iberia|Avianca|Copa)\b", raw_body, re.IGNORECASE)
+    airline_match = re.search(r"\b(Delta|United|American|Lufthansa|Swiss|Singapore|Air France|Iberia|Avianca|Copa)\b", cleaned_body, re.IGNORECASE)
     if airline_match:
         entities["airline"] = airline_match.group(1).title()
 
@@ -100,14 +136,22 @@ def parse_and_stage_email(
     else:
         entities["cabin_class"] = "Standard / Flexible"
 
-    # Confirmation / PNR extraction
-    pnr_match = re.search(r"(?:pnr|confirmation|ref|voucher|code)\s*#?\s*[:\-]?\s*([A-Z0-9\-_]{4,24})", raw_body, re.IGNORECASE)
+    # Confirmation / PNR extraction — require at least one digit so English words like "VacationAccess" are never captured
+    pnr_match = (
+        re.search(
+            r"(?:vax\s*(?:reservation|booking|confirmation)?|pnr|confirmation|reservation|booking|ref|voucher|code)\s*(?:number|no\.?)?\s*#?\s*[:\-]?\s*#?\s*((?=[A-Z0-9\-_]*\d)[A-Z0-9\-_]{4,24})\b",
+            cleaned_body,
+            re.IGNORECASE,
+        )
+        or re.search(r"#\s*((?=[A-Z0-9\-_]*\d)[A-Z0-9\-_]{5,24})\b", cleaned_body, re.IGNORECASE)
+    )
     if pnr_match:
         entities["confirmation_code"] = pnr_match.group(1).upper()
 
     # 3. Immediate LLM Suggested Plan for Guest Inquiries
     from backend.sidecar.services.thesis_rag import generate_llm_suggested_plan
 
+    llm_plan: Dict[str, Any] = {}
     if intent == "GUEST_INTAKE_INQUIRY":
         # Only inquiries get a plan: flight notices and vouchers should not spend free-tier model quota.
         llm_plan = generate_llm_suggested_plan(
@@ -116,7 +160,7 @@ def parse_and_stage_email(
             room_preference="private-suite",
             movement_experience="all-levels",
             health_notes="Inbound email inquiry",
-            intentions=raw_body[:300],
+            intentions=cleaned_body[:300],
         )
         entities["llm_suggested_plan"] = llm_plan
         suggested_action = (
@@ -133,13 +177,18 @@ def parse_and_stage_email(
         )
     elif intent == "VOUCHER_CONFIRMATION":
         suggested_action = (
-            f"Reconcile voucher #{entities.get('confirmation_code', 'N/A')} against sanctuary room-block manifest. "
-            f"Verify group capacity limit."
+            f"Reconcile voucher / VAX confirmation #{entities.get('confirmation_code', 'N/A')} against sanctuary room-block manifest. "
+            f"Verify group capacity limit and offline payment ledger."
+        )
+    elif intent == "CORPORATE_RETREAT_PROPOSAL":
+        suggested_action = (
+            f"Prepare executive / private cohort retreat proposal for {entities['extracted_name']} ({entities['extracted_email']}). "
+            f"Routed to kareena@grandtravelcruise.com & armaan@grandtravelcruise.com."
         )
     else:
         suggested_action = (
-            f"Review inquiry from {entities['extracted_name']} (routed to kareena@grandtravelcruise.com & armaan@grandtravelcruise.com). "
-            f"LLM Suggested Plan: {llm_plan.get('summary', '')}"
+            f"Review inbound message from {entities['extracted_name']} ({entities['extracted_email']}), "
+            f"routed to kareena@grandtravelcruise.com & armaan@grandtravelcruise.com."
         )
 
     # 4. Create Staged Record (status = PENDING_APPROVAL)

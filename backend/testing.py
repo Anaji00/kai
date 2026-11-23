@@ -20,13 +20,33 @@ def ensure_test_admin(db):
 
 
 def admin_headers() -> Dict[str, str]:
-    """Bearer headers for a real test operator session."""
+    """Bearer headers for a real test operator session (re-issues if an earlier test revoked sessions)."""
     global _cached_headers
-    if _cached_headers is None:
-        from backend.database import SessionLocal, init_db
-        from backend.services.auth_service import create_operator_session
+    from backend.database import SessionLocal, init_db
+    from backend.models import OperatorUser, PortalSession
+    from backend.services.auth_service import create_operator_session, decode_token
 
-        init_db()
+    init_db()
+    if _cached_headers is not None:
+        try:
+            token = _cached_headers["Authorization"].split(" ", 1)[1]
+            claims = decode_token(token, "access")
+            sid = claims.get("sid")
+            with SessionLocal() as db:
+                session = db.query(PortalSession).filter(PortalSession.session_id == sid).first()
+                user = db.query(OperatorUser).filter(OperatorUser.id == claims.get("sub")).first()
+                if (
+                    session is None
+                    or session.revoked_at is not None
+                    or user is None
+                    or not user.is_active
+                    or user.token_version != claims.get("ver")
+                ):
+                    _cached_headers = None
+        except Exception:
+            _cached_headers = None
+
+    if _cached_headers is None:
         with SessionLocal() as db:
             tokens = create_operator_session(db, ensure_test_admin(db), "127.0.0.1", "pytest")
             _cached_headers = {"Authorization": f"Bearer {tokens.access_token}"}

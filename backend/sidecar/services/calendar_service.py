@@ -8,6 +8,16 @@ logger = logging.getLogger("kai_calendar_service")
 
 STATIC_COHORTS = [
     {
+        "id": "cohort_pv_2027",
+        "title": "Puerto Vallarta Oceanfront Somatic Restoration (Marival Armony)",
+        "sanctuary_slug": "puerto-vallarta-2027",
+        "category": "COHORT",
+        "start_time": "2027-01-28T15:00:00Z",
+        "end_time": "2027-01-31T11:00:00Z",
+        "location": "Marival Armony Luxury Resort & Suites, Punta de Mita, Puerto Vallarta",
+        "notes": "14 guests max. Flagship KAI Wellness Sanctuary cohort hosted via Grand Travel & Cruise."
+    },
+    {
         "id": "cohort_nosara_2027",
         "title": "Nosara Canopy & Ocean Somatic Alignment",
         "sanctuary_slug": "nosara",
@@ -166,6 +176,19 @@ def create_calendar_event(
     return event
 
 
+def _escape_ical_text(value: Optional[str]) -> str:
+    """RFC 5545 text escaping: prevents CRLF property injection and escapes backslash, comma, semicolon, newline."""
+    raw = str(value or "")
+    raw = raw.replace("\r\n", "\n").replace("\r", "\n")
+    raw = raw.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace("\n", "\\n")
+    return raw
+
+
+def _sanitize_ical_uid(value: Optional[str]) -> str:
+    raw = str(value or "event")
+    return "".join(ch for ch in raw if ch.isalnum() or ch in ("-", "_", ".")) or "event"
+
+
 def generate_ical_feed(events: List[Dict[str, Any]]) -> str:
     """
     Generates an RFC 5545 compliant iCalendar (.ics) feed string.
@@ -183,16 +206,17 @@ def generate_ical_feed(events: List[Dict[str, Any]]) -> str:
     for e in events:
         start_dt = datetime.fromisoformat(e["start_time"].replace("Z", "+00:00")) if isinstance(e["start_time"], str) else e["start_time"]
         end_dt = datetime.fromisoformat(e["end_time"].replace("Z", "+00:00")) if isinstance(e["end_time"], str) else e["end_time"]
-        
+
         dtstart = start_dt.strftime("%Y%m%dT%H%M%SZ")
         dtend = end_dt.strftime("%Y%m%dT%H%M%SZ")
-        summary = e.get("title", "KAI Sanctuary Event").replace(",", "\\,").replace(";", "\\;")
-        description = (e.get("notes", "") or "").replace("\n", " ").replace(",", "\\,").replace(";", "\\;")
-        location = (e.get("location", "") or "").replace(",", "\\,").replace(";", "\\;")
+        uid = _sanitize_ical_uid(e.get("id", "event"))
+        summary = _escape_ical_text(e.get("title", "KAI Sanctuary Event"))
+        description = _escape_ical_text(e.get("notes", ""))
+        location = _escape_ical_text(e.get("location", ""))
 
         lines.extend([
             "BEGIN:VEVENT",
-            f"UID:{e.get('id', 'event')}@kaiwellnessretreats.com",
+            f"UID:{uid}@kaiwellnessretreats.com",
             f"DTSTAMP:{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
             f"DTSTART:{dtstart}",
             f"DTEND:{dtend}",

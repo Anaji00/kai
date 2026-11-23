@@ -1,13 +1,12 @@
 "use client";
 
-import React from "react";
+import React, { useActionState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import {
   Activity,
   Sparkles,
   Compass,
-  ShieldCheck,
   Globe,
   Award,
   Trophy,
@@ -15,10 +14,24 @@ import {
   Mail,
   Share2,
   Heart,
+  BookOpen,
+  ExternalLink,
+  ArrowRight,
+  CheckCircle2,
+  Loader2,
 } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
+import { subscribeNewsletter } from "@/app/actions/booking";
 
 export default function AboutPage() {
+  const [newsletterState, newsletterAction, isSubscribing] = useActionState(
+    subscribeNewsletter,
+    {
+      success: false,
+      message: "",
+    }
+  );
+
   return (
     <div className="py-12 sm:py-20 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-24">
       {/* 1. THE HEARTS BEHIND KAI: SIBLING STORY & HERITAGE */}
@@ -160,42 +173,50 @@ export default function AboutPage() {
                   </p>
                 </div>
 
-                {/* Dense Credential Matrix */}
+                {/* Highlights */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                   <div className="rounded-2xl bg-sand/50 border border-sand-border p-3.5 space-y-1">
                     <span className="text-[10px] uppercase tracking-wider font-semibold text-olive flex items-center gap-1">
-                      <Activity className="h-3.5 w-3.5 text-terracotta" /> Clinical Care
+                      <Activity className="h-3.5 w-3.5 text-terracotta" /> Nursing Background
                     </span>
                     <p className="text-xs text-sage font-medium">Registered Nurse (BSN, RN)</p>
                     <p className="text-[11px] text-sage/75">
-                      Compassionate acute care, patient advocacy &amp; holistic mind-body well-being.
+                      Years of bedside nursing experience, patient care, and whole-person wellness.
                     </p>
                   </div>
                   <div className="rounded-2xl bg-sand/50 border border-sand-border p-3.5 space-y-1">
                     <span className="text-[10px] uppercase tracking-wider font-semibold text-olive flex items-center gap-1">
-                      <Sparkles className="h-3.5 w-3.5 text-terracotta" /> Somatic &amp; Acoustic
+                      <Sparkles className="h-3.5 w-3.5 text-terracotta" /> Yoga &amp; Sound
                     </span>
-                    <p className="text-xs text-sage font-medium">Certified Yoga &amp; Sound Healing</p>
+                    <p className="text-xs text-sage font-medium">Certified Yoga &amp; Sound Baths</p>
                     <p className="text-[11px] text-sage/75">
-                      Mindful yoga, meditation, 432Hz crystal sound healing &amp; slow somatic pacing.
+                      Gentle yoga, guided meditation, crystal sound baths, and unhurried rest.
                     </p>
                   </div>
                   <div className="rounded-2xl bg-sand/50 border border-sand-border p-3.5 space-y-1">
                     <span className="text-[10px] uppercase tracking-wider font-semibold text-olive flex items-center gap-1">
                       <Award className="h-3.5 w-3.5 text-terracotta" /> Industry Recognition
                     </span>
-                    <p className="text-xs text-sage font-medium">Travel Age West Rising Star</p>
+                    <a
+                      href="https://www.travelagewest.com/Industry-Insight/Business-Features/future-leaders-in-travel-watch-list-2026"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-sage font-medium hover:text-terracotta inline-flex items-center gap-1 transition-colors"
+                    >
+                      <span>TravelAge West Future Leader</span>
+                      <ExternalLink className="h-3 w-3 text-terracotta" />
+                    </a>
                     <p className="text-[11px] text-sage/75">
-                      Honored travel industry talent with generational roots in luxury hospitality.
+                      Named to the <em>5 Future Leaders to Watch List</em> and co-owner of Grand Travel &amp; Cruise.
                     </p>
                   </div>
                   <div className="rounded-2xl bg-sand/50 border border-sand-border p-3.5 space-y-1">
                     <span className="text-[10px] uppercase tracking-wider font-semibold text-olive flex items-center gap-1">
-                      <Heart className="h-3.5 w-3.5 text-terracotta" /> Welcoming Space
+                      <Heart className="h-3.5 w-3.5 text-terracotta" /> Community
                     </span>
-                    <p className="text-xs text-sage font-medium">A Sanctuary for All</p>
+                    <p className="text-xs text-sage font-medium">A Space for Everyone</p>
                     <p className="text-[11px] text-sage/75">
-                      A welcoming space where guests pause, breathe, reconnect, and simply be themselves.
+                      A welcoming environment where guests can pause, breathe, and be themselves.
                     </p>
                   </div>
                 </div>
@@ -210,7 +231,13 @@ export default function AboutPage() {
                 <Mail className="h-3.5 w-3.5 text-terracotta" />
                 kareena@grandtravelcruise.com
               </a>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/newsletter#kareena-press"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-sage hover:text-terracotta transition-colors"
+                >
+                  <BookOpen className="h-3 w-3 text-terracotta" /> Press &amp; Articles
+                </Link>
                 <a
                   href="https://www.instagram.com/kareenatravelrn/"
                   target="_blank"
@@ -302,15 +329,15 @@ export default function AboutPage() {
                   </p>
                 </div>
 
-                {/* Dense Credential Matrix */}
+                {/* Highlights */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                   <div className="rounded-2xl bg-sand/50 border border-sand-border p-3.5 space-y-1">
                     <span className="text-[10px] uppercase tracking-wider font-semibold text-olive flex items-center gap-1">
-                      <Trophy className="h-3.5 w-3.5 text-terracotta" /> Endurance &amp; Discipline
+                      <Trophy className="h-3.5 w-3.5 text-terracotta" /> Athletics &amp; Recovery
                     </span>
-                    <p className="text-xs text-sage font-medium">Ironman Finisher &amp; Lifelong Athlete</p>
+                    <p className="text-xs text-sage font-medium">Ironman Finisher &amp; Athlete</p>
                     <p className="text-[11px] text-sage/75">
-                      Soccer, endurance sports, perseverance, mental strength &amp; structured recovery.
+                      Soccer, endurance sports, mental resilience, and the importance of recovery.
                     </p>
                   </div>
                   <div className="rounded-2xl bg-sand/50 border border-sand-border p-3.5 space-y-1">
@@ -319,25 +346,25 @@ export default function AboutPage() {
                     </span>
                     <p className="text-xs text-sage font-medium">Certified Yoga Instructor</p>
                     <p className="text-[11px] text-sage/75">
-                      Mindful movement, presence, slowing down &amp; finding joy in life&rsquo;s simplest moments.
+                      Movement, presence, slowing down, and finding joy in simple moments.
                     </p>
                   </div>
                   <div className="rounded-2xl bg-sand/50 border border-sand-border p-3.5 space-y-1">
                     <span className="text-[10px] uppercase tracking-wider font-semibold text-olive flex items-center gap-1">
                       <Compass className="h-3.5 w-3.5 text-terracotta" /> Travel &amp; Hospitality
                     </span>
-                    <p className="text-xs text-sage font-medium">Cross-Cultural Lineage</p>
+                    <p className="text-xs text-sage font-medium">Family Travel Heritage</p>
                     <p className="text-[11px] text-sage/75">
-                      Hospitality heritage, appreciation for diverse cultures &amp; friendships that last.
+                      Raised in travel and hospitality with a love for new cultures and lasting friendships.
                     </p>
                   </div>
                   <div className="rounded-2xl bg-sand/50 border border-sand-border p-3.5 space-y-1">
                     <span className="text-[10px] uppercase tracking-wider font-semibold text-olive flex items-center gap-1">
-                      <Briefcase className="h-3.5 w-3.5 text-terracotta" /> Retreat Architecture
+                      <Briefcase className="h-3.5 w-3.5 text-terracotta" /> Retreat Planning
                     </span>
-                    <p className="text-xs text-sage font-medium">Business &amp; Travel Synthesis</p>
+                    <p className="text-xs text-sage font-medium">Operations &amp; Experience</p>
                     <p className="text-[11px] text-sage/75">
-                      Thoughtfully designed retreats inspiring personal growth, connection &amp; discovery.
+                      Thoughtfully planned retreats built around connection, adventure, and ease.
                     </p>
                   </div>
                 </div>
@@ -352,18 +379,212 @@ export default function AboutPage() {
                 <Mail className="h-3.5 w-3.5 text-terracotta" />
                 armaan@grandtravelcruise.com
               </a>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3">
+                <Link
+                  href="/newsletter"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-sage hover:text-terracotta transition-colors"
+                >
+                  <BookOpen className="h-3 w-3 text-terracotta" /> Beyond The Retreats
+                </Link>
                 <a
                   href="https://grandtravelcruise.com/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-1 text-[11px] text-olive hover:text-terracotta"
                 >
-                  <Compass className="h-3 w-3" /> Grand Travel Executive Desk
+                  <Compass className="h-3 w-3" /> Grand Travel &amp; Cruise
                 </a>
               </div>
             </div>
           </article>
+        </div>
+
+        {/* 2.5 BEYOND THE RETREATS: NEWSLETTER & KAREENA'S PRESS FEATURES */}
+        <div
+          id="beyond-the-retreats"
+          className="rounded-3xl border border-sand-border bg-linen p-6 sm:p-10 lg:p-12 shadow-sm space-y-8 scroll-mt-28"
+        >
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            {/* Left: Overview & Press Links */}
+            <div className="lg:col-span-7 space-y-5">
+              <span className="text-xs uppercase tracking-[0.2em] text-olive font-semibold block">
+                Newsletter &amp; Press
+              </span>
+
+              <div className="space-y-1.5">
+                <h2 className="font-serif text-3xl sm:text-5xl text-sage font-light leading-tight">
+                  Beyond The Retreats
+                </h2>
+                <p className="font-serif text-xl sm:text-2xl text-sage/80 italic font-normal">
+                  Notes on everyday wellness, mindful travel, and gratitude.
+                </p>
+              </div>
+
+              <p className="text-xs sm:text-sm text-sage/85 leading-relaxed">
+                For Kareena and Armaan, wellness doesn&rsquo;t end when you head home from a retreat. Through their newsletter,{" "}
+                <Link
+                  href="/newsletter"
+                  className="font-medium text-sage underline decoration-terracotta/60 underline-offset-4 hover:text-terracotta transition-colors"
+                >
+                  Beyond The Retreats
+                </Link>
+                , and Kareena&rsquo;s features in <em>TravelAge West</em>, <em>Travel Weekly</em>, and <em>Click2Houston</em>, they share simple ways to slow down, stories from their family&rsquo;s travel agency, and early word when new 12&ndash;14 guest retreat dates open.
+              </p>
+
+              {/* Pull-Quote from TravelAge West */}
+              <blockquote className="rounded-2xl bg-sand/60 border border-sand-border p-4 sm:p-5 space-y-1.5">
+                <p className="font-serif text-base sm:text-lg text-sage italic leading-snug">
+                  &ldquo;As someone with a biracial background, I bring a &lsquo;melting pot&rsquo; approach to relationships, allowing me to build trust and create meaningful client experiences across different cultures and communities.&rdquo;
+                </p>
+                <footer className="text-[11px] text-sage/70">
+                  &mdash; Kareena Islam in <em>TravelAge West</em> (5 Future Leaders to Watch)
+                </footer>
+              </blockquote>
+
+              {/* Press Links Grid */}
+              <div className="space-y-2.5 pt-1">
+                <span className="text-[11px] uppercase tracking-wider font-semibold text-olive block">
+                  Read Kareena&rsquo;s Features &amp; Interviews
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <a
+                    href="https://www.travelagewest.com/Industry-Insight/Business-Features/future-leaders-in-travel-watch-list-2026"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group rounded-2xl border border-sand-border bg-sand/40 hover:bg-sand hover:border-terracotta/60 p-3.5 transition-all flex flex-col justify-between gap-1.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-terracotta">
+                        TravelAge West
+                      </span>
+                      <ExternalLink className="h-3 w-3 text-sage/60 group-hover:text-terracotta transition-colors" />
+                    </div>
+                    <p className="text-xs font-medium text-sage leading-snug">
+                      5 Future Leaders to Watch List
+                    </p>
+                  </a>
+
+                  <a
+                    href="https://www.travelagewest.com/Events/future-leaders-in-travel-2026-2"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group rounded-2xl border border-sand-border bg-sand/40 hover:bg-sand hover:border-terracotta/60 p-3.5 transition-all flex flex-col justify-between gap-1.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-terracotta">
+                        TravelAge West
+                      </span>
+                      <ExternalLink className="h-3 w-3 text-sage/60 group-hover:text-terracotta transition-colors" />
+                    </div>
+                    <p className="text-xs font-medium text-sage leading-snug">
+                      Travel Advisors Write Their Next Chapter at Future Leaders in Travel
+                    </p>
+                  </a>
+
+                  <a
+                    href="https://www.click2houston.com/news/local/2026/11/14/faa-ground-stop-can-you-get-a-refund-if-your-flight-is-canceled-heres-what-to-know/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group rounded-2xl border border-sand-border bg-sand/40 hover:bg-sand hover:border-terracotta/60 p-3.5 transition-all flex flex-col justify-between gap-1.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-olive">
+                        Click2Houston (KPRC 2)
+                      </span>
+                      <ExternalLink className="h-3 w-3 text-sage/60 group-hover:text-terracotta transition-colors" />
+                    </div>
+                    <p className="text-xs font-medium text-sage leading-snug">
+                      FAA Ground Stop: Advice for Travelers When Flights Are Canceled
+                    </p>
+                  </a>
+
+                  <a
+                    href="https://www.travelweekly.com/News-at-TW/Future-Leaders-in-Travel-opens-application-for-2026-event"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="group rounded-2xl border border-sand-border bg-sand/40 hover:bg-sand hover:border-terracotta/60 p-3.5 transition-all flex flex-col justify-between gap-1.5"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-olive">
+                        Travel Weekly
+                      </span>
+                      <ExternalLink className="h-3 w-3 text-sage/60 group-hover:text-terracotta transition-colors" />
+                    </div>
+                    <p className="text-xs font-medium text-sage leading-snug">
+                      Future Leaders in Travel Returning Guide Announcement
+                    </p>
+                  </a>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Newsletter Signup Card */}
+            <div className="lg:col-span-5 rounded-2xl border border-sand-border bg-sand/50 p-6 sm:p-7 space-y-5">
+              <div className="space-y-1.5">
+                <h3 className="font-serif text-2xl sm:text-3xl text-sage font-normal leading-snug">
+                  Join <em>Beyond The Retreats</em>
+                </h3>
+                <p className="text-xs text-sage/80 leading-relaxed">
+                  Get occasional notes from Kareena and Armaan on mindful living, travel, and early access to our 12&ndash;14 guest retreats.
+                </p>
+              </div>
+
+              {newsletterState.success ? (
+                <div className="rounded-2xl bg-linen border border-olive/40 p-4 text-xs text-sage space-y-1.5">
+                  <div className="flex items-center gap-2 font-semibold text-olive">
+                    <CheckCircle2 className="h-4 w-4 text-olive shrink-0" />
+                    <span>You&rsquo;re on the list</span>
+                  </div>
+                  <p className="text-sage/80">{newsletterState.message}</p>
+                </div>
+              ) : (
+                <form action={newsletterAction} className="space-y-2.5">
+                  <input type="hidden" name="source" value="founders-beyond-the-retreats" />
+                  <label htmlFor="founders-newsletter-email" className="sr-only">
+                    Email address
+                  </label>
+                  <input
+                    id="founders-newsletter-email"
+                    type="email"
+                    name="email"
+                    required
+                    placeholder="Your email address"
+                    className="w-full rounded-xl border border-sand-border bg-linen px-4 py-3 text-xs text-sage placeholder:text-sage/50 focus:border-olive focus:outline-none"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isSubscribing}
+                    className="w-full flex items-center justify-center gap-2 rounded-full bg-sage px-5 py-3 text-xs font-semibold uppercase tracking-widest text-linen hover:bg-sage-dark transition-all shadow-sm disabled:opacity-50"
+                  >
+                    {isSubscribing ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>Joining...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Subscribe</span>
+                        <ArrowRight className="h-3.5 w-3.5" />
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
+
+              <div className="pt-4 border-t border-sand-border/80 flex flex-col gap-2">
+                <Link
+                  href="/newsletter"
+                  className="inline-flex items-center justify-between rounded-xl border border-sand-border bg-linen hover:border-terracotta px-4 py-2.5 text-xs font-medium text-sage transition-all group"
+                >
+                  <span>Visit the Beyond The Retreats Page</span>
+                  <ArrowRight className="h-3.5 w-3.5 text-terracotta group-hover:translate-x-0.5 transition-transform shrink-0" />
+                </Link>
+                <span className="text-[11px] text-sage/60">
+                  Occasional updates only. Unsubscribe anytime.
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* OUR PHILOSOPHY: LIVING BIG — BE IN GRATITUDE */}

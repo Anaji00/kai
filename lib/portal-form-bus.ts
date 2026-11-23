@@ -23,6 +23,14 @@ export type FormFillType =
   | "partner_lead"
   | "billing_folio"
   | "crm_mutation"
+  | "vax_import"
+  | "crm_ui_command"
+  | "delete_crm_record"
+  | "smart_paste_extract"
+  | "split_companion_folio"
+  | "auto_chase_missing"
+  | "batch_crm_update"
+  | "reconcile_commissions"
   | "calendar_event"
   | "cohort_update";
 
@@ -202,8 +210,23 @@ export function onTabSwitch(callback: (tab: string) => void): () => void {
  * Universal "Explain This" contextual trigger.
  * Dispatches an event to open ClinicalCopilotDrawer pre-loaded with query and mode.
  */
-export function triggerExplainThis(query: string, mode: string = "clinical_safety"): void {
+export function triggerExplainThis(query: string, mode: string = "omniscient"): void {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("kai:copilot:open", { detail: { query, mode } }));
+  }
+}
+
+export function triggerCopilotForGuest(guestName: string, query?: string, sanctuarySlug?: string): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent("kai:copilot:open", {
+        detail: {
+          guestName,
+          query,
+          sanctuarySlug,
+          mode: "omniscient",
+        },
+      })
+    );
   }
 }

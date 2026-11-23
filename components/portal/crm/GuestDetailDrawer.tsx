@@ -25,7 +25,9 @@ import {
   Clock,
   ArrowRight,
   RefreshCw,
+  Sparkles,
 } from "lucide-react";
+import { triggerCopilotForGuest } from "@/lib/portal-form-bus";
 import {
   CRMClientDetailResponse,
   CRMClientItem,
@@ -74,6 +76,16 @@ export function GuestDetailDrawer({
   const [logSummary, setLogSummary] = useState<string>("");
   const [isLogging, setIsLogging] = useState<boolean>(false);
   const [activities, setActivities] = useState<CRMActivityItem[]>(initialActivities);
+
+  // Sync local drawer state whenever the inspected guest changes (e.g., clicking "Inspect Companion")
+  React.useEffect(() => {
+    setWaiverStatus(client.waiver_status || "PENDING");
+    setMedicalStatus(client.medical_clearance_status || "PENDING_REVIEW");
+    setCompanionName(client.companion_name || "");
+    setCompanionInput(client.companion_name || "");
+    setEditingCompanion(false);
+    setActivities(detail.activities || []);
+  }, [client.id, client.waiver_status, client.medical_clearance_status, client.companion_name, detail.activities]);
 
   // 1-Click Clipboard Feedback State
   const [briefingCopied, setBriefingCopied] = useState<boolean>(false);
@@ -194,8 +206,9 @@ export function GuestDetailDrawer({
     setTimeout(() => setBriefingCopied(false), 2200);
   };
 
-  // WhatsApp Web URL helper
-  const cleanPhoneDigits = (client.phone || "").replace(/[^0-9]/g, "");
+  // WhatsApp Web URL helper (normalize 10-digit US numbers with leading '1')
+  const rawPhoneDigits = (client.phone || "").replace(/[^0-9]/g, "");
+  const cleanPhoneDigits = rawPhoneDigits.length === 10 ? `1${rawPhoneDigits}` : rawPhoneDigits;
   const whatsAppUrl = cleanPhoneDigits ? `https://wa.me/${cleanPhoneDigits}` : null;
 
   return (
@@ -231,6 +244,17 @@ export function GuestDetailDrawer({
             </div>
 
             <div className="flex items-center space-x-1.5 shrink-0">
+              {/* 1-Click Ask KAI about this Guest */}
+              <button
+                type="button"
+                onClick={() => triggerCopilotForGuest(client.full_name)}
+                className="inline-flex items-center space-x-1 text-xs px-2.5 py-1.5 rounded-lg bg-[#2D3E35] text-white hover:bg-[#1E2B24] font-semibold transition-colors cursor-pointer"
+                title={`Open KAI Assistant focused on ${client.full_name}`}
+              >
+                <Sparkles className="w-3.5 h-3.5 text-amber-200" />
+                <span>Ask KAI</span>
+              </button>
+
               {/* WhatsApp 1-Click Direct Chat */}
               {whatsAppUrl ? (
                 <a
@@ -446,20 +470,20 @@ export function GuestDetailDrawer({
                     </button>
                   </div>
 
-                  {/* Medical / Clinical Triage Toggle */}
+                  {/* Health & Activity Check Toggle */}
                   <div className="p-3 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] flex flex-col justify-between space-y-2">
                     <div>
-                      <span className="text-[10px] text-[#5C6B5E] uppercase font-semibold block">Clinical Triage Clearance</span>
+                      <span className="text-[10px] text-[#5C6B5E] uppercase font-semibold block">Health &amp; Activity Check</span>
                       <div className="mt-1 flex items-center space-x-1.5">
                         {medicalStatus === "CLEARED" ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-100 text-emerald-900 border border-emerald-300">
                             <CheckCircle2 className="w-3 h-3 text-emerald-700" />
-                            <span>Clinically Cleared</span>
+                            <span>Cleared</span>
                           </span>
                         ) : (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-amber-100 text-amber-900 border border-amber-300">
                             <AlertCircle className="w-3 h-3 text-amber-700" />
-                            <span>Awaiting Nurse Review</span>
+                            <span>Needs Review</span>
                           </span>
                         )}
                       </div>
@@ -474,7 +498,7 @@ export function GuestDetailDrawer({
                       }`}
                     >
                       <Check className="w-3 h-3" />
-                      <span>{medicalStatus === "CLEARED" ? "Mark Review" : "Mark Clinical Cleared"}</span>
+                      <span>{medicalStatus === "CLEARED" ? "Mark Needs Review" : "Mark Cleared"}</span>
                     </button>
                   </div>
                 </div>
@@ -544,7 +568,7 @@ export function GuestDetailDrawer({
                         onClick={() => onInspectCompanion(companionName, client.companion_id)}
                         className="inline-flex items-center space-x-1 text-xs px-2.5 py-1 rounded-md bg-white border border-[#E5DDD0] text-[#2D3E35] hover:bg-[#F2ECE4] font-semibold transition-colors cursor-pointer"
                       >
-                        <span>View Dossier</span>
+                        <span>View Profile</span>
                         <ArrowRight className="w-3 h-3 text-[#5C6B5E]" />
                       </button>
                     )}
@@ -556,18 +580,18 @@ export function GuestDetailDrawer({
                 )}
               </div>
 
-              {/* Dietary & Clinical Protocols */}
+              {/* Dietary & Health Notes */}
               <div className="p-4 rounded-xl bg-white border border-[#E5DDD0] space-y-2.5">
                 <div className="flex items-center space-x-2">
                   <HeartPulse className="w-4 h-4 text-rose-600" />
                   <span className="font-bold text-xs uppercase tracking-wider text-[#2D3E35]">
-                    Clinical &amp; Dietary Directives
+                    Dietary &amp; Health Notes
                   </span>
                 </div>
                 <div className="p-3 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-xs text-[#2D3E35] leading-relaxed">
                   {client.dietary_requirements ||
                     client.health_notes ||
-                    "Standard organic Blue Zone culinary protocol. No severe allergies documented."}
+                    "No dietary restrictions or allergies noted."}
                 </div>
                 {client.tags && client.tags.length > 0 && (
                   <div className="flex flex-wrap gap-1 pt-1">
@@ -650,7 +674,7 @@ export function GuestDetailDrawer({
                     }`}
                   >
                     <HeartPulse className="w-3 h-3" />
-                    <span>Clinical Triage</span>
+                    <span>Health Note</span>
                   </button>
                 </div>
 
@@ -819,7 +843,12 @@ export function GuestDetailDrawer({
                           </div>
                           <div className="text-right">
                             <div className="font-bold text-[#2D3E35]">${t.total_investment.toLocaleString()}</div>
-                            <div className="text-[10px] font-semibold text-emerald-800 uppercase tracking-wider">
+                            <div className="text-[10px] font-semibold uppercase tracking-wider text-emerald-800">
+                              {(t.status || "").toUpperCase() === "CANCELLED" || (t.status || "").toUpperCase() === "MEDICAL_FREEZE"
+                                ? t.status
+                                : `Paid $${Number(t.paid_amount ?? 0).toLocaleString()} · Due $${Number(t.final_balance ?? Math.max(0, t.total_investment - Number(t.paid_amount ?? 0))).toLocaleString()}`}
+                            </div>
+                            <div className="text-[10px] text-[#5C6B5E] uppercase tracking-wider">
                               {t.deposit_status}
                             </div>
                             {onInspectTrip && (
@@ -845,8 +874,8 @@ export function GuestDetailDrawer({
                             <Plane className="w-3.5 h-3.5 text-[#5C6B5E]" />
                             <div>
                               <span className="font-semibold text-[#2D3E35]">
-                                {t.smart_flight?.airline
-                                  ? `${t.smart_flight.airline} ${t.smart_flight.flight_number || ""}`.trim()
+                                {t.smart_flight?.airline || t.smart_flight?.flight_number
+                                  ? `${t.smart_flight.airline || ""} ${t.smart_flight.flight_number || ""}`.trim()
                                   : t.flight_details || "Awaiting Flight Details"}
                               </span>
                               {t.smart_flight?.arrival_time && (
@@ -908,11 +937,11 @@ export function GuestDetailDrawer({
                             <button
                               type="button"
                               disabled={isAutomating}
-                              onClick={() => onAutomateTrip(t.id, "draft_post_retreat_arc", "30-Day Integration Arc")}
+                              onClick={() => onAutomateTrip(t.id, "draft_post_retreat_arc", "Post-Retreat Follow-Up")}
                               className="inline-flex items-center justify-center space-x-1 px-2.5 py-1.5 text-[11px] font-semibold text-[#2D3E35] bg-[#FAF7F2] hover:bg-[#F2ECE4] border border-[#E5DDD0] rounded-md transition-colors cursor-pointer disabled:opacity-50"
                             >
                               <Compass className="w-3 h-3 text-[#5C6B5E]" />
-                              <span>30-Day Arc</span>
+                              <span>Follow-Up</span>
                             </button>
                           </div>
                         </div>

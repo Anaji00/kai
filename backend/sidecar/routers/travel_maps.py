@@ -1,4 +1,5 @@
 import logging
+import math
 from typing import List, Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -102,6 +103,16 @@ def get_sanctuary_routes(
     return query.all()
 
 
+def _validate_coordinates(lat: float, lon: float, label: str = "coordinates") -> None:
+    if not (math.isfinite(lat) and math.isfinite(lon)):
+        raise HTTPException(status_code=422, detail=f"Invalid {label}: latitude and longitude must be finite numbers.")
+    if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid {label}: latitude must be within [-90, 90] and longitude within [-180, 180].",
+        )
+
+
 @router.post("/routes/calculate", response_model=SanctuaryRouteResponse)
 def calculate_dynamic_route(
     req: RouteCalculateRequest,
@@ -111,6 +122,8 @@ def calculate_dynamic_route(
     Computes terrain-adjusted geodesic distance, drive time, and luxury vehicle match.
     Persists newly calculated route to database.
     """
+    _validate_coordinates(req.origin_lat, req.origin_lon, "origin coordinates")
+    _validate_coordinates(req.destination_lat, req.destination_lon, "destination coordinates")
     result = compute_custom_route(
         origin_name=req.origin_name,
         origin_lat=req.origin_lat,
@@ -181,6 +194,8 @@ async def get_sanctuary_weather(
         coords = SANCTUARY_COORDS.get(slug, SANCTUARY_COORDS["nosara"])
         target_lat = coords["lat"]
         target_lon = coords["lon"]
+    else:
+        _validate_coordinates(target_lat, target_lon, "weather coordinates")
 
     forecast = await fetch_sanctuary_weather(lat=target_lat, lon=target_lon, sanctuary_slug=slug)
     return WeatherForecastResponse(**forecast)
@@ -193,6 +208,7 @@ async def get_sanctuary_weather_post(
     """
     POST variant for fetching real-time microclimate weather.
     """
+    _validate_coordinates(req.lat, req.lon, "weather forecast coordinates")
     slug = req.sanctuary_slug.lower() if req.sanctuary_slug else "nosara"
     forecast = await fetch_sanctuary_weather(lat=req.lat, lon=req.lon, sanctuary_slug=slug)
     return WeatherForecastResponse(**forecast)

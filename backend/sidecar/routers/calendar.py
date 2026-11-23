@@ -1,6 +1,6 @@
 import logging
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.orm import Session
 from backend.database import get_db
@@ -45,12 +45,20 @@ def add_calendar_event(
     Creates a new custom calendar event (e.g. 20-minute consultation or somatic block).
     """
     try:
+        clean_title = (req.title or "").strip()
+        if not clean_title:
+            raise HTTPException(status_code=422, detail="Event title cannot be blank.")
         start_dt = datetime.fromisoformat(req.start_time.replace("Z", "+00:00"))
         end_dt = datetime.fromisoformat(req.end_time.replace("Z", "+00:00"))
+        # Normalize both to comparable awareness before comparing end > start
+        s_cmp = start_dt if start_dt.tzinfo else start_dt.replace(tzinfo=timezone.utc)
+        e_cmp = end_dt if end_dt.tzinfo else end_dt.replace(tzinfo=timezone.utc)
+        if e_cmp <= s_cmp:
+            raise HTTPException(status_code=422, detail="Event end_time must be strictly after start_time.")
 
         event = create_calendar_event(
             db=db,
-            title=req.title,
+            title=clean_title,
             category=req.category,
             start_time=start_dt,
             end_time=end_dt,
@@ -73,6 +81,8 @@ def add_calendar_event(
             notes=event.notes,
             intake_id=event.intake_id
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Failed to create calendar event: {str(e)}", exc_info=True)
         raise HTTPException(status_code=400, detail=f"Invalid event data: {str(e)}")

@@ -6,10 +6,12 @@ from unittest import mock
 import pytest
 from fastapi.testclient import TestClient
 
-from backend.database import SessionLocal
+from backend.database import SessionLocal, init_db
 from backend.main import app
 from backend.models import AuditEvent, AuthAttempt, OperatorUser, PasswordResetToken
 from backend.services import auth_service
+
+init_db()
 
 PASSWORD = "a-genuine-staff-password"
 

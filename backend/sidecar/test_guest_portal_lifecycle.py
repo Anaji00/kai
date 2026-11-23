@@ -247,7 +247,7 @@ class TestGuestPortalLifecycle:
         # Check operator view of pulses
         op_resp = client.get(
             f"/api/v1/sidecar/guest-portal/pulses/{sample_intake.id}",
-            headers=ADMIN_HEADERS
+            headers=admin_headers()
         )
         assert op_resp.status_code == 200
         pulses = op_resp.json()["pulses"]
@@ -272,7 +272,7 @@ class TestGuestPortalLifecycle:
         rev_resp = client.post(
             "/api/v1/sidecar/guest-portal/revoke-token",
             json={"token": token_data["token"]},
-            headers=ADMIN_HEADERS
+            headers=admin_headers()
         )
         assert rev_resp.status_code == 200
         assert rev_resp.json()["revoked"] is True
@@ -285,7 +285,7 @@ class TestGuestPortalLifecycle:
         """Generating a token via router auto-stages a guest_companion_invitation in action_drafts."""
         resp = client.post(
             f"/api/v1/sidecar/guest-portal/generate-token?intake_id={sample_intake.id}&auto_stage_invitation=true",
-            headers=ADMIN_HEADERS
+            headers=admin_headers()
         )
         assert resp.status_code == 200
         body = resp.json()
@@ -297,9 +297,93 @@ class TestGuestPortalLifecycle:
         approve_resp = client.post(
             f"/api/v1/drafts/{draft_id}/approve",
             json={"operator_name": "Kareena Islam"},
-            headers=ADMIN_HEADERS
+            headers=admin_headers()
         )
         assert approve_resp.status_code == 200
         approve_data = approve_resp.json()
         assert approve_data["status"] == "approved"
         assert approve_data["dispatch_result"]["channel"] == "GUEST_COMPANION_INVITE_DISPATCH"
+
+    def test_09_proposal_sign_requires_email_and_keeps_offline_settlement_pending(self, db: Session):
+        """
+        Offline VAX / Wire Governance:
+        1. Signing a proposal with a mismatched email returns 403.
+        2. Signing with the matching guest email saves waiver/flight/dietary details,
+           sets status='PROPOSAL_SIGNED' and deposit_status='AWAITING_OFFLINE_SETTLEMENT',
+           and NEVER marks funds PAID until an advisor logs VAX/wire receipt.
+        """
+        from backend.sidecar.models import CRMClient, CRMTrip
+        import uuid
+
+        c_id = str(uuid.uuid4())
+        t_id = str(uuid.uuid4())
+        crm_trip_id = f"kai_trp_{uuid.uuid4().hex[:8]}"
+        client_rec = CRMClient(
+            id=c_id,
+            crm_contact_id=f"kai_cnt_{uuid.uuid4().hex[:8]}",
+            full_name="Maya Lin",
+            email="maya.offline.test@example.com",
+            waiver_status="PENDING",
+            tags=["KAI_GUEST"],
+        )
+        trip_rec = CRMTrip(
+            id=t_id,
+            crm_trip_id=crm_trip_id,
+            client_id=c_id,
+            client_name="Maya Lin",
+            client_email="maya.offline.test@example.com",
+            sanctuary_slug="puerto-vallarta-2027",
+            title="Marival Armony Sanctuary",
+            dates="Jan 28 – Jan 31, 2027",
+            room_tier="Oceanfront King Suite",
+            status="PROPOSED_ITINERARY",
+            total_investment=9500.0,
+            deposit_amount=2850.0,
+            deposit_status="PENDING_CLIENT_AUTHORIZATION",
+            final_balance=6650.0,
+        )
+        db.add(client_rec)
+        db.add(trip_rec)
+        db.commit()
+
+        # Mismatched email must be rejected
+        bad_resp = client.post(
+            "/api/v1/sidecar/guest-portal/proposal/approve",
+            json={
+                "ref": crm_trip_id,
+                "guest_email": "attacker@example.com",
+                "payment_preference": "VAX_HOST_AGENCY_CALL",
+                "e_signature": "Maya Lin",
+                "agreed_to_terms": True,
+            },
+        )
+        assert bad_resp.status_code == 403
+
+        # Valid guest email signs proposal + arrival check-in without marking PAID
+        ok_resp = client.post(
+            "/api/v1/sidecar/guest-portal/proposal/approve",
+            json={
+                "ref": crm_trip_id,
+                "guest_email": "maya.offline.test@example.com",
+                "payment_preference": "BANK_WIRE_ACH",
+                "e_signature": "Maya Lin",
+                "agreed_to_terms": True,
+                "flight_number": "UA-1582",
+                "origin_airport": "IAH",
+                "dietary_notes": "Gluten-Free, Pescatarian",
+            },
+        )
+        assert ok_resp.status_code == 200, ok_resp.text
+        body = ok_resp.json()
+        assert body["trip"]["status"] == "PROPOSAL_SIGNED"
+        assert body["trip"]["deposit_status"] == "AWAITING_OFFLINE_SETTLEMENT"
+
+        db.expire_all()
+        refreshed_trip = db.query(CRMTrip).filter(CRMTrip.id == t_id).first()
+        refreshed_client = db.query(CRMClient).filter(CRMClient.id == c_id).first()
+        assert refreshed_trip.deposit_status == "AWAITING_OFFLINE_SETTLEMENT"
+        assert (refreshed_trip.payment_history or []) == []
+        assert refreshed_trip.smart_flight.get("flight_number") == "UA-1582"
+        assert refreshed_trip.smart_flight.get("departure_airport") == "IAH"
+        assert refreshed_client.waiver_status == "SIGNED"
+        assert refreshed_client.dietary_requirements == "Gluten-Free, Pescatarian"

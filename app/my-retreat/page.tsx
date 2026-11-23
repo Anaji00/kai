@@ -288,14 +288,17 @@ function MyRetreatContent() {
   const [scheduleExpanded, setScheduleExpanded] = useState(true);
   const [loadingDemo, setLoadingDemo] = useState(false);
 
-  // Proposal Authorization Modal State
+  // Proposal Acceptance & Arrival Check-In Modal State (Offline VAX / Wire Settlement)
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [approving, setApproving] = useState(false);
   const [approvalSuccessRef, setApprovalSuccessRef] = useState<string | null>(null);
-  const [cardholderName, setCardholderName] = useState("");
-  const [billingPostalCode, setBillingPostalCode] = useState("");
-  const [cardLast4, setCardLast4] = useState("4242");
-  const [cardBrand, setCardBrand] = useState("Visa");
+  const [confirmEmail, setConfirmEmail] = useState("");
+  const [paymentPreference, setPaymentPreference] = useState<
+    "VAX_HOST_AGENCY_CALL" | "BANK_WIRE_ACH" | "CORPORATE_WIRE"
+  >("VAX_HOST_AGENCY_CALL");
+  const [checkInFlight, setCheckInFlight] = useState("");
+  const [checkInOrigin, setCheckInOrigin] = useState("");
+  const [checkInDietary, setCheckInDietary] = useState("");
   const [eSignature, setESignature] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [approvalError, setApprovalError] = useState<string | null>(null);
@@ -385,8 +388,13 @@ function MyRetreatContent() {
             }
             setSelectedSuiteTier(json.proposal.room_tier);
             setSuitePriceAdjustment(0);
-            setCardholderName(json.proposal.guest_name || "");
             setESignature(json.proposal.guest_name || "");
+            if (json.proposal.smart_flight?.flight_number) {
+              setCheckInFlight(String(json.proposal.smart_flight.flight_number));
+            }
+            if (json.proposal.smart_flight?.departure_airport) {
+              setCheckInOrigin(String(json.proposal.smart_flight.departure_airport));
+            }
           } else {
             setError("Unable to display proposal. Please contact your concierge.");
           }
@@ -465,8 +473,12 @@ function MyRetreatContent() {
 
   const handleApproveProposal = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!confirmEmail.trim()) {
+      setApprovalError("Please confirm the email address on your reservation.");
+      return;
+    }
     if (!agreedToTerms) {
-      setApprovalError("Please check the legal authorization consent box to proceed.");
+      setApprovalError("Please accept the sanctuary booking terms and cancellation policy to proceed.");
       return;
     }
     if (!eSignature.trim()) {
@@ -484,28 +496,30 @@ function MyRetreatContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ref: proposal?.ref,
-          cardholder_name: cardholderName,
-          billing_postal_code: billingPostalCode || "90210",
-          card_last4: cardLast4,
-          card_brand: cardBrand,
-          e_signature: eSignature,
+          guest_email: confirmEmail.trim(),
+          payment_preference: paymentPreference,
+          e_signature: eSignature.trim(),
           agreed_to_terms: true,
           selected_room_tier: effectiveSuiteTier,
           custom_total_investment: effectiveTotalInvestment,
+          flight_number: checkInFlight.trim() || undefined,
+          origin_airport: checkInOrigin.trim().toUpperCase() || undefined,
+          dietary_notes: checkInDietary.trim() || undefined,
         }),
       });
 
       const json = await res.json();
       if (!res.ok) {
-        throw new Error(json.detail || "Unable to authorize deposit. Please contact concierge.");
+        throw new Error(json.detail || "Unable to submit proposal approval. Please contact concierge.");
       }
 
-      setApprovalSuccessRef(json.auth_reference);
+      setApprovalSuccessRef(json.agreement_reference || json.auth_reference);
+      setShowApprovalModal(false);
       if (proposal) {
         setProposal({
           ...proposal,
-          status: "CONFIRMED",
-          deposit_status: "PAID",
+          status: json.trip?.status || "PROPOSAL_SIGNED",
+          deposit_status: json.trip?.deposit_status || "AWAITING_OFFLINE_SETTLEMENT",
           room_tier: effectiveSuiteTier,
           total_investment: effectiveTotalInvestment,
           deposit_amount: effectiveDepositAmount,
@@ -513,7 +527,7 @@ function MyRetreatContent() {
         });
       }
     } catch (err: unknown) {
-      setApprovalError(err instanceof Error ? err.message : "Deposit authorization error.");
+      setApprovalError(err instanceof Error ? err.message : "Proposal approval error.");
     } finally {
       setApproving(false);
     }
@@ -535,9 +549,18 @@ function MyRetreatContent() {
     );
   }
 
-  // ──── Interactive Sanctuary Proposal View ────
+  // ──── Interactive Sanctuary Proposal & Arrival Check-In View ────
   if (proposal && !data) {
-    const isConfirmed = proposal.status === "CONFIRMED" || proposal.deposit_status === "PAID";
+    const statusUpper = (proposal.status || "").toUpperCase();
+    const isInactiveProposal = statusUpper === "CANCELLED" || statusUpper === "MEDICAL_FREEZE";
+    const isDepositPaid =
+      !isInactiveProposal &&
+      (proposal.deposit_status === "PAID" || statusUpper === "CONFIRMED");
+    const isProposalSigned =
+      !isInactiveProposal &&
+      (isDepositPaid ||
+        statusUpper === "PROPOSAL_SIGNED" ||
+        proposal.deposit_status === "AWAITING_OFFLINE_SETTLEMENT");
 
     return (
       <div className="min-h-screen bg-linen">
@@ -555,7 +578,7 @@ function MyRetreatContent() {
                   KAI Wellness Retreats &middot; Grand Travel &amp; Cruise
                 </span>
                 <h1 className="font-serif text-2xl sm:text-3xl text-sage font-light">
-                  Private Sanctuary Reservation Proposal
+                  Private Sanctuary Proposal &amp; Arrival Pass
                 </h1>
                 <p className="text-xs text-sage/70 mt-1">
                   Prepared for <span className="font-semibold text-sage">{proposal.guest_name}</span> &middot; Reference: <span className="font-mono text-terracotta">{proposal.ref}</span>
@@ -564,15 +587,27 @@ function MyRetreatContent() {
             </div>
 
             <div>
-              {isConfirmed ? (
+              {isInactiveProposal ? (
+                <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-800 border border-rose-300">
+                  <AlertCircle className="h-4 w-4 text-rose-600" />
+                  {statusUpper === "MEDICAL_FREEZE"
+                    ? "Medical Hold · Concierge Transfer Pending"
+                    : "Proposal Inactive / Cancelled"}
+                </div>
+              ) : isDepositPaid ? (
                 <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
                   <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  Confirmed &amp; Deposit Authorized
+                  Confirmed &amp; Deposit Settled
+                </div>
+              ) : isProposalSigned ? (
+                <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-800 border border-blue-300">
+                  <CheckCircle2 className="h-4 w-4 text-blue-600" />
+                  Signed &middot; Awaiting VAX / Wire Deposit
                 </div>
               ) : (
                 <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-300">
                   <Clock className="h-4 w-4 text-amber-600" />
-                  Awaiting Deposit Authorization
+                  Awaiting Proposal Signature
                 </div>
               )}
             </div>
@@ -605,8 +640,8 @@ function MyRetreatContent() {
               </div>
             </div>
 
-            {/* Tern Parity: Self-Service Suite Option Selection */}
-            {!isConfirmed && (
+            {/* Self-Service Suite Option Selection */}
+            {!isProposalSigned && !isInactiveProposal && (
               <div className="space-y-3 pt-1">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-serif font-bold uppercase tracking-wider text-sage flex items-center gap-1.5">
@@ -754,14 +789,18 @@ function MyRetreatContent() {
                 <span className="text-[10px] uppercase tracking-wider text-terracotta block">30% Suite Retainer Deposit</span>
                 <span className="font-serif text-2xl text-terracotta font-medium">${effectiveDepositAmount.toLocaleString()}</span>
                 <span className="text-[10px] text-sage/60 block mt-0.5">
-                  {isConfirmed ? "Paid & Authorized" : "Due Upon Proposal Approval"}
+                  {isDepositPaid
+                    ? "Settled via VAX / Wire"
+                    : isProposalSigned
+                    ? "Signed · Awaiting VAX / Wire Settlement"
+                    : "Due Upon Proposal Approval"}
                 </span>
               </div>
 
               <div className="p-4 rounded-xl bg-sand/50 border border-sand-border/80">
                 <span className="text-[10px] uppercase tracking-wider text-sage/60 block">70% Final Balance</span>
                 <span className="font-serif text-2xl text-sage font-medium">${effectiveFinalBalance.toLocaleString()}</span>
-                <span className="text-[10px] text-sage/50 block mt-0.5">Scheduled 45 Days Prior</span>
+                <span className="text-[10px] text-sage/50 block mt-0.5">Due 60 Days Prior to Departure</span>
               </div>
             </div>
 
@@ -775,7 +814,7 @@ function MyRetreatContent() {
             <div className="flex items-center justify-between border-b border-sand-border/60 pb-4">
               <div>
                 <h3 className="font-serif text-xl text-sage">Daily Itinerary</h3>
-                <p className="text-xs text-sage/60">Circadian circadian rhythm optimization &amp; somatic restorativeness</p>
+                <p className="text-xs text-sage/60">Circadian rhythm optimization &amp; somatic restoration</p>
               </div>
               <span className="text-xs text-olive bg-olive-soft px-3 py-1 rounded-full font-medium">
                 {proposal.itinerary_blocks.length} Activities
@@ -812,49 +851,66 @@ function MyRetreatContent() {
             </div>
           </div>
 
-          {/* Host Agency Guarantee & Authorization Action */}
+          {/* Host Agency Guarantee & Offline Settlement Action */}
           <div className="glass-card rounded-2xl p-6 sm:p-8 space-y-6 border-l-4 border-l-terracotta">
             <div className="flex items-start gap-3">
               <Shield className="h-6 w-6 text-terracotta shrink-0 mt-1" />
               <div className="space-y-1">
                 <h4 className="font-serif text-lg text-sage">Grand Travel &amp; Cruise Host Agency Guarantee</h4>
                 <p className="text-xs text-sage/70 leading-relaxed">
-                  25-year premier host agency legacy. All reservations feature encrypted card security, transparent booking terms,
-                  PCI-compliant tokenization, and strict adherence to luxury travel consumer protection guidelines.
+                  25-year premier host agency legacy (Funjet 500 Club / ALG Vacations). No card is charged on this page—once you sign your proposal and share arrival details, Grand Travel &amp; Cruise processes your 30% deposit directly via VAX VacationAccess or bank wire.
                 </p>
               </div>
             </div>
 
-            {isConfirmed ? (
+            {isInactiveProposal ? (
+              <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 space-y-2">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-5 w-5 text-rose-700" />
+                  <span className="font-semibold text-sm">
+                    {statusUpper === "MEDICAL_FREEZE"
+                      ? "Reservation Placed on Medical Hold (Credit Protected)"
+                      : "This Sanctuary Proposal Is No Longer Active"}
+                  </span>
+                </div>
+                <p className="text-xs text-rose-800 leading-relaxed">
+                  Please contact Kareena &amp; Armaan at{" "}
+                  <a href="mailto:concierge@kaiwellnessretreats.com" className="underline font-semibold">
+                    concierge@kaiwellnessretreats.com
+                  </a>{" "}
+                  to transfer your cohort credit or request a refreshed sanctuary proposal.
+                </p>
+              </div>
+            ) : isDepositPaid ? (
               <div className="p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 space-y-3">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-5 w-5 text-emerald-700" />
-                  <span className="font-semibold text-sm">Sanctuary Reservation Confirmed &amp; Secured</span>
+                  <span className="font-semibold text-sm">Sanctuary Reservation Confirmed &amp; Deposit Settled</span>
                 </div>
                 <p className="text-xs text-emerald-800 leading-relaxed">
-                  Your 30% deposit of ${proposal.deposit_amount.toLocaleString()} USD has been successfully authorized
-                  {approvalSuccessRef ? ` (Reference: ${approvalSuccessRef})` : ""}.
+                  Your 30% deposit of ${proposal.deposit_amount.toLocaleString()} USD has been verified by Grand Travel &amp; Cruise.
                   Your luxury suite at {proposal.title} is fully reserved.
                 </p>
-                <div className="pt-2">
-                  <button
-                    onClick={loadDemoToken}
-                    disabled={loadingDemo}
-                    className="inline-flex items-center gap-2 rounded-full bg-emerald-700 hover:bg-emerald-800 text-linen px-5 py-2.5 text-xs uppercase tracking-wider font-medium transition-all shadow-sm"
-                  >
-                    <Sparkles className="h-3.5 w-3.5" />
-                    Enter Sanctuary Companion Experience
-                  </button>
+              </div>
+            ) : isProposalSigned ? (
+              <div className="p-4 rounded-xl bg-blue-50 border border-blue-200 text-blue-950 space-y-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-5 w-5 text-blue-700" />
+                  <span className="font-semibold text-sm">Proposal Signed &amp; Arrival Details Logged</span>
                 </div>
+                <p className="text-xs text-blue-900 leading-relaxed">
+                  Your suite selection ({effectiveSuiteTier}) and agreement are on file
+                  {approvalSuccessRef ? ` (Reference: ${approvalSuccessRef})` : ""}. No card was charged online—Kareena &amp; Armaan at Grand Travel &amp; Cruise will contact you shortly to finalize your 30% deposit (${effectiveDepositAmount.toLocaleString()} USD) via VAX VacationAccess or bank wire.
+                </p>
               </div>
             ) : (
               <div className="pt-2 flex flex-col sm:flex-row items-center gap-4">
                 <button
                   onClick={() => setShowApprovalModal(true)}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-terracotta hover:bg-terracotta/90 text-linen px-8 py-4 text-xs uppercase tracking-widest font-semibold transition-all shadow-md hover:shadow-lg"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-full bg-terracotta hover:bg-terracotta/90 text-linen px-8 py-4 text-xs uppercase tracking-widest font-semibold transition-all shadow-md hover:shadow-lg cursor-pointer"
                 >
-                  <CreditCard className="h-4 w-4" />
-                  Approve {effectiveSuiteTier} &amp; Authorize Deposit (${effectiveDepositAmount.toLocaleString()} USD)
+                  <FileCheck2 className="h-4 w-4" />
+                  Sign Proposal &amp; Confirm Arrival Details
                 </button>
                 <a
                   href="mailto:concierge@kaiwellnessretreats.com?subject=Proposal%20Inquiry"
@@ -867,7 +923,7 @@ function MyRetreatContent() {
           </div>
         </div>
 
-        {/* ──── Direct Credit Card Authorization Modal / Drawer ──── */}
+        {/* ──── Proposal Acceptance & Arrival Check-In Modal (Offline VAX / Wire) ──── */}
         <AnimatePresence>
           {showApprovalModal && (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
@@ -881,14 +937,14 @@ function MyRetreatContent() {
                 <div className="px-6 py-4 bg-white border-b border-sand-border/80 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <span className="p-2 rounded-lg bg-terracotta text-linen">
-                      <Lock className="w-4 h-4" />
+                      <FileCheck2 className="w-4 h-4" />
                     </span>
                     <div>
                       <h3 className="font-serif text-lg font-bold text-sage leading-tight">
-                        Credit Card Authorization Form
+                        Approve Proposal &amp; Arrival Check-In
                       </h3>
                       <p className="text-[11px] text-sage/70">
-                        Grand Travel &amp; Cruise &middot; Secure Deposit Authorization
+                        Grand Travel &amp; Cruise &middot; No card charged online
                       </p>
                     </div>
                   </div>
@@ -910,57 +966,74 @@ function MyRetreatContent() {
                   )}
 
                   <div className="p-3.5 rounded-xl bg-sand/60 border border-sand-border/80 space-y-1">
-                    <span className="text-[10px] uppercase tracking-wider text-sage/60 block">Authorization Total ({effectiveSuiteTier})</span>
+                    <span className="text-[10px] uppercase tracking-wider text-sage/60 block">
+                      Selected Suite &amp; 30% Deposit ({effectiveSuiteTier})
+                    </span>
                     <p className="font-serif text-xl text-sage font-medium">
-                      ${effectiveDepositAmount.toLocaleString()} USD
+                      ${effectiveDepositAmount.toLocaleString()} USD Deposit &middot; ${effectiveTotalInvestment.toLocaleString()} Total
                     </p>
                     <p className="text-[11px] text-sage/60">
-                      30% Suite Retainer for {proposal.title} ({proposal.dates})
+                      {proposal.title} ({proposal.dates}) · Remaining 70% (${effectiveFinalBalance.toLocaleString()} USD) due 60 days prior
                     </p>
                   </div>
 
                   <div className="space-y-1">
                     <label className="text-[11px] font-semibold text-sage uppercase tracking-wider block">
-                      Cardholder Full Legal Name
+                      Confirm Your Email on File <span className="text-terracotta">*</span>
                     </label>
                     <input
-                      type="text"
+                      type="email"
                       required
-                      value={cardholderName}
-                      onChange={(e) => setCardholderName(e.target.value)}
-                      placeholder="e.g. Dr. Genevieve Sterling"
+                      value={confirmEmail}
+                      onChange={(e) => setConfirmEmail(e.target.value)}
+                      placeholder="Enter the email address on your reservation"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-sand-border bg-white text-sage text-xs focus:outline-none focus:ring-1 focus:ring-terracotta"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                      <label className="text-[11px] font-semibold text-sage uppercase tracking-wider block">
-                        Card Brand
-                      </label>
-                      <select
-                        value={cardBrand}
-                        onChange={(e) => setCardBrand(e.target.value)}
-                        className="w-full px-3.5 py-2.5 rounded-xl border border-sand-border bg-white text-sage text-xs focus:outline-none focus:ring-1 focus:ring-terracotta"
-                      >
-                        <option value="Visa">Visa</option>
-                        <option value="Mastercard">Mastercard</option>
-                        <option value="Amex">American Express</option>
-                        <option value="Discover">Discover</option>
-                      </select>
-                    </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-semibold text-sage uppercase tracking-wider block">
+                      Preferred Deposit Settlement Method
+                    </label>
+                    <select
+                      value={paymentPreference}
+                      onChange={(e) =>
+                        setPaymentPreference(
+                          e.target.value as "VAX_HOST_AGENCY_CALL" | "BANK_WIRE_ACH" | "CORPORATE_WIRE"
+                        )
+                      }
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-sand-border bg-white text-sage text-xs focus:outline-none focus:ring-1 focus:ring-terracotta"
+                    >
+                      <option value="VAX_HOST_AGENCY_CALL">VAX VacationAccess Card Auth (via Grand Travel Advisor)</option>
+                      <option value="BANK_WIRE_ACH">Domestic / International Bank Wire (ACH / SWIFT)</option>
+                      <option value="CORPORATE_WIRE">Corporate / Executive Holding Wire</option>
+                    </select>
+                  </div>
 
+                  {/* Optional 60-Second Arrival Check-In */}
+                  <div className="grid grid-cols-2 gap-3 pt-1">
                     <div className="space-y-1">
                       <label className="text-[11px] font-semibold text-sage uppercase tracking-wider block">
-                        Card Last 4 Digits
+                        Arrival Flight # (Optional)
                       </label>
                       <input
                         type="text"
-                        maxLength={4}
-                        required
-                        value={cardLast4}
-                        onChange={(e) => setCardLast4(e.target.value)}
-                        placeholder="e.g. 4242"
+                        value={checkInFlight}
+                        onChange={(e) => setCheckInFlight(e.target.value)}
+                        placeholder="e.g. UA-1582"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-sand-border bg-white text-sage text-xs font-mono focus:outline-none focus:ring-1 focus:ring-terracotta"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-semibold text-sage uppercase tracking-wider block">
+                        Origin Airport (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        maxLength={6}
+                        value={checkInOrigin}
+                        onChange={(e) => setCheckInOrigin(e.target.value.toUpperCase())}
+                        placeholder="e.g. IAH, ORD, JFK"
                         className="w-full px-3.5 py-2.5 rounded-xl border border-sand-border bg-white text-sage text-xs font-mono focus:outline-none focus:ring-1 focus:ring-terracotta"
                       />
                     </div>
@@ -968,21 +1041,20 @@ function MyRetreatContent() {
 
                   <div className="space-y-1">
                     <label className="text-[11px] font-semibold text-sage uppercase tracking-wider block">
-                      Billing Postal / Zip Code
+                      Dietary / Allergy Notes for Chef (Optional)
                     </label>
                     <input
                       type="text"
-                      required
-                      value={billingPostalCode}
-                      onChange={(e) => setBillingPostalCode(e.target.value)}
-                      placeholder="e.g. 90210"
+                      value={checkInDietary}
+                      onChange={(e) => setCheckInDietary(e.target.value)}
+                      placeholder="e.g. Gluten-Free, Pescatarian, Tree-Nut Allergy"
                       className="w-full px-3.5 py-2.5 rounded-xl border border-sand-border bg-white text-sage text-xs focus:outline-none focus:ring-1 focus:ring-terracotta"
                     />
                   </div>
 
                   <div className="space-y-1">
                     <label className="text-[11px] font-semibold text-sage uppercase tracking-wider block">
-                      Legal Electronic Signature
+                      Legal Electronic Signature <span className="text-terracotta">*</span>
                     </label>
                     <input
                       type="text"
@@ -1004,10 +1076,7 @@ function MyRetreatContent() {
                         className="mt-0.5 h-4 w-4 rounded border-sand-border text-terracotta focus:ring-terracotta"
                       />
                       <span className="text-[11px] text-sage/75 leading-relaxed">
-                        I hereby authorize KAI Wellness Retreats and host agency Grand Travel &amp; Cruise to charge the
-                        non-refundable 30% sanctuary deposit of <strong>${effectiveDepositAmount.toLocaleString()} USD</strong> to the
-                        card above for the {effectiveSuiteTier}. I acknowledge that the remaining 70% balance (${effectiveFinalBalance.toLocaleString()} USD)
-                        will be automatically scheduled 45 days prior to retreat departure in accordance with the luxury cancellation policy.
+                        I approve this sanctuary proposal for <strong>{effectiveSuiteTier}</strong> (${effectiveTotalInvestment.toLocaleString()} USD total), accept the KAI Wellness Retreats liability waiver &amp; cancellation terms, and request Grand Travel &amp; Cruise to coordinate my 30% deposit (${effectiveDepositAmount.toLocaleString()} USD) offline via my selected method.
                       </span>
                     </label>
                   </div>
@@ -1023,17 +1092,17 @@ function MyRetreatContent() {
                     <button
                       type="submit"
                       disabled={approving || !agreedToTerms}
-                      className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-terracotta hover:bg-terracotta/90 text-linen text-xs font-semibold uppercase tracking-wider transition-all disabled:opacity-50"
+                      className="inline-flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-terracotta hover:bg-terracotta/90 text-linen text-xs font-semibold uppercase tracking-wider transition-all disabled:opacity-50 cursor-pointer"
                     >
                       {approving ? (
                         <>
                           <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                          Authorizing Deposit…
+                          Submitting Signature…
                         </>
                       ) : (
                         <>
                           <Check className="h-3.5 w-3.5" />
-                          Authorize Deposit (${effectiveDepositAmount.toLocaleString()})
+                          Sign Proposal &amp; Request Settlement
                         </>
                       )}
                     </button>

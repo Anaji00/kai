@@ -147,13 +147,30 @@ export async function submitBookingInquiry(
         routedEmails: resData.routedEmails || FOUNDER_EMAILS,
       };
     }
+    // Never mask an explicit 4xx validation or conflict rejection behind the email fallback.
+    if (apiRes.status >= 400 && apiRes.status < 500) {
+      let detail = "Unable to submit your reservation inquiry. Please review your details and try again.";
+      try {
+        const errJson = await apiRes.json();
+        if (typeof errJson?.detail === "string" && errJson.detail.trim()) {
+          detail = errJson.detail;
+        }
+      } catch {
+        // ignore JSON parse failure
+      }
+      return {
+        success: false,
+        message: detail,
+      };
+    }
   } catch (apiErr) {
     console.log("[FastAPI Backend unavailable, invoking resilient server action]:", apiErr);
   }
 
   // 2. Resilient Server Action Fallback
   const retreat = getRetreatById(data.retreatId);
-  const retreatTitle = retreat ? `${retreat.title} (${retreat.destination})` : data.retreatId;
+  const retreatTitle = (retreat ? `${retreat.title} (${retreat.destination})` : data.retreatId).replace(/[\r\n]+/g, " ");
+  const safeGuestName = data.fullName.replace(/[\r\n]+/g, " ").trim();
   const retreatDates = retreat ? retreat.dates : "January 28 – 31, 2027";
   const resendApiKey = process.env.RESEND_API_KEY;
   const fromEmailAdmin =
@@ -164,7 +181,7 @@ export async function submitBookingInquiry(
     "KAI Concierge Desk <concierge@kaiwellnessretreats.com>";
 
   const resend = resendApiKey ? new Resend(resendApiKey) : null;
-  const founderSubject = `[New KAI Inquiry] ${retreatTitle} - ${data.fullName} (${bookingReference})`;
+  const founderSubject = `[New KAI Inquiry] ${retreatTitle} - ${safeGuestName} (${bookingReference})`;
   const guestSubject = `Your KAI Sanctuary Reservation Inquiry for ${retreatTitle} [Ref: ${bookingReference}]`;
 
   const adminHtml = `
@@ -290,6 +307,7 @@ export async function subscribeNewsletter(
   formData: FormData
 ): Promise<{ success: boolean; message: string }> {
   const email = formData.get("email") as string;
+  const source = ((formData.get("source") as string) || "footer").trim();
   const validation = newsletterSchema.safeParse({ email });
 
   if (!validation.success) {
@@ -305,7 +323,7 @@ export async function subscribeNewsletter(
     const apiRes = await fetch(`${backendUrl}/api/v1/newsletter/subscribe`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: validation.data.email, source: "footer" }),
+      body: JSON.stringify({ email: validation.data.email, source }),
       signal: AbortSignal.timeout(3000),
     });
     if (apiRes.ok) {

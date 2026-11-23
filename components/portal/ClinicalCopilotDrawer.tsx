@@ -43,6 +43,7 @@ import {
   Zap,
   UserPlus,
   CheckCheck,
+  RotateCcw,
 } from "lucide-react";
 import {
   chatWithCopilot,
@@ -123,38 +124,46 @@ const PILLAR_MODES: Array<{
 
 const CHATGPT_STARTER_CARDS = [
   {
-    title: "Update guest room or status",
-    subtitle: "Change suite, payment, or booking status",
-    prompt: "Update Eleanor Vance's room tier to Private Cliffside Plunge Villa and mark status as CONFIRMED",
-    icon: Database,
-  },
-  {
-    title: "Add new guest booking",
-    subtitle: "Create guest & trip with deposit",
-    prompt: "Add a new guest Sophia Laurent to Nosara in an Oceanfront King Suite with a $4,350 deposit paid",
-    icon: UserPlus,
-  },
-  {
-    title: "Airport pickup manifest",
-    subtitle: "Group flights & driver schedule",
-    prompt: "Group delayed airport arrivals into luxury van pickups and build the chauffeur manifest for Nosara",
+    title: "Import VAX Reservation #",
+    subtitle: "Pull ALG Vacations package, flights & Amstar transfer",
+    prompt: "Import VAX 84920174",
     icon: Plane,
   },
   {
-    title: "Chef dietary & allergy matrix",
-    subtitle: "Guest allergies & menu preferences",
-    prompt: "Create the Private Chef allergy-safe dietary matrix for Nosara",
-    icon: Utensils,
+    title: "Smart Paste WhatsApp / Email",
+    subtitle: "Extract name, flights, suite, allergies & USD in 1 click",
+    prompt:
+      "/paste Hi Kareena! This is Serena Vance (serena.vance@lumina.co, +1 713-555-0194). Booked United UA-1582 IAH to PVR with my sister Maya Vance. Two-Bedroom Oceanfront Penthouse Villa ($12,600 total, $3,780 deposit paid). Strictly Gluten-Free & Dairy-Free.",
+    icon: Sparkles,
+  },
+  {
+    title: "Split Roommate Folio 50/50",
+    subtitle: "Divide shared suite into 2 independent payment folios",
+    prompt: "Split Camila Vance's folio 50/50 with Devon Vance",
+    icon: DollarSign,
+  },
+  {
+    title: "Auto-Chase Missing Items",
+    subtitle: "Sweep cohort for missing flights, waivers & 70% balances",
+    prompt: "/chase Auto-chase all missing flights, waivers, and balances due",
+    icon: CheckCheck,
   },
 ];
 
 const QUICK_SLASH_ACTIONS = [
-  { cmd: "/crm", label: "Update Guest", prompt: "Update Eleanor Vance's dietary notes to Gluten-free, seed-oil-free, no shellfish" },
-  { cmd: "/book", label: "Quote Stay", prompt: "Calculate 6-night stay for Marcus Sterling at Amalfi in a Private Cliffside Villa" },
-  { cmd: "/finance", label: "Buyout Quote", prompt: "Calculate villa buyout and 30/70 payment breakdown for 14 guests at Nosara" },
+  { cmd: "/vax", label: "Import VAX #84920174", prompt: "Import VAX 84920174" },
+  {
+    cmd: "/paste",
+    label: "Smart Paste Email/WhatsApp",
+    prompt:
+      "/paste Hi Kareena! This is Serena Vance (serena.vance@lumina.co, +1 713-555-0194). Booked United UA-1582 IAH to PVR with my sister Maya Vance. Two-Bedroom Oceanfront Penthouse Villa ($12,600 total, $3,780 deposit paid). Gluten-Free & Dairy-Free.",
+  },
+  { cmd: "/split", label: "Split 50/50 Folio", prompt: "Split Camila Vance's folio 50/50 with Devon Vance" },
+  { cmd: "/chase", label: "Auto-Chase Missing", prompt: "/chase Auto-chase all missing flights and balances" },
+  { cmd: "/commission", label: "VAX 14.5% Commission Audit", prompt: "/commission Reconcile VAX commissions" },
   { cmd: "/radar", label: "Driver Sheet", prompt: "/radar Generate airport chauffeur manifest for Nosara" },
   { cmd: "/chef", label: "Chef List", prompt: "/chef Build Private Chef dietary & allergen matrix for Nosara" },
-  { cmd: "/approve", label: "Approve Queue", prompt: "Approve all pending drafts in the Action Review Queue" },
+  { cmd: "/due", label: "Filter Balances Due", prompt: "Show balances due" },
 ];
 
 /**
@@ -214,7 +223,7 @@ function renderCleanMarkdown(rawText: string): React.ReactNode {
     if (trimmed.startsWith("• ") || trimmed.startsWith("* ") || trimmed.startsWith("- ")) {
       elements.push(
         <div key={idx} className="flex items-start gap-2 pl-1 py-0.5 text-[13px] leading-relaxed text-neutral-200">
-          <span className="text-neutral-500 select-none mt-1 text-[10px]">●</span>
+          <span className="w-1.5 h-1.5 rounded-full bg-neutral-400 mt-2 shrink-0 inline-block" />
           <div className="flex-1">{renderInlineMarkdown(trimmed.slice(2))}</div>
         </div>
       );
@@ -268,8 +277,22 @@ export default function ClinicalCopilotDrawer({
   const [inputMessage, setInputMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [executingProposalIdx, setExecutingProposalIdx] = useState<number | null>(null);
-  const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [executingProposalIdx, setExecutingProposalIdx] = useState<string | null>(null);
+  const [copiedIdx, setCopiedIdx] = useState<string | null>(null);
+  const [quickTweakInputs, setQuickTweakInputs] = useState<Record<string, string>>({});
+  const [quickMutatingKey, setQuickMutatingKey] = useState<string | null>(null);
+
+  // Active Selected Guest Context from Live CRM clicks
+  const [activeGuestFocus, setActiveGuestFocus] = useState<{ name: string; id?: string } | null>(null);
+
+  // Three Exits State: Dismiss & Undo (keyed by message.id to avoid cross-thread collisions)
+  const [dismissedProposals, setDismissedProposals] = useState<Record<string, boolean>>({});
+  const [proposalHistory, setProposalHistory] = useState<Record<string, Record<string, unknown>[]>>({});
+  const [undoingIdx, setUndoingIdx] = useState<string | null>(null);
+
+  // Up-arrow prompt recall history
+  const [promptHistory, setPromptHistory] = useState<string[]>([]);
+  const [historyPointer, setHistoryPointer] = useState<number | null>(null);
 
   // ChatGPT-style Voice Mode States
   const [isVoiceMode, setIsVoiceMode] = useState(false);
@@ -283,6 +306,8 @@ export default function ClinicalCopilotDrawer({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<any>(null);
+  const liveTranscriptRef = useRef<string>("");
+  const isVoiceModeRef = useRef<boolean>(false);
   const executedInitialRef = useRef<string | null>(null);
 
   const [threads, setThreads] = useState<ConversationThread[]>([
@@ -361,6 +386,39 @@ export default function ClinicalCopilotDrawer({
       }
     }
   }, []);
+
+  // Listen to CRM guest selections & contextual "Ask KAI" triggers
+  useEffect(() => {
+    const handleSelectGuest = (e: Event) => {
+      const ce = e as CustomEvent<{ guest_name?: string; guestName?: string; name?: string; id?: string; query?: string }>;
+      const gName = ce.detail?.guest_name || ce.detail?.guestName || ce.detail?.name;
+      if (gName) {
+        setActiveGuestFocus({ name: gName, id: ce.detail?.id });
+      }
+      if (ce.detail?.query) {
+        setTimeout(() => {
+          handleSend(ce.detail.query);
+        }, 120);
+      }
+    };
+    window.addEventListener("kai:copilot:select-guest", handleSelectGuest);
+    window.addEventListener("kai-crm-select-guest", handleSelectGuest);
+    window.addEventListener("kai:copilot:open", handleSelectGuest);
+    return () => {
+      window.removeEventListener("kai:copilot:select-guest", handleSelectGuest);
+      window.removeEventListener("kai-crm-select-guest", handleSelectGuest);
+      window.removeEventListener("kai:copilot:open", handleSelectGuest);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (guestContext && typeof guestContext === "object") {
+      const gName = (guestContext.name || guestContext.guest_name || guestContext.client_name) as string | undefined;
+      if (gName) {
+        setActiveGuestFocus({ name: gName, id: guestContext.id as string | undefined });
+      }
+    }
+  }, [guestContext]);
 
   // Auto-scroll messages to bottom
   const scrollToBottom = useCallback(() => {
@@ -465,7 +523,7 @@ export default function ClinicalCopilotDrawer({
         {
           id: `msg_${Date.now()}`,
           sender: "copilot",
-          text: `**✓ CRM Record Synchronized** (\`${res.record_id || "crm_sync"}\`)\n\n${res.summary || `Updated ${editingGuestName} in KAI Sanctuary CRM.`}`,
+          text: `**[CRM Record Synchronized]** (\`${res.record_id || "crm_sync"}\`)\n\n${res.summary || `Updated ${editingGuestName} in KAI Sanctuary CRM.`}`,
           form_fill_proposal: {
             form_type: "crm_mutation",
             form_title: res.title || `CRM Updated · ${editingGuestName}`,
@@ -490,6 +548,154 @@ export default function ClinicalCopilotDrawer({
     }
   };
 
+  const handleQuickMutateField = async (
+    guestName: string,
+    field: string,
+    value: unknown,
+    msgId: string
+  ) => {
+    const mutateKey = `${msgId}_${field}_${String(value)}`;
+    setQuickMutatingKey(mutateKey);
+    try {
+      const targetMessage = messages.find((m) => m.id === msgId);
+      const currentProposal = targetMessage?.form_fill_proposal;
+      const currentFields = (currentProposal?.changes || currentProposal?.fields || {}) as Record<string, unknown>;
+
+      // Push snapshot to undo stack before executing mutation
+      setProposalHistory((prev) => ({
+        ...prev,
+        [msgId]: [...(prev[msgId] || []), { ...currentFields }],
+      }));
+
+      const payloadFields: Record<string, unknown> = {
+        target_name: guestName,
+        client_name: guestName,
+        action_subtype: "crm_record_update",
+      };
+
+      if (field === "append_dietary") {
+        const existingDiet = String(currentFields.dietary_requirements || currentFields.dietary || "").trim();
+        const toAdd = String(value);
+        if (existingDiet && !existingDiet.toLowerCase().includes(toAdd.toLowerCase())) {
+          payloadFields.dietary_requirements = `${existingDiet}, ${toAdd}`;
+        } else if (!existingDiet) {
+          payloadFields.dietary_requirements = toAdd;
+        } else {
+          payloadFields.dietary_requirements = existingDiet;
+        }
+      } else {
+        payloadFields[field] = value;
+      }
+
+      const res = await executeCopilotCrmAction({
+        form_type: "crm_mutation",
+        action_type: "update_crm_record",
+        fields: payloadFields,
+        payload: payloadFields,
+      });
+
+      if (res.success) {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== msgId || !m.form_fill_proposal) return m;
+            const mergedChanges = {
+              ...currentFields,
+              ...(res.changes || payloadFields),
+            };
+            return {
+              ...m,
+              proposal_authorized: true,
+              form_fill_proposal: {
+                ...m.form_fill_proposal,
+                executed: true,
+                changes: mergedChanges,
+                summary: res.summary || m.form_fill_proposal.summary,
+              },
+            };
+          })
+        );
+
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("crm-updated", { detail: res }));
+        }
+        await loadCrmSnapshotData();
+      }
+    } catch (err) {
+      console.error("Failed to mutate CRM record on the fly:", err);
+    } finally {
+      setQuickMutatingKey(null);
+    }
+  };
+
+  const handleUndoProposal = async (msgId: string) => {
+    const history = proposalHistory[msgId] || [];
+    if (history.length === 0) return;
+    const previousFields = history[history.length - 1];
+    const targetMessage = messages.find((m) => m.id === msgId);
+    const currentProposal = targetMessage?.form_fill_proposal;
+    if (!currentProposal) return;
+
+    setUndoingIdx(msgId);
+    const gName = String(
+      previousFields.client_name || previousFields.name || previousFields.guest_name || previousFields.guest || ""
+    ).trim();
+
+    try {
+      const payloadFields: Record<string, unknown> = {
+        ...previousFields,
+        target_name: gName,
+        client_name: gName,
+        action_subtype: "crm_record_update",
+      };
+      const res = await executeCopilotCrmAction({
+        form_type: "crm_mutation",
+        action_type: "update_crm_record",
+        fields: payloadFields,
+        payload: payloadFields,
+      });
+
+      if (res.success) {
+        setProposalHistory((prev) => ({
+          ...prev,
+          [msgId]: (prev[msgId] || []).slice(0, -1),
+        }));
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== msgId || !m.form_fill_proposal) return m;
+            return {
+              ...m,
+              form_fill_proposal: {
+                ...m.form_fill_proposal,
+                executed: true,
+                changes: previousFields,
+                summary: `[Reverted] Restored snapshot for ${gName}.`,
+              },
+            };
+          })
+        );
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("crm-updated", { detail: res }));
+        }
+        await loadCrmSnapshotData();
+      }
+    } catch (err) {
+      console.error("Failed to undo proposal mutation:", err);
+    } finally {
+      setUndoingIdx(null);
+    }
+  };
+
+  const handleDismissProposal = (msgId: string) => {
+    setDismissedProposals((prev) => ({ ...prev, [msgId]: true }));
+  };
+
+  const handleSendQuickAdjustment = (guestName: string, msgId: string) => {
+    const raw = (quickTweakInputs[msgId] || "").trim();
+    if (!raw) return;
+    setQuickTweakInputs((prev) => ({ ...prev, [msgId]: "" }));
+    handleSend(`Update ${guestName}: ${raw}`);
+  };
+
   // Execute a Playbook directly from the Assistant
   const handleRunPlaybook = async (pb: AIAutomationPlaybookItem) => {
     setRunningPlaybookCode(pb.playbook_code);
@@ -510,7 +716,7 @@ export default function ClinicalCopilotDrawer({
         {
           id: `msg_${Date.now()}_c`,
           sender: "copilot",
-          text: `### ✓ Executed Playbook #${pb.scenario_number}: ${pb.title}\n\n${res.ai_copilot_briefing}\n\n• **Target**: ${res.target}\n• **Staged Drafts**: ${res.staged_draft_ids?.length ? res.staged_draft_ids.map((d) => `#${d}`).join(", ") : "Synchronized"}`,
+          text: `### [Executed] Playbook #${pb.scenario_number}: ${pb.title}\n\n${res.ai_copilot_briefing}\n\n• **Target**: ${res.target}\n• **Staged Drafts**: ${res.staged_draft_ids?.length ? res.staged_draft_ids.map((d) => `#${d}`).join(", ") : "Synchronized"}`,
           latency_ms: res.execution_latency_ms,
           suggested_followups: [
             "Approve all pending drafts in the Action Review Queue",
@@ -527,7 +733,7 @@ export default function ClinicalCopilotDrawer({
         {
           id: `msg_${Date.now()}_err`,
           sender: "copilot",
-          text: `⚠️ **Playbook Execution Error**: ${err instanceof Error ? err.message : String(err)}`,
+          text: `**Playbook Execution Error**: ${err instanceof Error ? err.message : String(err)}`,
         },
       ]);
     } finally {
@@ -606,12 +812,14 @@ export default function ClinicalCopilotDrawer({
       recognition.onstart = () => {
         setIsListening(true);
         setLiveVoiceTranscript("");
+        liveTranscriptRef.current = "";
       };
 
       recognition.onresult = (e: any) => {
         const transcript = Array.from(e.results)
           .map((result: any) => result[0].transcript)
           .join("");
+        liveTranscriptRef.current = transcript;
         setLiveVoiceTranscript(transcript);
         setInputMessage(transcript);
       };
@@ -622,8 +830,9 @@ export default function ClinicalCopilotDrawer({
 
       recognition.onend = () => {
         setIsListening(false);
-        if (isVoiceMode && liveVoiceTranscript.trim()) {
-          handleSend(liveVoiceTranscript);
+        const finalTranscript = liveTranscriptRef.current.trim();
+        if (isVoiceModeRef.current && finalTranscript) {
+          handleSend(finalTranscript);
         }
       };
 
@@ -672,13 +881,28 @@ export default function ClinicalCopilotDrawer({
     }
     setLoading(true);
 
+    // Prompt recall history
+    setPromptHistory((prev) => [query, ...prev.filter((p) => p !== query)].slice(0, 50));
+    setHistoryPointer(null);
+
+    const mergedGuestContext = {
+      ...(guestContext || {}),
+      ...(activeGuestFocus ? { active_guest_name: activeGuestFocus.name, active_guest_id: activeGuestFocus.id } : {}),
+    };
+
     const convHistory = messages
-      .filter((m) => m.text && !m.isDocument)
-      .slice(-4)
-      .map((m) => ({
-        role: m.sender === "user" ? "user" : "assistant",
-        content: m.text,
-      }));
+      .filter((m) => (m.text || m.form_fill_proposal) && !m.isDocument)
+      .slice(-10)
+      .map((m) => {
+        let content = m.text || "";
+        if (m.form_fill_proposal?.action_title || m.form_fill_proposal?.form_title) {
+          content += `\n[Proposal: ${m.form_fill_proposal.action_title || m.form_fill_proposal.form_title} - ${m.form_fill_proposal.summary || ""}]`;
+        }
+        return {
+          role: m.sender === "user" ? "user" : "assistant",
+          content: content.trim(),
+        };
+      });
 
     const currentPath = typeof window !== "undefined" ? window.location.pathname : undefined;
     let accumulatedText = "";
@@ -703,47 +927,50 @@ export default function ClinicalCopilotDrawer({
       await chatWithCopilotStream(
         query,
         activeMode,
-        guestContext,
+        mergedGuestContext,
         undefined,
         currentPath,
         convHistory,
         {
           onToken: (token) => {
             accumulatedText += token;
-            setMessages((prev) => {
-              const lastIdx = prev.length - 1;
-              if (lastIdx < 0) return prev;
-              const copy = [...prev];
-              copy[lastIdx] = { ...copy[lastIdx], text: accumulatedText };
-              return copy;
-            });
+            setMessages((prev) =>
+              prev.map((m, idx) =>
+                m.id === assistantMsgId || (idx === prev.length - 1 && m.sender === "copilot")
+                  ? { ...m, text: accumulatedText }
+                  : m
+              )
+            );
           },
           onMeta: (meta) => {
             const prop = meta.form_fill_proposal;
             if (prop?.executed && typeof window !== "undefined") {
+              if (prop.form_type === "crm_ui_command" && prop.fields) {
+                window.dispatchEvent(new CustomEvent("kai:crm:command", { detail: prop.fields }));
+              }
               window.dispatchEvent(new CustomEvent("crm-updated", { detail: prop }));
               window.dispatchEvent(new CustomEvent("intakes-updated", { detail: prop }));
               loadCrmSnapshotData();
             }
-            setMessages((prev) => {
-              const lastIdx = prev.length - 1;
-              if (lastIdx < 0) return prev;
-              const copy = [...prev];
-              copy[lastIdx] = {
-                ...copy[lastIdx],
-                safety_level: meta.safety_level,
-                safety_screened: meta.safety_screened,
-                citations: meta.citations || copy[lastIdx].citations,
-                suggested_followups: meta.suggested_followups || copy[lastIdx].suggested_followups,
-                form_fill_proposal: prop || copy[lastIdx].form_fill_proposal,
-                proposal_authorized: Boolean(prop?.executed),
-                sanctuary_slug: meta.sanctuary_slug || copy[lastIdx].sanctuary_slug,
-                latency_ms: meta.latency_ms,
-                model_used: meta.model_used,
-                tool_calls: meta.tool_calls,
-              };
-              return copy;
-            });
+            setMessages((prev) =>
+              prev.map((m, idx) =>
+                m.id === assistantMsgId || (idx === prev.length - 1 && m.sender === "copilot")
+                  ? {
+                      ...m,
+                      safety_level: meta.safety_level,
+                      safety_screened: meta.safety_screened,
+                      citations: meta.citations || m.citations,
+                      suggested_followups: meta.suggested_followups || m.suggested_followups,
+                      form_fill_proposal: prop || m.form_fill_proposal,
+                      proposal_authorized: Boolean(prop?.executed),
+                      sanctuary_slug: meta.sanctuary_slug || m.sanctuary_slug,
+                      latency_ms: meta.latency_ms,
+                      model_used: meta.model_used,
+                      tool_calls: meta.tool_calls,
+                    }
+                  : m
+              )
+            );
           },
           onDone: () => {
             setLoading(false);
@@ -758,7 +985,7 @@ export default function ClinicalCopilotDrawer({
                 const directResp = await chatWithCopilot(
                   query,
                   activeMode,
-                  guestContext,
+                  mergedGuestContext,
                   undefined,
                   currentPath,
                   convHistory
@@ -796,7 +1023,7 @@ export default function ClinicalCopilotDrawer({
                   const copy = [...prev];
                   copy[lastIdx] = {
                     ...copy[lastIdx],
-                    text: `⚠️ **Connection Notice**: ${fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)}`,
+                    text: `**Connection Notice**: ${fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)}`,
                     safety_level: "CLEAR",
                   };
                   return copy;
@@ -868,7 +1095,7 @@ export default function ClinicalCopilotDrawer({
         {
           id: `doc_err_${Date.now()}`,
           sender: "copilot",
-          text: `⚠️ **Document Notice**: Could not read \`${fileName}\`. Please verify it is a PDF, PNG, JPG, or CSV under 10MB.`,
+          text: `**Document Notice**: Could not read \`${fileName}\`. Please verify it is a PDF, PNG, JPG, or CSV under 10MB.`,
           safety_level: "CLEAR",
         },
       ]);
@@ -880,9 +1107,9 @@ export default function ClinicalCopilotDrawer({
     }
   };
 
-  const copyToClipboard = (text: string, idx: number) => {
+  const copyToClipboard = (text: string, msgId: string) => {
     navigator.clipboard.writeText(text);
-    setCopiedIdx(idx);
+    setCopiedIdx(msgId);
     setTimeout(() => setCopiedIdx(null), 2000);
   };
 
@@ -899,8 +1126,8 @@ export default function ClinicalCopilotDrawer({
   };
 
   // Direct In-Place Execution of any CRM Action Proposal without leaving the chat
-  const handleExecuteProposalInPlace = async (proposal: FormFillProposal, idx: number) => {
-    setExecutingProposalIdx(idx);
+  const handleExecuteProposalInPlace = async (proposal: FormFillProposal, msgId: string) => {
+    setExecutingProposalIdx(msgId);
     try {
       const res = await executeCopilotCrmAction({
         form_type: proposal.form_type,
@@ -913,11 +1140,11 @@ export default function ClinicalCopilotDrawer({
       dispatchFormFill({ ...proposal, executed: true });
       await loadCrmSnapshotData();
 
-      setMessages((prev) => {
-        const copy = [...prev];
-        if (copy[idx]) {
-          copy[idx] = {
-            ...copy[idx],
+      setMessages((prev) =>
+        prev.map((m) => {
+          if (m.id !== msgId) return m;
+          return {
+            ...m,
             proposal_authorized: true,
             form_fill_proposal: {
               ...proposal,
@@ -928,20 +1155,15 @@ export default function ClinicalCopilotDrawer({
               summary: res.summary || proposal.summary,
             },
           };
-        }
-        return copy;
-      });
+        })
+      );
     } catch (err) {
       console.error("Failed to execute CRM proposal:", err);
       // Still dispatch on form bus as fallback
       dispatchFormFill(proposal);
-      setMessages((prev) => {
-        const copy = [...prev];
-        if (copy[idx]) {
-          copy[idx] = { ...copy[idx], proposal_authorized: true };
-        }
-        return copy;
-      });
+      setMessages((prev) =>
+        prev.map((m) => (m.id === msgId ? { ...m, proposal_authorized: true } : m))
+      );
     } finally {
       setExecutingProposalIdx(null);
     }
@@ -1351,6 +1573,7 @@ export default function ClinicalCopilotDrawer({
                     stopListening();
                     stopSpeaking();
                     setIsVoiceMode(false);
+                    isVoiceModeRef.current = false;
                     onClose();
                   }}
                   className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-white/[0.06] transition-colors cursor-pointer"
@@ -1498,7 +1721,7 @@ export default function ClinicalCopilotDrawer({
                           type="text"
                           value={editingDietary}
                           onChange={(e) => setEditingDietary(e.target.value)}
-                          placeholder="Celiac, seed-oil-free..."
+                          placeholder="Gluten-free, dairy-free..."
                           className="w-full px-2.5 py-1.5 rounded-lg bg-[#0D0D0D] border border-white/[0.1] text-xs text-white focus:outline-none focus:border-white/30"
                         />
                       </div>
@@ -1596,6 +1819,7 @@ export default function ClinicalCopilotDrawer({
                         stopListening();
                         stopSpeaking();
                         setIsVoiceMode(false);
+                        isVoiceModeRef.current = false;
                       }}
                       className="px-4 py-2 rounded-full bg-white/[0.07] hover:bg-white/[0.12] text-xs text-neutral-200 transition-colors cursor-pointer"
                     >
@@ -1714,7 +1938,7 @@ export default function ClinicalCopilotDrawer({
                               <div className="pl-7">{renderCleanMarkdown(m.text)}</div>
 
                               {/* Interactive CRM Record Mutation / Action Proposal Card */}
-                              {m.form_fill_proposal && (
+                              {m.form_fill_proposal && !dismissedProposals[m.id] && (
                                 <div className="ml-7 mt-2 p-3 rounded-2xl bg-[#161616] border border-white/[0.1] space-y-2">
                                   <div className="flex items-center justify-between gap-2">
                                     <div className="flex items-center gap-1.5 text-xs font-medium text-white truncate">
@@ -1723,17 +1947,44 @@ export default function ClinicalCopilotDrawer({
                                         {m.form_fill_proposal.action_title || m.form_fill_proposal.form_title}
                                       </span>
                                     </div>
-                                    <span
-                                      className={`text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 ${
-                                        m.form_fill_proposal.executed || m.proposal_authorized
-                                          ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
-                                          : "bg-white/[0.08] text-neutral-300"
-                                      }`}
-                                    >
-                                      {m.form_fill_proposal.executed || m.proposal_authorized
-                                        ? "✓ Saved"
-                                        : "Pending"}
-                                    </span>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <span
+                                        className={`text-[10px] font-medium px-2 py-0.5 rounded-full inline-flex items-center gap-1 ${
+                                          m.form_fill_proposal.executed || m.proposal_authorized
+                                            ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/30"
+                                            : "bg-white/[0.08] text-neutral-300"
+                                        }`}
+                                      >
+                                        {(m.form_fill_proposal.executed || m.proposal_authorized) && (
+                                          <Check className="w-3 h-3 text-emerald-400" />
+                                        )}
+                                        <span>{m.form_fill_proposal.executed || m.proposal_authorized ? "Saved" : "Pending"}</span>
+                                      </span>
+
+                                      {/* Exit 3: Undo Button (if mutation history exists) */}
+                                      {(proposalHistory[m.id] || []).length > 0 && (
+                                        <button
+                                          type="button"
+                                          disabled={undoingIdx === m.id}
+                                          onClick={() => handleUndoProposal(m.id)}
+                                          className="px-2 py-0.5 rounded-lg bg-white/[0.06] hover:bg-white/[0.12] text-amber-300 hover:text-amber-200 text-[10px] font-medium transition flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                          title="Undo last mutation"
+                                        >
+                                          <RotateCcw className={`w-3 h-3 ${undoingIdx === m.id ? "animate-spin" : ""}`} />
+                                          <span>Undo</span>
+                                        </button>
+                                      )}
+
+                                      {/* Exit 1: Dismiss Button */}
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDismissProposal(m.id)}
+                                        className="p-1 rounded-md text-neutral-400 hover:text-white hover:bg-white/[0.08] transition-colors cursor-pointer"
+                                        title="Dismiss action card"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
                                   </div>
 
                                   {/* Key-Value Diff Grid of Touched Fields (Simplified Plain English for Non-Technical Staff) */}
@@ -1789,11 +2040,11 @@ export default function ClinicalCopilotDrawer({
                                     {!(m.form_fill_proposal.executed || m.proposal_authorized) ? (
                                       <button
                                         type="button"
-                                        disabled={executingProposalIdx === idx}
-                                        onClick={() => handleExecuteProposalInPlace(m.form_fill_proposal!, idx)}
+                                        disabled={executingProposalIdx === m.id}
+                                        onClick={() => handleExecuteProposalInPlace(m.form_fill_proposal!, m.id)}
                                         className="px-3 py-1 rounded-xl bg-white hover:bg-neutral-200 text-black text-xs font-semibold transition flex items-center gap-1 cursor-pointer"
                                       >
-                                        {executingProposalIdx === idx ? (
+                                        {executingProposalIdx === m.id ? (
                                           <>
                                             <RefreshCw className="w-3 h-3 animate-spin" />
                                             <span>Saving…</span>
@@ -1815,9 +2066,9 @@ export default function ClinicalCopilotDrawer({
                                     <button
                                       type="button"
                                       onClick={() => {
-                                        const fields = m.form_fill_proposal?.fields || {};
+                                        const fields = (m.form_fill_proposal?.changes || m.form_fill_proposal?.fields || {}) as Record<string, unknown>;
                                         const gName = String(
-                                          fields.client_name || fields.name || fields.guest_name || ""
+                                          fields.client_name || fields.name || fields.guest_name || fields.guest || ""
                                         );
                                         selectRecordForQuickEdit(gName);
                                       }}
@@ -1838,6 +2089,182 @@ export default function ClinicalCopilotDrawer({
                                       </button>
                                     )}
                                   </div>
+
+                                  {/* On-The-Fly Dynamic Mutation Deck */}
+                                  {(() => {
+                                    const propFields = (m.form_fill_proposal.changes || m.form_fill_proposal.fields || {}) as Record<string, unknown>;
+                                    const gName = String(propFields.client_name || propFields.name || propFields.guest_name || propFields.guest || "").trim();
+                                    if (!gName) return null;
+                                    return (
+                                      <div className="pt-2 border-t border-white/[0.08] space-y-2 mt-2">
+                                        <div className="flex items-center justify-between text-[10px] text-neutral-400 font-medium">
+                                          <span className="uppercase tracking-wider font-semibold text-neutral-300">Quick Mutate on the Fly</span>
+                                          <span className="text-neutral-500">1-click direct CRM update</span>
+                                        </div>
+
+                                        {/* Suite Selector Pills */}
+                                        <div className="space-y-1">
+                                          <div className="text-[10px] text-neutral-400">Suite Tier:</div>
+                                          <div className="flex flex-wrap gap-1.5">
+                                            {[
+                                              { label: "Cliffside Plunge Villa", val: "Private Cliffside Plunge Villa" },
+                                              { label: "Oceanfront King Suite", val: "Oceanfront King Suite" },
+                                              { label: "Penthouse Villa", val: "Two-Bedroom Oceanfront Penthouse Villa" },
+                                              { label: "Ocean Canopy Villa", val: "Private Ocean Canopy Villa" },
+                                            ].map((s) => (
+                                              <button
+                                                key={s.val}
+                                                type="button"
+                                                disabled={quickMutatingKey !== null}
+                                                onClick={() => handleQuickMutateField(gName, "room_tier", s.val, m.id)}
+                                                className="px-2 py-0.5 rounded-lg text-[10px] bg-white/[0.05] hover:bg-white/[0.12] border border-white/[0.08] text-neutral-200 transition cursor-pointer disabled:opacity-50"
+                                              >
+                                                {s.label}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        </div>
+
+                                        {/* Payment & Deposit Pills */}
+                                        <div className="space-y-1">
+                                          <div className="text-[10px] text-neutral-400">Payment & Deposit:</div>
+                                          <div className="flex flex-wrap gap-1.5">
+                                            {[
+                                              { label: "30% Deposit Paid", field: "deposit_status", val: "PAID" },
+                                              { label: "50% Paid ($5,700)", field: "amount_paid", val: 5700 },
+                                              { label: "Paid in Full", field: "final_balance_status", val: "PAID" },
+                                              { label: "SWIFT Wire Logged", field: "payment_method", val: "SWIFT Wire Transfer" },
+                                            ].map((p) => (
+                                              <button
+                                                key={p.label}
+                                                type="button"
+                                                disabled={quickMutatingKey !== null}
+                                                onClick={() => handleQuickMutateField(gName, p.field, p.val, m.id)}
+                                                className="px-2 py-0.5 rounded-lg text-[10px] bg-white/[0.05] hover:bg-white/[0.12] border border-white/[0.08] text-neutral-200 transition cursor-pointer disabled:opacity-50"
+                                              >
+                                                {p.label}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        </div>
+
+                                        {/* Dietary Directives Toggles */}
+                                        <div className="space-y-1">
+                                          <div className="text-[10px] text-neutral-400">Dietary Directives:</div>
+                                          <div className="flex flex-wrap gap-1.5">
+                                            {[
+                                              "+ Gluten-Free",
+                                              "+ Nut-Free",
+                                              "+ Dairy-Free",
+                                              "+ No Shellfish",
+                                              "+ Plant-Forward",
+                                            ].map((diet) => (
+                                              <button
+                                                key={diet}
+                                                type="button"
+                                                disabled={quickMutatingKey !== null}
+                                                onClick={() => handleQuickMutateField(gName, "append_dietary", diet.replace("+ ", ""), m.id)}
+                                                className="px-2 py-0.5 rounded-lg text-[10px] bg-white/[0.05] hover:bg-emerald-500/20 hover:border-emerald-500/40 border border-white/[0.08] text-neutral-300 hover:text-emerald-300 transition cursor-pointer disabled:opacity-50"
+                                              >
+                                                {diet}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        </div>
+
+                                        {/* Compliance & Pre-Arrival Readiness */}
+                                        <div className="space-y-1">
+                                          <div className="text-[10px] text-neutral-400">Readiness & Compliance:</div>
+                                          <div className="flex flex-wrap gap-1.5">
+                                            {[
+                                              { label: "✓ Sign Waiver", field: "waiver_signed", val: true },
+                                              { label: "✓ Clear Health Check", field: "medical_cleared", val: true },
+                                            ].map((cp) => (
+                                              <button
+                                                key={cp.label}
+                                                type="button"
+                                                disabled={quickMutatingKey !== null}
+                                                onClick={() => handleQuickMutateField(gName, cp.field, cp.val, m.id)}
+                                                className="px-2 py-0.5 rounded-lg text-[10px] bg-white/[0.05] hover:bg-emerald-500/20 border border-white/[0.08] text-neutral-200 transition cursor-pointer disabled:opacity-50"
+                                              >
+                                                {cp.label}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        </div>
+
+                                        {/* Sanctuary Switcher */}
+                                        <div className="space-y-1">
+                                          <div className="text-[10px] text-neutral-400">Sanctuary:</div>
+                                          <div className="flex flex-wrap gap-1.5">
+                                            {[
+                                              { label: "Puerto Vallarta", val: "puerto-vallarta-2027" },
+                                              { label: "Riviera Maya", val: "riviera-maya" },
+                                              { label: "Nosara", val: "nosara" },
+                                              { label: "Amalfi Coast", val: "amalfi" },
+                                              { label: "Ubud Bali", val: "bali" },
+                                            ].map((sanc) => (
+                                              <button
+                                                key={sanc.val}
+                                                type="button"
+                                                disabled={quickMutatingKey !== null}
+                                                onClick={() => handleQuickMutateField(gName, "sanctuary_slug", sanc.val, m.id)}
+                                                className="px-2 py-0.5 rounded-lg text-[10px] bg-white/[0.05] hover:bg-white/[0.12] border border-white/[0.08] text-neutral-200 transition cursor-pointer disabled:opacity-50"
+                                              >
+                                                {sanc.label}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        </div>
+
+                                        {/* Status Pills */}
+                                        <div className="space-y-1">
+                                          <div className="text-[10px] text-neutral-400">Status:</div>
+                                          <div className="flex flex-wrap gap-1.5">
+                                            {[
+                                              { label: "Confirmed", val: "CONFIRMED" },
+                                              { label: "Deposit Paid", val: "DEPOSIT_PAID" },
+                                              { label: "Waitlisted", val: "WAITLISTED" },
+                                            ].map((st) => (
+                                              <button
+                                                key={st.val}
+                                                type="button"
+                                                disabled={quickMutatingKey !== null}
+                                                onClick={() => handleQuickMutateField(gName, "status", st.val, m.id)}
+                                                className="px-2 py-0.5 rounded-lg text-[10px] bg-white/[0.05] hover:bg-white/[0.12] border border-white/[0.08] text-neutral-200 transition cursor-pointer disabled:opacity-50"
+                                              >
+                                                {st.label}
+                                              </button>
+                                            ))}
+                                          </div>
+                                        </div>
+
+                                        {/* Fast Custom Tweak Bar */}
+                                        <div className="pt-1 flex items-center gap-1.5">
+                                          <input
+                                            type="text"
+                                            placeholder={`Tweak ${gName} (e.g. flight AA1290, deposit 5000)...`}
+                                            value={quickTweakInputs[m.id] || ""}
+                                            onChange={(e) => setQuickTweakInputs(prev => ({ ...prev, [m.id]: e.target.value }))}
+                                            onKeyDown={(e) => {
+                                              if (e.key === "Enter") {
+                                                e.preventDefault();
+                                                handleSendQuickAdjustment(gName, m.id);
+                                              }
+                                            }}
+                                            className="flex-1 px-2.5 py-1 text-xs rounded-xl bg-white/[0.04] border border-white/[0.1] text-white placeholder-neutral-500 focus:outline-none focus:border-white/30"
+                                          />
+                                          <button
+                                            type="button"
+                                            onClick={() => handleSendQuickAdjustment(gName, m.id)}
+                                            className="px-3 py-1 text-xs font-semibold rounded-xl bg-white text-black hover:bg-neutral-200 transition cursor-pointer"
+                                          >
+                                            Tweak
+                                          </button>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
                                 </div>
                               )}
 
@@ -1846,15 +2273,15 @@ export default function ClinicalCopilotDrawer({
                                 <div className="pl-7 pt-1 flex flex-wrap items-center gap-2 text-[11px] text-neutral-500">
                                   <button
                                     type="button"
-                                    onClick={() => copyToClipboard(m.text, idx)}
+                                    onClick={() => copyToClipboard(m.text, m.id)}
                                     className="hover:text-neutral-200 flex items-center gap-1 transition-colors cursor-pointer"
                                   >
-                                    {copiedIdx === idx ? (
+                                    {copiedIdx === m.id ? (
                                       <Check className="w-3 h-3 text-emerald-400" />
                                     ) : (
                                       <Copy className="w-3 h-3" />
                                     )}
-                                    <span>{copiedIdx === idx ? "Copied" : "Copy"}</span>
+                                    <span>{copiedIdx === m.id ? "Copied" : "Copy"}</span>
                                   </button>
 
                                   <button
@@ -1889,6 +2316,7 @@ export default function ClinicalCopilotDrawer({
                                         if (printWin) {
                                           printWin.document.write(
                                             `<html><head><title>KAI Private Chef Matrix</title><style>body{font-family:sans-serif;padding:24px;}</style></head><body><h2>KAI Private Chef Dietary Matrix</h2><pre style="white-space:pre-wrap;font-family:inherit;">${m.text
+                                              .replace(/&/g, "&amp;")
                                               .replace(/</g, "&lt;")
                                               .replace(/>/g, "&gt;")}</pre></body></html>`
                                           );
@@ -2007,15 +2435,35 @@ export default function ClinicalCopilotDrawer({
                       )}
                     </AnimatePresence>
 
+                    {/* Ambient Active Guest Context Banner */}
+                    {activeGuestFocus && (
+                      <div className="flex items-center justify-between px-3 py-1 mb-1.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-[11px] text-emerald-300">
+                        <div className="flex items-center gap-1.5 truncate">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+                          <span className="text-neutral-400">Target Guest:</span>
+                          <strong className="text-emerald-200 font-semibold truncate">{activeGuestFocus.name}</strong>
+                          <span className="text-[10px] text-neutral-400">(Live Synchronized)</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setActiveGuestFocus(null)}
+                          className="text-neutral-400 hover:text-white p-0.5 rounded cursor-pointer"
+                          title="Clear active guest focus"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    )}
+
                     {/* 1-Click Hospitality Quick Action Pills for Non-Technical Staff */}
                     <div className="flex items-center gap-1.5 overflow-x-auto py-1 px-1 scrollbar-none text-[11px] mb-1.5">
                       {[
-                        { label: "✓ Confirm Eleanor", query: "elanor cliffside plunge villa confirm" },
-                        { label: "💵 Add Sophia Deposit", query: "add sophia laurent noasra king suite 4350 paid" },
-                        { label: "🍽️ Chef Dietary Matrix", query: "chef list allergies nosara" },
-                        { label: "🚗 Airport Drivers", query: "nosara driver sheet airport pickups" },
-                        { label: "💰 14-Guest Buyout", query: "buyout 14 guests nosara 30/70" },
-                        { label: "✅ Approve Drafts", query: "approve all pending drafts" },
+                        { label: "Import VAX #38492014", query: "Import VAX 38492014" },
+                        { label: "Confirm Eleanor", query: "elanor cliffside plunge villa confirm" },
+                        { label: "Add Sophia Deposit", query: "add sophia laurent noasra king suite 4350 paid" },
+                        { label: "Show Balances Due", query: "show balances due" },
+                        { label: "Chef Dietary Sheet", query: "chef list allergies nosara" },
+                        { label: "Airport Drivers", query: "nosara driver sheet airport pickups" },
                       ].map((chip) => (
                         <button
                           key={chip.label}
@@ -2072,6 +2520,21 @@ export default function ClinicalCopilotDrawer({
                           if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault();
                             handleSend();
+                          } else if (e.key === "ArrowUp" && (inputMessage === "" || historyPointer !== null) && promptHistory.length > 0) {
+                            e.preventDefault();
+                            const nextIdx = historyPointer === null ? 0 : Math.min(historyPointer + 1, promptHistory.length - 1);
+                            setHistoryPointer(nextIdx);
+                            setInputMessage(promptHistory[nextIdx]);
+                          } else if (e.key === "ArrowDown" && historyPointer !== null) {
+                            e.preventDefault();
+                            if (historyPointer > 0) {
+                              const nextIdx = historyPointer - 1;
+                              setHistoryPointer(nextIdx);
+                              setInputMessage(promptHistory[nextIdx]);
+                            } else {
+                              setHistoryPointer(null);
+                              setInputMessage("");
+                            }
                           }
                         }}
                         placeholder="Message KAI or update any CRM record…"
@@ -2109,6 +2572,7 @@ export default function ClinicalCopilotDrawer({
                           type="button"
                           onClick={() => {
                             setIsVoiceMode(true);
+                            isVoiceModeRef.current = true;
                             startListening();
                           }}
                           className="w-8 h-8 rounded-full bg-white/[0.1] hover:bg-white/[0.18] text-white flex items-center justify-center transition-colors shrink-0 cursor-pointer"

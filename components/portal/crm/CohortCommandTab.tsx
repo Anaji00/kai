@@ -33,6 +33,7 @@ import {
   resolveRoomAllocationConflict,
   postponeCohortForceMajeure,
   scheduleBodyworkSession,
+  executeCopilotCrmAction,
 } from "@/lib/sidecar-api";
 
 interface CohortCommandTabProps {
@@ -47,15 +48,15 @@ interface CohortCommandTabProps {
 const SANCTUARY_COHORTS = [
   {
     slug: "puerto-vallarta-2027",
-    title: "Puerto Vallarta · Sierra Madre Cliffside Sanctuary",
-    dates: "Oct 10–15, 2027",
-    capacity: 12,
+    title: "Puerto Vallarta · Mexico Retreat",
+    dates: "Jan 28–31, 2027",
+    capacity: 14,
     location: "Puerto Vallarta, Mexico (PVR)",
-    defaultDate: "2027-10-12",
+    defaultDate: "2027-01-30",
   },
   {
     slug: "nosara",
-    title: "Nosara · Blue Zone Somatic Restoration",
+    title: "Nosara · Costa Rica Retreat",
     dates: "Nov 14–19, 2026",
     capacity: 12,
     location: "Guanacaste, Costa Rica (LIR)",
@@ -63,7 +64,7 @@ const SANCTUARY_COHORTS = [
   },
   {
     slug: "amalfi",
-    title: "Amalfi Coast · Tyrrhenian Cliffside Immersion",
+    title: "Amalfi Coast · Italy Retreat",
     dates: "May 18–23, 2027",
     capacity: 12,
     location: "Ravello, Italy (NAP)",
@@ -71,11 +72,19 @@ const SANCTUARY_COHORTS = [
   },
   {
     slug: "bali",
-    title: "Bali · Ubud Jungle Autonomic Sanctuary",
+    title: "Ubud · Bali Retreat",
     dates: "Sep 08–13, 2027",
     capacity: 12,
     location: "Ubud, Bali (DPS)",
     defaultDate: "2027-09-10",
+  },
+  {
+    slug: "riviera-maya",
+    title: "Riviera Maya · Mexico Retreat",
+    dates: "Apr 15–19, 2026",
+    capacity: 14,
+    location: "Riviera Maya, Mexico (CUN)",
+    defaultDate: "2026-04-16",
   },
 ];
 
@@ -90,6 +99,9 @@ export default function CohortCommandTab({
   const [selectedSlug, setSelectedSlug] = useState<string>("puerto-vallarta-2027");
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [showOperationsDrawer, setShowOperationsDrawer] = useState<boolean>(true);
+  const [rosterViewMode, setRosterViewMode] = useState<"guests" | "suite_board">("guests");
+  const [pairingPrimaryTripId, setPairingPrimaryTripId] = useState<string>("");
+  const [pairingCompanionName, setPairingCompanionName] = useState<string>("");
 
   // Result states for live visual inspection
   const [dietaryManifest, setDietaryManifest] = useState<{
@@ -133,7 +145,25 @@ export default function CohortCommandTab({
     message: string;
   } | null>(null);
 
-  const cohortTrips = trips.filter((t) => t.sanctuary_slug === selectedSlug);
+  const matchesCohortSlug = (tripSlug: string | undefined, cohortSlug: string) => {
+    const a = (tripSlug || "").toLowerCase().trim();
+    const b = cohortSlug.toLowerCase().trim();
+    if (!a) return false;
+    if (a === b) return true;
+    if (b === "puerto-vallarta-2027" && (a.includes("puerto") || a.includes("vallarta") || a.includes("marival"))) {
+      return true;
+    }
+    return a.includes(b);
+  };
+
+  const isActiveCohortTrip = (t: CRMTripItem) => {
+    const st = (t.status || "").toUpperCase();
+    return st !== "CANCELLED" && st !== "MEDICAL_FREEZE";
+  };
+
+  const cohortTrips = trips.filter(
+    (t) => matchesCohortSlug(t.sanctuary_slug, selectedSlug) && isActiveCohortTrip(t)
+  );
   const currentCohortMeta =
     SANCTUARY_COHORTS.find((c) => c.slug === selectedSlug) || SANCTUARY_COHORTS[0];
 
@@ -141,7 +171,7 @@ export default function CohortCommandTab({
   const [selectedGuestId, setSelectedGuestId] = useState<string>("");
   const [bodyworkGuestName, setBodyworkGuestName] = useState("");
   const [bodyworkGuestEmail, setBodyworkGuestEmail] = useState("");
-  const [bodyworkPractitioner, setBodyworkPractitioner] = useState("Mateo Silva (Master Craniosacral)");
+  const [bodyworkPractitioner, setBodyworkPractitioner] = useState("Mateo Silva (Massage & Bodywork)");
   const [bodyworkTimeSlot, setBodyworkTimeSlot] = useState("14:00");
   const [bodyworkDate, setBodyworkDate] = useState(currentCohortMeta.defaultDate);
 
@@ -204,7 +234,7 @@ export default function CohortCommandTab({
         operator_name: "Kareena Islam",
       });
       notifyDraftUpdate(
-        `Weather Pivot Executed for ${currentCohortMeta.title}: ${res.updated_trips_count} guests shifted indoors to Geodesic Sound Domes & Magnesium Flotation (Draft #${res.draft_id}).`
+        `Weather Pivot Executed for ${currentCohortMeta.title}: ${res.updated_trips_count} guests moved indoors to covered pavilion & spa suites (Draft #${res.draft_id}).`
       );
       onRefresh();
     } catch (err: unknown) {
@@ -284,10 +314,10 @@ export default function CohortCommandTab({
     setBusyAction("allergen");
     try {
       const res = await triggerAllergenQuarantineProtocol(selectedSlug, {
-        contaminated_item: "Artisanal Cacao & Macadamia Paste (Batch #MX-409)",
+        contaminated_item: "Tree Nut / Peanut Kitchen Alert",
         allergen_category: "TREE_NUT_PEANUT_CROSS_CONTAMINATION",
-        safe_alternative: "Single-Origin Organic Pumpkin Seed & Tahini Ganache",
-        action_notes: "Immediate quarantine of Batch #MX-409; sanitize prep stations 1 & 2.",
+        safe_alternative: "Dedicated Nut-Free Kitchen Prep",
+        action_notes: "Separate prep stations and verify nut-free plating for flagged guests.",
         operator_name: "Kareena Islam",
       });
       setAllergenAlertResult(res);
@@ -374,12 +404,12 @@ export default function CohortCommandTab({
     try {
       const res = await scheduleBodyworkSession(selectedSlug, {
         practitioner_name: bodyworkPractitioner,
-        practitioner_service: "90-Min Craniosacral & Vagal Fascia Release",
+        practitioner_service: "60-Min Private Massage & Bodywork",
         client_name: bodyworkGuestName,
         client_email: bodyworkGuestEmail,
         session_date: bodyworkDate,
         requested_time_slot: bodyworkTimeSlot,
-        duration_minutes: 90,
+        duration_minutes: 60,
       });
       if (res.allocated) {
         setBodyworkFeedback({
@@ -410,7 +440,9 @@ export default function CohortCommandTab({
       {/* 1. Cohort Selector Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3.5">
         {SANCTUARY_COHORTS.map((cohort) => {
-          const count = trips.filter((t) => t.sanctuary_slug === cohort.slug).length;
+          const count = trips.filter(
+            (t) => matchesCohortSlug(t.sanctuary_slug, cohort.slug) && isActiveCohortTrip(t)
+          ).length;
           const pct = Math.min(100, Math.round((count / cohort.capacity) * 100));
           const isSelected = selectedSlug === cohort.slug;
 
@@ -504,17 +536,164 @@ export default function CohortCommandTab({
           </div>
         </div>
 
-        {/* 3. Confirmed Cohort Guest Roster (Actual Visibility of Cohort Members) */}
+        {/* 3. Confirmed Cohort Guest Roster & Visual Suite Pairing Board */}
         <div>
-          <div className="flex items-center justify-between mb-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
             <h3 className="font-serif text-sm font-bold text-[#2D3E35] flex items-center space-x-2">
               <Users className="w-4 h-4 text-[#C07D63]" />
               <span>Cohort Guest &amp; Villa Roster ({cohortTrips.length} Guests)</span>
             </h3>
-            <span className="text-[11px] text-[#5C6B5E]">
-              1-click to schedule 1:1 bodywork sessions
-            </span>
+            <div className="flex items-center gap-2">
+              <div className="bg-[#FAF7F2] p-0.5 rounded-lg border border-[#E5DDD0] flex items-center text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setRosterViewMode("guests")}
+                  className={`px-2.5 py-1 rounded-md font-semibold cursor-pointer transition-colors ${
+                    rosterViewMode === "guests"
+                      ? "bg-[#2D3E35] text-[#FAF7F2]"
+                      : "text-[#5C6B5E] hover:text-[#2D3E35]"
+                  }`}
+                >
+                  Guest Cards
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRosterViewMode("suite_board")}
+                  className={`px-2.5 py-1 rounded-md font-semibold cursor-pointer transition-colors ${
+                    rosterViewMode === "suite_board"
+                      ? "bg-[#2D3E35] text-[#FAF7F2]"
+                      : "text-[#5C6B5E] hover:text-[#2D3E35]"
+                  }`}
+                >
+                  Visual Suite &amp; Roommate Board
+                </button>
+              </div>
+            </div>
           </div>
+
+          {rosterViewMode === "suite_board" && (
+            <div className="mb-4 p-4 rounded-xl bg-[#FAF7F2] border border-[#E5DDD0] space-y-3 animate-in fade-in text-xs">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E5DDD0] pb-2.5">
+                <div>
+                  <span className="text-[10px] font-mono uppercase font-bold text-[#C07D63] block">
+                    Visual Suite Allocation &amp; 50/50 Roommate Pairing
+                  </span>
+                  <div className="font-serif font-bold text-sm text-[#2D3E35]">
+                    Pair Solo Travelers or Split Any Shared Suite 50/50
+                  </div>
+                </div>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    const targetTrip =
+                      cohortTrips.find((t) => t.id === pairingPrimaryTripId) || cohortTrips[0];
+                    if (!targetTrip) return;
+                    const comp =
+                      pairingCompanionName.trim() ||
+                      `${targetTrip.client_name.split(" ")[0]}'s Roommate`;
+                    if (comp.toLowerCase() === targetTrip.client_name.trim().toLowerCase()) {
+                      notifyDraftUpdate("Notice: Roommate name must be different from the primary traveler.");
+                      return;
+                    }
+                    setBusyAction("pair_split");
+                    try {
+                      const res = await executeCopilotCrmAction({
+                        form_type: "split_companion_folio",
+                        action_type: "split_companion_folio",
+                        target_id: targetTrip.id,
+                        sanctuary_slug: selectedSlug,
+                        fields: {
+                          primary_name: targetTrip.client_name,
+                          companion_name: comp,
+                          total_investment: targetTrip.total_investment,
+                          room_tier: targetTrip.room_tier,
+                        },
+                      });
+                      setPairingCompanionName("");
+                      notifyDraftUpdate(
+                        res.summary ||
+                          `Paired ${targetTrip.client_name} & ${comp} and split folio 50/50.`
+                      );
+                      onRefresh();
+                    } finally {
+                      setBusyAction(null);
+                    }
+                  }}
+                  className="flex flex-wrap items-center gap-2"
+                >
+                  <select
+                    value={pairingPrimaryTripId || cohortTrips[0]?.id || ""}
+                    onChange={(e) => setPairingPrimaryTripId(e.target.value)}
+                    className="px-2.5 py-1.5 rounded-lg border border-[#E5DDD0] bg-white text-xs font-semibold text-[#2D3E35]"
+                  >
+                    {cohortTrips.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.client_name} ({t.room_tier})
+                      </option>
+                    ))}
+                  </select>
+                  <input
+                    type="text"
+                    value={pairingCompanionName}
+                    onChange={(e) => setPairingCompanionName(e.target.value)}
+                    placeholder="Roommate / Companion Name..."
+                    className="px-2.5 py-1.5 rounded-lg border border-[#E5DDD0] bg-white text-xs text-[#2D3E35]"
+                  />
+                  <button
+                    type="submit"
+                    disabled={busyAction === "pair_split" || cohortTrips.length === 0}
+                    className="px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white text-xs font-bold cursor-pointer disabled:opacity-50"
+                  >
+                    {busyAction === "pair_split" ? "Splitting..." : "Pair & Split 50/50"}
+                  </button>
+                </form>
+              </div>
+
+              {/* Grouped by Room / Villa Tier */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {Array.from(
+                  cohortTrips.reduce((acc, t) => {
+                    const tier = t.room_tier || "Sanctuary Master Villa";
+                    acc.set(tier, [...(acc.get(tier) || []), t]);
+                    return acc;
+                  }, new Map<string, CRMTripItem[]>())
+                ).map(([tier, tierTrips]) => (
+                  <div
+                    key={tier}
+                    className="p-3 rounded-xl bg-white border border-[#E5DDD0] space-y-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-serif font-bold text-xs text-[#2D3E35] flex items-center gap-1.5">
+                        <BedDouble className="w-3.5 h-3.5 text-[#C07D63]" />
+                        <span>{tier}</span>
+                      </span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#FAF7F2] border border-[#E5DDD0] text-[#5C6B5E]">
+                        {tierTrips.length} Assigned
+                      </span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {tierTrips.map((t) => (
+                        <div
+                          key={t.id}
+                          className="flex items-center justify-between p-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[11px]"
+                        >
+                          <div>
+                            <span className="font-bold text-[#2D3E35]">{t.client_name}</span>
+                            <span className="text-[#5C6B5E] ml-1.5">
+                              (${t.total_investment.toLocaleString()} USD)
+                            </span>
+                          </div>
+                          <span className="font-mono text-[10px] text-emerald-800 font-semibold">
+                            {t.title?.includes("50% Split") ? "50/50 Split Active" : "Single Folio"}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {cohortTrips.length === 0 ? (
             <div className="p-6 rounded-xl bg-[#FAF7F2] border border-[#E5DDD0] text-center space-y-1">
@@ -853,16 +1032,16 @@ export default function CohortCommandTab({
         )}
       </div>
 
-      {/* 5. 1:1 Master Bodywork & Somatic Practitioner Scheduling (Idiot-Proofed) */}
+      {/* 5. 1:1 Spa & Wellness Session Scheduling */}
       <div id="bodywork-scheduler-section" className="bg-white p-5 rounded-xl border border-[#E5DDD0] shadow-xs space-y-3">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#E5DDD0] pb-3">
           <div>
             <h3 className="font-serif text-base font-bold text-[#2D3E35] flex items-center space-x-2">
               <Calendar className="w-4 h-4 text-[#C07D63]" />
-              <span>1:1 Master Bodywork &amp; Somatic Practitioner Scheduling</span>
+              <span>1:1 Spa &amp; Wellness Session Scheduling</span>
             </h3>
             <p className="text-xs text-[#5C6B5E] mt-0.5">
-              Prevents concurrent double-booking of scarce 1:1 clinical practitioners and automatically proposes adjacent slots on collision.
+              Prevents double-booking of 1:1 spa and wellness sessions and suggests the next open time slot if taken.
             </p>
           </div>
         </div>
@@ -956,9 +1135,9 @@ export default function CohortCommandTab({
               onChange={(e) => setBodyworkPractitioner(e.target.value)}
               className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-[#E5DDD0] bg-[#FAF7F2] text-[#2D3E35]"
             >
-              <option value="Mateo Silva (Master Craniosacral)">Mateo Silva (Craniosacral)</option>
-              <option value="Dr. Sofia Mendez (Vagal Acupuncture)">Dr. Sofia Mendez (Acupuncture)</option>
-              <option value="Kareena Islam, BSN, RN (Somatic Consultation)">Kareena Islam, RN (Clinical)</option>
+              <option value="Mateo Silva (Massage & Bodywork)">Mateo Silva (Massage &amp; Bodywork)</option>
+              <option value="Sofia Mendez (Acupuncture)">Sofia Mendez (Acupuncture)</option>
+              <option value="Kareena Islam, RN (Wellness Check-In)">Kareena Islam, RN (Wellness Check-In)</option>
             </select>
           </div>
 

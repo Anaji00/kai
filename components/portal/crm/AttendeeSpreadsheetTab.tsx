@@ -51,7 +51,14 @@ export interface AttendeeRow {
   roomNumber: string;
   assignedHost: string;
   groupCategory: "confirmed" | "in_review" | "waitlist";
-  bookingStatus: "Confirmed" | "Deposit Paid" | "In Review" | "Waitlist" | "Completed";
+  bookingStatus:
+    | "Confirmed"
+    | "Deposit Paid"
+    | "In Review"
+    | "Waitlist"
+    | "Completed"
+    | "Cancelled"
+    | "Medical Freeze";
   totalPrice: number;
   amountPaid: number;
   balanceDue: number;
@@ -138,8 +145,51 @@ const STATUS_CONFIG: Record<
     text: "text-white",
     group: "waitlist",
   },
+  Cancelled: {
+    label: "Cancelled",
+    dbStatus: "CANCELLED",
+    bg: "bg-rose-700 hover:bg-rose-800",
+    text: "text-white",
+    group: "waitlist",
+  },
+  "Medical Freeze": {
+    label: "Medical Freeze",
+    dbStatus: "MEDICAL_FREEZE",
+    bg: "bg-indigo-700 hover:bg-indigo-800",
+    text: "text-white",
+    group: "waitlist",
+  },
 };
 
+function escapeCsvCell(raw: unknown): string {
+  const str = String(raw ?? "").replace(/\r?\n/g, " ").trim();
+  // Prevent spreadsheet formula injection (=, +, -, @) while keeping negative numbers safe
+  const safeStr = /^[=+\-@]/.test(str) && !/^-\d+(\.\d+)?$/.test(str) ? `'${str}` : str;
+  return `"${safeStr.replace(/"/g, '""')}"`;
+}
+
+function downloadCsvRows(filename: string, headers: string[], rowsData: unknown[][]) {
+  const csvContent = [
+    headers.map(escapeCsvCell).join(","),
+    ...rowsData.map((row) => row.map(escapeCsvCell).join(",")),
+  ].join("\n");
+  const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function normalizeWhatsAppPhone(rawPhone?: string): string {
+  const digits = (rawPhone || "").replace(/\D/g, "");
+  if (!digits) return "17135550148";
+  if (digits.length === 10) return `1${digits}`;
+  return digits;
+}
 function normalizeSanctuarySlug(raw?: string): string {
   const s = (raw || "").toLowerCase();
   if (s.includes("vallarta") || s.includes("pvr")) return "puerto-vallarta-2027";
@@ -183,6 +233,7 @@ export default function AttendeeSpreadsheetTab({
 
   // 1-Click GUI Hospitality Quick Tools State
   const [copiedEmails, setCopiedEmails] = useState(false);
+  const [showAutoChasePanel, setShowAutoChasePanel] = useState(false);
   // Concierge Lens Triage Filter State
   const [activeLens, setActiveLens] = useState<"ALL" | "ALERTS" | "BALANCE_DUE" | "MISSING_FLIGHT" | "PENDING_CLEARANCE">(
     initialLens || "ALL"
@@ -247,32 +298,51 @@ export default function AttendeeSpreadsheetTab({
 
   const saveTimerRef = useRef<Record<string, NodeJS.Timeout>>({});
 
+  const isInactiveRow = (r: AttendeeRow) =>
+    r.bookingStatus === "Cancelled" || r.bookingStatus === "Medical Freeze";
+
   const pendingCount = useMemo(() => {
     return rows.filter((r) => r.bookingStatus === "In Review" || r.bookingStatus === "Deposit Paid").length;
   }, [rows]);
 
   const dietAlertCount = useMemo(() => {
     return rows.filter((r) => {
+      if (isInactiveRow(r)) return false;
       const diet = (r.dietaryNotes || "").toLowerCase();
-      return diet && !diet.includes("standard") && !diet.includes("none") && diet !== "seed-oil-free organic menu";
+      return diet && !diet.includes("standard") && !diet.includes("none") && !diet.includes("no restrictions");
     }).length;
   }, [rows]);
 
   const balanceDueCount = useMemo(() => {
-    return rows.filter((r) => r.balanceDue > 0).length;
+    return rows.filter((r) => !isInactiveRow(r) && r.balanceDue > 0).length;
   }, [rows]);
 
   const missingFlightCount = useMemo(() => {
     return rows.filter(
       (r) =>
-        r.flightStatus === "Awaiting Flight Details" ||
-        !r.flightDetails ||
-        r.flightDetails.toLowerCase().includes("awaiting")
+        !isInactiveRow(r) &&
+        (r.flightStatus === "Awaiting Flight Details" ||
+          !r.flightDetails ||
+          r.flightDetails.toLowerCase().includes("awaiting"))
     ).length;
   }, [rows]);
 
   const pendingClearanceCount = useMemo(() => {
-    return rows.filter((r) => r.waiverStatus !== "Signed" || r.medicalClearance !== "Cleared").length;
+    return rows.filter(
+      (r) => !isInactiveRow(r) && (r.waiverStatus !== "Signed" || r.medicalClearance !== "Cleared")
+    ).length;
+  }, [rows]);
+
+  const needsChaseRows = useMemo(() => {
+    return rows.filter(
+      (r) =>
+        !isInactiveRow(r) &&
+        (r.balanceDue > 0 ||
+          r.flightStatus === "Awaiting Flight Details" ||
+          !r.flightDetails ||
+          r.flightDetails.toLowerCase().includes("awaiting") ||
+          r.waiverStatus !== "Signed")
+    );
   }, [rows]);
 
   const handleToggleSelectAll = () => {
@@ -350,29 +420,22 @@ export default function AttendeeSpreadsheetTab({
       "Dietary & Health Notes",
     ];
     const csvRows = targetRows.map((r) => [
-      `"${r.name}"`,
-      `"${r.email}"`,
-      `"${r.sanctuaryName}"`,
-      `"${r.roomTier}"`,
-      `"${r.bookingStatus}"`,
+      r.name,
+      r.email,
+      r.sanctuaryName,
+      r.roomTier,
+      r.bookingStatus,
       r.totalPrice,
       r.amountPaid,
       r.balanceDue,
-      `"${r.flightDetails}"`,
-      `"${r.dietaryNotes}"`,
+      r.flightDetails,
+      r.dietaryNotes,
     ]);
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...csvRows.map((e) => e.join(","))].join("\n");
-    const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute(
-      "download",
-      `KAI_Selected_Guests_${new Date().toISOString().slice(0, 10)}.csv`
+    downloadCsvRows(
+      `KAI_Selected_Guests_${new Date().toISOString().slice(0, 10)}.csv`,
+      headers,
+      csvRows
     );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   const handleOneClickConfirmAllPending = () => {
@@ -436,25 +499,28 @@ export default function AttendeeSpreadsheetTab({
         (emailKey ? clientByEmailMap.get(emailKey) : null) ||
         (nameKey ? clientByNameMap.get(nameKey) : null);
 
-      const total = Number(trip.total_investment || 14500);
-      const paid = Number(
-        trip.paid_amount ??
-          trip.deposit_amount ??
-          (trip.status === "CONFIRMED" ? Math.round(total * 0.3) : 0)
-      );
-      const balance = Math.max(0, total - paid);
-
       const stUpper = (trip.status || "").toUpperCase();
       let bookingStatus: AttendeeRow["bookingStatus"] = "Confirmed";
       let group: AttendeeRow["groupCategory"] = "confirmed";
 
-      if (stUpper.includes("WAITLIST")) {
+      if (stUpper.includes("CANCEL")) {
+        bookingStatus = "Cancelled";
+        group = "waitlist";
+      } else if (stUpper.includes("FREEZE")) {
+        bookingStatus = "Medical Freeze";
+        group = "waitlist";
+      } else if (stUpper.includes("WAITLIST")) {
         bookingStatus = "Waitlist";
         group = "waitlist";
       } else if (stUpper.includes("DEPOSIT") || stUpper.includes("HOLD")) {
         bookingStatus = "Deposit Paid";
         group = "in_review";
-      } else if (stUpper.includes("PROPOSAL") || stUpper.includes("INQUIRY") || stUpper.includes("REVIEW") || stUpper.includes("PENDING")) {
+      } else if (
+        stUpper.includes("PROPOSAL") ||
+        stUpper.includes("INQUIRY") ||
+        stUpper.includes("REVIEW") ||
+        stUpper.includes("PENDING")
+      ) {
         bookingStatus = "In Review";
         group = "in_review";
       } else if (stUpper.includes("COMPLETE")) {
@@ -462,13 +528,30 @@ export default function AttendeeSpreadsheetTab({
         group = "waitlist";
       }
 
+      const total = Number(trip.total_investment ?? 0);
+      const paid = Number(trip.paid_amount ?? 0);
+      const balance =
+        bookingStatus === "Cancelled" || bookingStatus === "Medical Freeze"
+          ? 0
+          : Math.max(0, Math.round((total - paid) * 100) / 100);
+
+      const hasFlightData = Boolean(
+        trip.smart_flight?.flight_number ||
+          trip.smart_flight?.airline ||
+          (trip.flight_details && !trip.flight_details.toLowerCase().includes("awaiting"))
+      );
+      const formattedFlight =
+        trip.smart_flight?.airline || trip.smart_flight?.flight_number
+          ? `${trip.smart_flight.airline || ""} ${trip.smart_flight.flight_number || ""}`.trim()
+          : trip.flight_details || "Awaiting Flight Details";
+
       const normSlug = normalizeSanctuarySlug(trip.sanctuary_slug);
       const sanctuary =
         SANCTUARY_OPTIONS.find((s) => s.slug === normSlug) || SANCTUARY_OPTIONS[0];
 
       return {
         id: trip.id || `att_${idx + 1}`,
-        clientId: matchedClient?.id,
+        clientId: matchedClient?.id || trip.client_id,
         tripId: trip.id,
         crmTripId: trip.crm_trip_id,
         name: trip.client_name || matchedClient?.full_name || "Sanctuary Guest",
@@ -476,8 +559,8 @@ export default function AttendeeSpreadsheetTab({
         phone: trip.client_phone || matchedClient?.phone || "+1 (555) 019-2834",
         sanctuarySlug: sanctuary.slug,
         sanctuaryName: sanctuary.name,
-        checkInDate: "2026-11-14",
-        checkOutDate: "2026-11-20",
+        checkInDate: trip.dates || "TBD",
+        checkOutDate: trip.dates || "TBD",
         nights: 6,
         roomTier: trip.room_tier || "Private Villa Sanctuary",
         roomNumber: trip.assigned_room_number || `Villa ${idx + 1}`,
@@ -487,17 +570,15 @@ export default function AttendeeSpreadsheetTab({
         totalPrice: total,
         amountPaid: paid,
         balanceDue: balance,
-        flightStatus: trip.smart_flight?.airline
+        flightStatus: hasFlightData
           ? "Flight Booked & Chauffeur Set"
           : "Awaiting Flight Details",
-        flightDetails: trip.smart_flight?.airline
-          ? `${trip.smart_flight.airline} ${trip.smart_flight.flight_number || ""}`.trim()
-          : trip.flight_details || "Grand Travel VIP Desk",
+        flightDetails: formattedFlight,
         dietaryNotes:
           matchedClient?.dietary_requirements ||
           trip.dietary_notes ||
           matchedClient?.health_notes ||
-          "Seed-oil-free organic menu",
+          "No restrictions",
         wellnessClearance: "Confirmed",
         waiverStatus:
           matchedClient?.waiver_status === "SIGNED"
@@ -517,6 +598,19 @@ export default function AttendeeSpreadsheetTab({
 
     setRows(mappedRows);
   }, [clients, trips]);
+
+  // Listen for Copilot lens filter commands
+  useEffect(() => {
+    const handleCrmCmd = (e: Event) => {
+      const ce = e as CustomEvent<Record<string, any>>;
+      const lens = ce.detail?.lens;
+      if (lens === "ALL" || lens === "ALERTS" || lens === "BALANCE_DUE" || lens === "MISSING_FLIGHT") {
+        setActiveLens(lens);
+      }
+    };
+    window.addEventListener("kai:crm:command", handleCrmCmd);
+    return () => window.removeEventListener("kai:crm:command", handleCrmCmd);
+  }, []);
 
   // Persist row update to backend SQLite CRM database (debounced 450ms for typing)
   const syncRowToBackend = (updatedRow: AttendeeRow) => {
@@ -563,7 +657,10 @@ export default function AttendeeSpreadsheetTab({
         if (field === "totalPrice" || field === "amountPaid") {
           const total = field === "totalPrice" ? Number(value) || 0 : row.totalPrice;
           const paid = field === "amountPaid" ? Number(value) || 0 : row.amountPaid;
-          updated.balanceDue = Math.max(0, total - paid);
+          updated.balanceDue =
+            updated.bookingStatus === "Cancelled" || updated.bookingStatus === "Medical Freeze"
+              ? 0
+              : Math.max(0, Math.round((total - paid) * 100) / 100);
         }
 
         if (field === "bookingStatus") {
@@ -571,6 +668,10 @@ export default function AttendeeSpreadsheetTab({
           if (conf) {
             updated.groupCategory = conf.group;
           }
+          updated.balanceDue =
+            value === "Cancelled" || value === "Medical Freeze"
+              ? 0
+              : Math.max(0, Math.round((updated.totalPrice - updated.amountPaid) * 100) / 100);
         }
 
         if (field === "sanctuarySlug") {
@@ -657,14 +758,17 @@ export default function AttendeeSpreadsheetTab({
   const handleDuplicateRow = async (row: AttendeeRow) => {
     setSaveState("saving");
     try {
-      const copyName = `${row.name} (Guest 2)`;
+      const baseName = row.name.replace(/\s*\(Guest\s+\d+\)$/i, "").trim();
+      const existingCopies = rows.filter((r) => r.name.startsWith(baseName)).length;
+      const copyName = `${baseName} (Guest ${existingCopies + 1})`;
+      const baseEmail = row.email.replace(/^guest\d+\./i, "");
       await executeCopilotCrmAction({
         form_type: "crm_mutation",
         action_type: "create_crm_record",
         sanctuary_slug: row.sanctuarySlug,
         fields: {
           client_name: copyName,
-          email: `guest2.${row.email}`,
+          email: `guest${existingCopies + 1}.${baseEmail}`,
           sanctuary_slug: row.sanctuarySlug,
           room_tier: row.roomTier,
           status: STATUS_CONFIG[row.bookingStatus]?.dbStatus || "CONFIRMED",
@@ -697,29 +801,22 @@ export default function AttendeeSpreadsheetTab({
       "Dietary & Health Notes",
     ];
     const csvRows = rows.map((r) => [
-      `"${r.name}"`,
-      `"${r.email}"`,
-      `"${r.sanctuaryName}"`,
-      `"${r.roomTier}"`,
-      `"${r.bookingStatus}"`,
+      r.name,
+      r.email,
+      r.sanctuaryName,
+      r.roomTier,
+      r.bookingStatus,
       r.totalPrice,
       r.amountPaid,
       r.balanceDue,
-      `"${r.flightDetails}"`,
-      `"${r.dietaryNotes}"`,
+      r.flightDetails,
+      r.dietaryNotes,
     ]);
-    const csvContent =
-      "data:text/csv;charset=utf-8," +
-      [headers.join(","), ...csvRows.map((e) => e.join(","))].join("\n");
-    const link = document.createElement("a");
-    link.setAttribute("href", encodeURI(csvContent));
-    link.setAttribute(
-      "download",
-      `KAI_Sanctuary_Guests_${new Date().toISOString().slice(0, 10)}.csv`
+    downloadCsvRows(
+      `KAI_Sanctuary_Guests_${new Date().toISOString().slice(0, 10)}.csv`,
+      headers,
+      csvRows
     );
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   // Print Guest Dossier
@@ -772,21 +869,25 @@ export default function AttendeeSpreadsheetTab({
       let matchesLens = true;
       if (activeLens === "ALERTS") {
         const diet = (r.dietaryNotes || "").toLowerCase();
-        matchesLens = Boolean(
-          diet &&
-          !diet.includes("standard") &&
-          !diet.includes("none") &&
-          diet !== "seed-oil-free organic menu"
-        );
+        matchesLens =
+          !isInactiveRow(r) &&
+          Boolean(
+            diet &&
+              !diet.includes("standard") &&
+              !diet.includes("none") &&
+              !diet.includes("no restrictions")
+          );
       } else if (activeLens === "BALANCE_DUE") {
-        matchesLens = r.balanceDue > 0;
+        matchesLens = !isInactiveRow(r) && r.balanceDue > 0;
       } else if (activeLens === "MISSING_FLIGHT") {
         matchesLens =
-          r.flightStatus === "Awaiting Flight Details" ||
-          !r.flightDetails ||
-          r.flightDetails.toLowerCase().includes("awaiting");
+          !isInactiveRow(r) &&
+          (r.flightStatus === "Awaiting Flight Details" ||
+            !r.flightDetails ||
+            r.flightDetails.toLowerCase().includes("awaiting"));
       } else if (activeLens === "PENDING_CLEARANCE") {
-        matchesLens = r.waiverStatus !== "Signed" || r.medicalClearance !== "Cleared";
+        matchesLens =
+          !isInactiveRow(r) && (r.waiverStatus !== "Signed" || r.medicalClearance !== "Cleared");
       }
 
       return matchesSearch && matchesDest && matchesStatus && matchesLens;
@@ -807,10 +908,11 @@ export default function AttendeeSpreadsheetTab({
     return res;
   }, [rows, deferredSearchQuery, destinationFilter, statusFilter, activeLens, sortField, sortOrder]);
 
+  const activeFilteredRows = filteredRows.filter((r) => !isInactiveRow(r));
   const totalAttendees = filteredRows.length;
-  const totalBilled = filteredRows.reduce((sum, r) => sum + r.totalPrice, 0);
-  const totalCollected = filteredRows.reduce((sum, r) => sum + r.amountPaid, 0);
-  const totalOutstanding = filteredRows.reduce((sum, r) => sum + r.balanceDue, 0);
+  const totalBilled = activeFilteredRows.reduce((sum, r) => sum + r.totalPrice, 0);
+  const totalCollected = activeFilteredRows.reduce((sum, r) => sum + r.amountPaid, 0);
+  const totalOutstanding = activeFilteredRows.reduce((sum, r) => sum + r.balanceDue, 0);
 
   return (
     <div className="space-y-4">
@@ -1022,6 +1124,9 @@ export default function AttendeeSpreadsheetTab({
               <option value="Deposit Paid">Deposit Paid</option>
               <option value="In Review">In Review</option>
               <option value="Waitlist">Waitlist</option>
+              <option value="Completed">Completed</option>
+              <option value="Cancelled">Cancelled</option>
+              <option value="Medical Freeze">Medical Freeze</option>
             </select>
           </div>
 
@@ -1054,7 +1159,7 @@ export default function AttendeeSpreadsheetTab({
                     arrival: r.checkInDate,
                   })),
                   kitchen_protocols: [
-                    "All culinary preparations strictly organic, seed-oil-free, and farm-to-table.",
+                    "Chef-prepared group meals with labeled allergen alternatives.",
                   ],
                 });
               }}
@@ -1068,29 +1173,29 @@ export default function AttendeeSpreadsheetTab({
               type="button"
               onClick={() => {
                 printCohortManifest({
-                  title: "Executive Chef Dietary & Allergy Directive Manifest",
+                  title: "Kitchen Dietary & Allergy Sheet",
                   dates: "Active Retreat Service",
                   location:
                     destinationFilter !== "ALL"
                       ? destinationFilter
-                      : "Sanctuary Kitchen & Dining Shala",
+                      : "Retreat Kitchen & Dining Area",
                   capacity: filteredRows.length,
                   guests: filteredRows.map((r) => ({
                     guest_name: r.name,
                     room_tier: r.roomTier,
-                    dietary_notes: r.dietaryNotes || "Standard Blue Zone Organic Dining",
-                    clinical_flags: r.dietaryNotes && !r.dietaryNotes.toLowerCase().includes("standard") ? ["SPECIAL_DIET"] : [],
+                    dietary_notes: r.dietaryNotes || "No restrictions",
+                    clinical_flags: r.dietaryNotes && !r.dietaryNotes.toLowerCase().includes("no restrictions") ? ["SPECIAL_DIET"] : [],
                     flight: r.flightDetails,
                     arrival: r.checkInDate,
                   })),
                   kitchen_protocols: [
-                    "100% Seed-Oil-Free cooking fat standard (single-origin cold-pressed olive oil & coconut oil only).",
-                    "Dedicated prep surface separation for celiac and severe nut allergies.",
+                    "Separate prep surfaces for gluten-free and severe nut allergies.",
+                    "Confirm all guest dietary notes prior to welcome dinner.",
                   ],
                 });
               }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
-              title="Print Kitchen Directive for Executive Chef"
+              title="Print Kitchen Sheet for Chef"
             >
               <Utensils className="w-3.5 h-3.5 text-amber-800" />
               <span>Print Kitchen Sheet</span>
@@ -1100,8 +1205,8 @@ export default function AttendeeSpreadsheetTab({
               type="button"
               onClick={() => {
                 printCohortManifest({
-                  title: "VIP Gateway Airport Chauffeur & Flight Arrival Manifest",
-                  dates: "Active Inbound & Outbound Flight Service",
+                  title: "Airport Transfer & Flight Arrival Sheet",
+                  dates: "Inbound & Outbound Transfers",
                   location:
                     destinationFilter !== "ALL"
                       ? destinationFilter
@@ -1115,12 +1220,12 @@ export default function AttendeeSpreadsheetTab({
                     arrival: r.checkInDate,
                   })),
                   kitchen_protocols: [
-                    "High-clearance luxury SUV escorts with chilled hydration and adaptogenic mist.",
+                    "Private airport pickup with chilled water and direct resort transfer.",
                   ],
                 });
               }}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
-              title="Print Chauffeur Schedule for Drivers"
+              title="Print Transfer Schedule for Drivers"
             >
               <Plane className="w-3.5 h-3.5 text-blue-800" />
               <span>Print Driver Sheet</span>
@@ -1128,11 +1233,11 @@ export default function AttendeeSpreadsheetTab({
           </div>
         </div>
 
-        {/* Concierge Lens Triage Strip (Zero-Search Staff Operations) */}
+        {/* Quick Filter Strip */}
         <div className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-[#FAF7F2] border border-[#E5DDD0]">
           <div className="flex items-center gap-1.5 flex-wrap">
             <span className="text-[10px] font-mono uppercase font-bold text-[#5C6B5E] mr-1">
-              Concierge Lens:
+              Quick Filter:
             </span>
             <button
               type="button"
@@ -1154,7 +1259,7 @@ export default function AttendeeSpreadsheetTab({
                   : "bg-white text-amber-900 border border-amber-200 hover:bg-amber-50"
               }`}
             >
-              Clinical &amp; Dietary Flags ({dietAlertCount})
+              Dietary &amp; Allergy Notes ({dietAlertCount})
             </button>
             <button
               type="button"
@@ -1191,7 +1296,31 @@ export default function AttendeeSpreadsheetTab({
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={async () => {
+                setShowAutoChasePanel((prev) => !prev);
+                await executeCopilotCrmAction({
+                  form_type: "auto_chase_missing",
+                  action_type: "auto_chase_missing",
+                  sanctuary_slug: destinationFilter === "ALL" ? "puerto-vallarta-2027" : destinationFilter,
+                });
+                setSaveState("saved");
+                setSaveMessage("Audited missing flights, waivers & balances");
+              }}
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-bold transition cursor-pointer border ${
+                showAutoChasePanel
+                  ? "bg-[#2D3E35] text-[#FAF7F2] border-[#2D3E35]"
+                  : "bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300"
+              }`}
+              title="Scan all guests for missing flights, unsigned waivers, or unpaid 70% balances and generate 1-click WhatsApp/Email reminders"
+            >
+              <Sparkles className="w-3 h-3 text-amber-600" />
+              <span>
+                Auto-Chase Missing ({needsChaseRows.length})
+              </span>
+            </button>
             <button
               type="button"
               onClick={handleOneClickConfirmAllPending}
@@ -1211,6 +1340,105 @@ export default function AttendeeSpreadsheetTab({
             </button>
           </div>
         </div>
+
+        {/* Auto-Chase Missing Items 1-Click Outreach Panel */}
+        {showAutoChasePanel && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50/70 p-3.5 space-y-2.5 animate-in fade-in text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 pb-2">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-700" />
+                <span className="font-bold text-[#2D3E35]">
+                  1-Click Auto-Chase Queue (Balances, Flight Numbers &amp; Waivers)
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await executeCopilotCrmAction({
+                      form_type: "batch_crm_update",
+                      action_type: "batch_crm_update",
+                      fields: { batch_operation: "mark all waivers signed" },
+                    });
+                    setSaveState("saved");
+                    setSaveMessage("Marked all cohort waivers signed");
+                    onRefreshData?.();
+                  }}
+                  className="px-2.5 py-1 rounded-md bg-emerald-700 hover:bg-emerald-800 text-white text-[11px] font-semibold cursor-pointer"
+                >
+                  Mark All Waivers Signed
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowAutoChasePanel(false)}
+                  className="text-[#5C6B5E] hover:text-[#2D3E35] font-semibold cursor-pointer"
+                >
+                  Hide
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {needsChaseRows
+                .slice(0, 6)
+                .map((r) => {
+                  const missingList: string[] = [];
+                  if (r.balanceDue > 0) missingList.push(`$${r.balanceDue.toLocaleString()} balance`);
+                  if (
+                    r.flightStatus === "Awaiting Flight Details" ||
+                    !r.flightDetails ||
+                    r.flightDetails.toLowerCase().includes("awaiting")
+                  ) {
+                    missingList.push("flight #");
+                  }
+                  if (r.waiverStatus !== "Signed") missingList.push("waiver");
+                  const cleanDigits = normalizeWhatsAppPhone(r.phone);
+                  const checkInPath = `/my-retreat?ref=${encodeURIComponent(r.crmTripId || r.tripId || r.id)}`;
+                  const checkInUrl =
+                    typeof window !== "undefined" ? `${window.location.origin}${checkInPath}` : checkInPath;
+                  const msgBody = encodeURIComponent(
+                    `Hi ${r.name.split(" ")[0]}, warm greetings from KAI Sanctuary! Quick check-in for your ${r.sanctuaryName.split(",")[0]} stay (${r.roomTier}): could you confirm your ${missingList.join(" & ")} on your 60-second arrival pass here: ${checkInUrl} ? Thank you!`
+                  );
+                  return (
+                    <div
+                      key={r.id}
+                      className="rounded-lg bg-white border border-[#E5DDD0] p-2.5 flex items-center justify-between gap-2"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-bold text-[#2D3E35] truncate">{r.name}</div>
+                        <div className="text-[11px] text-amber-900 truncate">
+                          Needs: <strong>{missingList.join(", ")}</strong>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <a
+                          href={checkInPath}
+                          className="px-2 py-1 rounded bg-[#2D3E35] hover:bg-[#1f2c25] text-[#FAF7F2] text-[10px] font-bold"
+                          title="Open Guest Self-Service Magic Check-In Pass"
+                        >
+                          Pass
+                        </a>
+                        <a
+                          href={`https://wa.me/${cleanDigits}?text=${msgBody}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200 text-[10px] font-bold"
+                        >
+                          WhatsApp
+                        </a>
+                        <a
+                          href={`mailto:${r.email}?subject=${encodeURIComponent(`KAI Sanctuary Quick Check-In: ${r.name}`)}&body=${msgBody}`}
+                          className="px-2 py-1 rounded bg-[#FAF7F2] hover:bg-[#F2ECE4] text-[#2D3E35] border border-[#E5DDD0] text-[10px] font-semibold"
+                        >
+                          Email
+                        </a>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
 
         {/* Multi-Select Floating Batch Actions Bar */}
         {selectedRowIds.size > 0 && (
@@ -1400,10 +1628,10 @@ export default function AttendeeSpreadsheetTab({
                                 <button
                                   type="button"
                                   onClick={() => onInspectGuest(row.clientId!)}
-                                  title="Inspect 360 Dossier"
-                                  className="text-[10px] text-emerald-800 hover:text-emerald-950 px-1 py-0.5 rounded hover:bg-emerald-50 shrink-0 font-semibold transition-colors"
+                                  title="Open Guest Profile"
+                                  className="text-[10px] text-emerald-800 hover:text-emerald-950 px-1 py-0.5 rounded hover:bg-emerald-50 shrink-0 font-semibold transition-colors cursor-pointer"
                                 >
-                                  Dossier
+                                  Profile
                                 </button>
                               )}
                             </div>
@@ -1489,8 +1717,16 @@ export default function AttendeeSpreadsheetTab({
                           <option value="Completed" className="bg-white text-stone-800 font-bold">
                             Completed
                           </option>
+                          <option value="Cancelled" className="bg-white text-rose-800 font-bold">
+                            Cancelled
+                          </option>
+                          <option value="Medical Freeze" className="bg-white text-indigo-800 font-bold">
+                            Medical Freeze
+                          </option>
                         </select>
-                        {row.bookingStatus !== "Confirmed" && (
+                        {(row.bookingStatus === "In Review" ||
+                          row.bookingStatus === "Deposit Paid" ||
+                          row.bookingStatus === "Waitlist") && (
                           <button
                             type="button"
                             onClick={() => handleUpdateRow(row.id, "bookingStatus", "Confirmed")}
@@ -1559,7 +1795,7 @@ export default function AttendeeSpreadsheetTab({
                         />
                         {/* 1-Click Dietary Preset Chips */}
                         <div className="flex flex-wrap gap-1 mt-1">
-                          {["Gluten-Free", "Seed-Oil-Free", "Vegan", "Nut-Free"].map((dietTag) => (
+                          {["Gluten-Free", "Dairy-Free", "Vegan", "Nut-Free"].map((dietTag) => (
                             <button
                               key={dietTag}
                               type="button"
@@ -1601,12 +1837,12 @@ export default function AttendeeSpreadsheetTab({
                           </span>
                           <span
                             className={`px-1.5 py-0.2 rounded border font-semibold ${
-                              row.flightDetails && !row.flightDetails.toLowerCase().includes("awaiting")
+                              row.flightStatus !== "Awaiting Flight Details"
                                 ? "bg-emerald-50 text-emerald-800 border-emerald-200"
                                 : "bg-amber-50 text-amber-800 border-amber-200"
                             }`}
                           >
-                            Flight: {row.flightDetails && !row.flightDetails.toLowerCase().includes("awaiting") ? "Set" : "Missing"}
+                            Flight: {row.flightStatus !== "Awaiting Flight Details" ? "Set" : "Missing"}
                           </span>
                           <span
                             className={`px-1.5 py-0.2 rounded border font-semibold ${
@@ -1643,6 +1879,15 @@ export default function AttendeeSpreadsheetTab({
                               <Compass className="w-3.5 h-3.5" />
                             </button>
                           )}
+                          <a
+                            href={`/my-retreat?ref=${encodeURIComponent(row.crmTripId || row.tripId || row.id)}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Open Guest Proposal & Arrival Check-In Pass"
+                            className="p-1.5 text-emerald-800 hover:text-emerald-950 hover:bg-emerald-50 rounded transition-colors cursor-pointer"
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                          </a>
                           <button
                             type="button"
                             onClick={() => handlePrintDossier(row)}
@@ -1677,7 +1922,7 @@ export default function AttendeeSpreadsheetTab({
             {filteredRows.length > 0 && (
               <tfoot>
                 <tr className="bg-[#FAF8F5] text-xs font-bold text-[#2D3E35] border-t border-[#E5DDD0]">
-                  <td className="py-2.5 px-3" colSpan={4}>
+                  <td className="py-2.5 px-3" colSpan={5}>
                     Total ({totalAttendees} {totalAttendees === 1 ? "Guest" : "Guests"})
                   </td>
                   <td className="py-2.5 px-3 text-right">

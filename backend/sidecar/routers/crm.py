@@ -9,6 +9,7 @@ import secrets
 import uuid
 import threading
 import math
+import re
 
 _cohort_reservation_lock = threading.Lock()
 _bodywork_scheduling_lock = threading.Lock()
@@ -129,6 +130,47 @@ def get_crm_client_detail(client_id: str, db: Session = Depends(get_db)):
             })
     unified_activities.sort(key=lambda a: a.get("timestamp") or "", reverse=True)
 
+    def _client_trip_paid(t: CRMTrip) -> float:
+        hist = t.payment_history or []
+        if hist:
+            return round(sum(float(p.get("amount", 0.0)) for p in hist), 2)
+        fin_st = (t.final_balance_status or "").upper()
+        dep_st = (t.deposit_status or "").upper()
+        if fin_st in ("PAID", "PAID_IN_FULL", "SETTLED_IN_FULL"):
+            return round(float(t.total_investment or 0.0), 2)
+        if dep_st in ("PAID", "DEPOSIT_PAID", "PARTIALLY_PAID"):
+            return round(max(0.0, float(t.total_investment or 0.0) - float(t.final_balance or 0.0)), 2)
+        return 0.0
+
+    trip_summaries = []
+    total_paid_all = 0.0
+    total_balance_due_all = 0.0
+    for t in trips:
+        t_paid = _client_trip_paid(t)
+        is_inactive = (t.status or "").upper() in ("CANCELLED", "MEDICAL_FREEZE")
+        t_bal = 0.0 if is_inactive else round(max(0.0, float(t.total_investment or 0.0) - t_paid), 2)
+        total_paid_all = round(total_paid_all + t_paid, 2)
+        total_balance_due_all = round(total_balance_due_all + t_bal, 2)
+        trip_summaries.append({
+            "id": t.id,
+            "crm_trip_id": t.crm_trip_id,
+            "title": t.title,
+            "sanctuary_slug": t.sanctuary_slug,
+            "dates": t.dates,
+            "room_tier": t.room_tier,
+            "status": t.status,
+            "total_investment": t.total_investment,
+            "deposit_amount": t.deposit_amount,
+            "deposit_status": t.deposit_status,
+            "paid_amount": t_paid,
+            "final_balance": t_bal,
+            "final_balance_status": t.final_balance_status,
+            "currency": t.currency or "USD",
+            "smart_flight": t.smart_flight,
+            "proposal_url": t.proposal_url or f"/my-retreat?ref={t.crm_trip_id}",
+            "deep_link": t.deep_link,
+        })
+
     return {
         "client": {
             "id": client.id,
@@ -148,7 +190,9 @@ def get_crm_client_detail(client_id: str, db: Session = Depends(get_db)):
             "companion_id": getattr(client, "companion_id", None),
             "companion_name": getattr(client, "companion_name", None),
             "loyalty_programs": client.loyalty_programs or {},
-            "total_lifetime_spend": client.total_lifetime_spend,
+            "total_lifetime_spend": max(float(client.total_lifetime_spend or 0.0), total_paid_all),
+            "total_paid_all_trips": total_paid_all,
+            "total_balance_due": total_balance_due_all,
             "total_trips_count": len(trips) or client.total_trips_count,
             "source": client.source,
             "notes": client.notes,
@@ -156,23 +200,7 @@ def get_crm_client_detail(client_id: str, db: Session = Depends(get_db)):
             "created_at": client.created_at.isoformat(),
         },
         "activities": unified_activities,
-        "trips": [
-            {
-                "id": t.id,
-                "crm_trip_id": t.crm_trip_id,
-                "title": t.title,
-                "sanctuary_slug": t.sanctuary_slug,
-                "dates": t.dates,
-                "room_tier": t.room_tier,
-                "status": t.status,
-                "total_investment": t.total_investment,
-                "deposit_amount": t.deposit_amount,
-                "deposit_status": t.deposit_status,
-                "smart_flight": t.smart_flight,
-                "deep_link": t.deep_link,
-            }
-            for t in trips
-        ],
+        "trips": trip_summaries,
         "intakes_count": len(intakes),
         "bookings_count": len(bookings),
         "flight_requests_count": len(flights),
@@ -422,6 +450,7 @@ class CRMTripCreateRequest(BaseModel):
     total_investment: float = Field(..., gt=0.0)
     deposit_amount: Optional[float] = None
     currency: str = "USD"
+    deposit_paid: bool = False
     smart_flight: Optional[Dict[str, Any]] = None
     ground_transfer: Optional[Dict[str, Any]] = None
     itinerary_blocks: Optional[List[Dict[str, Any]]] = None
@@ -447,9 +476,17 @@ class CRMTripCreateRequest(BaseModel):
     @field_validator("total_investment")
     @classmethod
     def validate_total_investment(cls, v: float) -> float:
-        import math
         if math.isnan(v) or math.isinf(v) or v <= 0.0:
             raise ValueError("Total investment must be a positive finite number")
+        return v
+
+    @field_validator("deposit_amount")
+    @classmethod
+    def validate_deposit_amount(cls, v: Optional[float]) -> Optional[float]:
+        if v is None:
+            return None
+        if math.isnan(v) or math.isinf(v) or v < 0.0:
+            raise ValueError("Deposit amount must be a non-negative finite number")
         return v
 
 
@@ -488,21 +525,46 @@ def create_crm_trip_record(
         db.add(client)
         db.flush()
 
+    if payload.deposit_amount is not None and payload.deposit_amount > payload.total_investment + 0.005:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Deposit amount (${payload.deposit_amount:,.2f}) cannot exceed total investment (${payload.total_investment:,.2f}).",
+        )
     deposit = round(payload.deposit_amount if payload.deposit_amount is not None else (payload.total_investment * 0.30), 2)
-    balance = round(payload.total_investment - deposit, 2)
+    has_paid_deposit = bool(payload.deposit_paid and deposit > 0)
+    # Scheduled proposal shows 70% balance due after deposit, while actual payment_history tracks collected cash
+    scheduled_balance = round(max(0.0, payload.total_investment - deposit), 2)
+    initial_payment_history = (
+        [
+            {
+                "payment_id": str(uuid.uuid4()),
+                "amount": deposit,
+                "currency": payload.currency or "USD",
+                "fx_rate": 1.0,
+                "fx_amount": deposit,
+                "payment_method": "INITIAL_VAX_OR_WIRE_DEPOSIT",
+                "transaction_reference": f"INIT-DEP-{secrets.token_hex(4).upper()}",
+                "notes": "Initial deposit recorded at booking import / creation.",
+                "processed_by": payload.operator_name,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+            }
+        ]
+        if has_paid_deposit
+        else []
+    )
     default_blocks = payload.itinerary_blocks or [
-        {"day": 1, "time": "15:00", "title": "Private Airport Tarmac Greeting & Villa Check-In", "description": "Chilled electrolyte towel escort and grounding herbal tea."},
-        {"day": 2, "time": "08:00", "title": "Morning 4-7-8 Vagal Breathwork & Coastal Movement", "description": "Parasympathetic downregulation and reformer alignment."},
-        {"day": 3, "time": "17:30", "title": "432Hz Crystal Alchemy Sound Bath & Blue Zone Dinner", "description": "Acoustic nervous system stillness and anti-inflammatory dining."},
+        {"day": 1, "time": "15:00", "title": "Airport Greeting & Villa Check-In", "description": "Private airport pickup, luggage transfer, and welcome refreshments."},
+        {"day": 2, "time": "08:30", "title": "Morning Movement & Guided Excursion", "description": "Morning yoga/stretching session followed by local excursion."},
+        {"day": 3, "time": "18:00", "title": "Evening Wellness & Group Dinner", "description": "Restorative spa session and chef-prepared group dinner."},
     ]
 
     initial_timeline = [
         {
-            "event": "PROPOSAL_CREATED",
-            "title": "Sanctuary Proposal Created",
+            "event": "TRIP_CREATED" if has_paid_deposit else "PROPOSAL_CREATED",
+            "title": "Booking Imported & Confirmed" if has_paid_deposit else "Retreat Proposal Created",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "operator": payload.operator_name,
-            "notes": f"Proposal generated for {client.full_name} ({payload.sanctuary_slug})"
+            "notes": f"Booking created for {client.full_name} ({payload.sanctuary_slug})"
         }
     ]
 
@@ -517,13 +579,14 @@ def create_crm_trip_record(
         title=trip_title,
         dates=payload.dates,
         room_tier=payload.room_tier,
-        status="PROPOSED_ITINERARY",
+        status=("CONFIRMED" if scheduled_balance <= 0 else "DEPOSIT_PAID") if has_paid_deposit else "PROPOSED_ITINERARY",
         total_investment=payload.total_investment,
         deposit_amount=deposit,
-        deposit_status="PENDING_CLIENT_AUTHORIZATION",
-        final_balance=balance,
-        final_balance_status="SCHEDULED",
+        deposit_status="PAID" if has_paid_deposit else "PENDING_CLIENT_AUTHORIZATION",
+        final_balance=scheduled_balance,
+        final_balance_status="PAID_IN_FULL" if (has_paid_deposit and scheduled_balance <= 0) else "SCHEDULED",
         currency=payload.currency,
+        payment_history=initial_payment_history,
         smart_flight=payload.smart_flight or {},
         ground_transfer=payload.ground_transfer or {},
         itinerary_blocks=default_blocks,
@@ -533,7 +596,8 @@ def create_crm_trip_record(
     db.add(trip)
 
     client.total_trips_count = (client.total_trips_count or 0) + 1
-    client.total_lifetime_spend = round((client.total_lifetime_spend or 0.0) + payload.total_investment, 2)
+    if has_paid_deposit:
+        client.total_lifetime_spend = round((client.total_lifetime_spend or 0.0) + deposit, 2)
 
     db.commit()
     db.refresh(trip)
@@ -592,7 +656,19 @@ def update_crm_trip_itinerary_blocks(
         blocks.append(payload["append_block"])
         trip.itinerary_blocks = blocks
     if "status" in payload and payload["status"]:
-        allowed_statuses = ["PROPOSED_ITINERARY", "CONFIRMED", "IN_PROGRESS", "COMPLETED", "CANCELLED", "MEDICAL_FREEZE"]
+        allowed_statuses = [
+            "INQUIRY",
+            "PROPOSED_ITINERARY",
+            "PROPOSAL_SIGNED",
+            "DEPOSIT_PAID",
+            "CONFIRMED",
+            "WAITLIST",
+            "WAITLIST_PRIORITY",
+            "IN_PROGRESS",
+            "COMPLETED",
+            "CANCELLED",
+            "MEDICAL_FREEZE",
+        ]
         val = str(payload["status"]).strip().upper()
         if val not in allowed_statuses:
             raise HTTPException(status_code=422, detail=f"Invalid trip status: '{val}'. Allowed: {allowed_statuses}")
@@ -655,11 +731,25 @@ def list_crm_trips(
 
     trips = query.order_by(CRMTrip.created_at.desc()).offset(offset).limit(limit).all()
 
+    def _compute_trip_paid_amount(t: CRMTrip) -> float:
+        hist = t.payment_history or []
+        if hist:
+            return round(sum(float(p.get("amount", 0.0)) for p in hist), 2)
+        dep_st = (t.deposit_status or "").upper()
+        fin_st = (t.final_balance_status or "").upper()
+        if fin_st in ("PAID", "PAID_IN_FULL", "SETTLED_IN_FULL"):
+            return round(float(t.total_investment or 0.0), 2)
+        if dep_st in ("PAID", "DEPOSIT_PAID", "PARTIALLY_PAID"):
+            return round(max(0.0, float(t.total_investment or 0.0) - float(t.final_balance or 0.0)), 2)
+        return 0.0
+
     return [
         {
             "id": t.id,
             "crm_trip_id": t.crm_trip_id,
-                        "client_name": t.client_name,
+            "client_id": t.client_id,
+            "companion_trip_id": getattr(t, "companion_trip_id", None),
+            "client_name": t.client_name,
             "client_email": t.client_email,
             "title": t.title,
             "sanctuary_slug": t.sanctuary_slug,
@@ -669,10 +759,15 @@ def list_crm_trips(
             "total_investment": t.total_investment,
             "deposit_amount": t.deposit_amount,
             "deposit_status": t.deposit_status,
-            "final_balance": t.final_balance,
+            "paid_amount": _compute_trip_paid_amount(t),
+            "final_balance": round(max(0.0, float(t.total_investment or 0.0) - _compute_trip_paid_amount(t)), 2),
+            "final_balance_status": t.final_balance_status,
+            "currency": t.currency or "USD",
             "activities_count": len(t.itinerary_blocks or []),
             "activity_timeline": t.activity_timeline or [],
             "smart_flight": t.smart_flight,
+            "ground_transfer": t.ground_transfer,
+            "proposal_url": t.proposal_url or f"/my-retreat?ref={t.crm_trip_id}",
             "deep_link": t.deep_link,
             "created_at": t.created_at.isoformat(),
         }
@@ -952,53 +1047,73 @@ def upgrade_trip_suite_tier(
     - 70% remaining balance adjusted
     - Stages an updated invoice draft in the Action Review Queue
     """
+    clean_tier = (new_room_tier or "").strip()
+    if not clean_tier:
+        raise HTTPException(status_code=422, detail="New room tier cannot be blank.")
+    if not math.isfinite(new_total_investment) or new_total_investment > 1_000_000:
+        raise HTTPException(status_code=422, detail="Updated total investment must be a valid finite amount up to $1,000,000.")
+
     trip = db.query(CRMTrip).filter(
         or_(CRMTrip.id == trip_id, CRMTrip.crm_trip_id == trip_id)
     ).first()
     if not trip:
         raise HTTPException(status_code=404, detail="Trip record not found in native CRM")
 
+    if (trip.status or "").upper() in ("CANCELLED", "MEDICAL_FREEZE"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Cannot upgrade suite on a trip in '{trip.status}' status. Re-activate the reservation first.",
+        )
+
     total_paid = round(sum(float(p.get("amount", 0.0)) for p in (trip.payment_history or [])), 2)
-    if new_total_investment < total_paid:
+    rounded_new_total = round(float(new_total_investment), 2)
+    if rounded_new_total < total_paid - 0.005:
         raise HTTPException(
             status_code=400,
-            detail=f"New total investment (${new_total_investment:,.2f}) cannot be less than payments already collected (${total_paid:,.2f})"
+            detail=f"New total investment (${rounded_new_total:,.2f}) cannot be less than payments already collected (${total_paid:,.2f})"
         )
 
     old_tier = trip.room_tier
     old_investment = trip.total_investment
 
-    new_deposit = round(new_total_investment * 0.3, 2)
-    new_balance = round(new_total_investment - new_deposit, 2)
+    new_deposit = round(rounded_new_total * 0.3, 2)
+    actual_remaining = max(0.0, round(rounded_new_total - total_paid, 2))
+    # Preserve settled cash on paid bookings; show 70% scheduled balance on unpaid proposals
+    new_balance = actual_remaining if total_paid > 0 else round(rounded_new_total - new_deposit, 2)
 
-    trip.room_tier = new_room_tier
-    trip.total_investment = new_total_investment
+    trip.room_tier = clean_tier
+    trip.total_investment = rounded_new_total
     trip.deposit_amount = new_deposit
     trip.final_balance = new_balance
+
+    if total_paid > 0:
+        trip.deposit_status = "PAID" if total_paid >= new_deposit - 0.005 else "PARTIALLY_PAID"
+        if actual_remaining == 0.0:
+            trip.final_balance_status = "SETTLED_IN_FULL"
+            trip.status = "CONFIRMED"
+        else:
+            trip.final_balance_status = "PARTIALLY_PAID"
+            if (trip.status or "").upper() == "CONFIRMED":
+                trip.status = "DEPOSIT_PAID"
 
     _record_trip_timeline_event(
         trip,
         "SUITE_UPGRADE",
-        f"Suite Upgraded to {new_room_tier}",
-        f"Investment adjusted from ${old_investment:,.2f} to ${new_total_investment:,.2f}.",
+        f"Suite Upgraded to {clean_tier}",
+        f"Investment adjusted from ${old_investment:,.2f} to ${rounded_new_total:,.2f}. Paid to date: ${total_paid:,.2f}. Remaining: ${actual_remaining:,.2f}.",
         operator_name,
     )
-
-    # Update CRMClient total lifetime spend
-    client = db.query(CRMClient).filter(CRMClient.id == trip.client_id).first()
-    if client:
-        diff = new_total_investment - old_investment
-        client.total_lifetime_spend = max(0.0, client.total_lifetime_spend + diff)
 
     content = (
         f"Suite Upgrade & Revised Payment Schedule for {trip.client_name}\n"
         f"Sanctuary: {trip.title} ({trip.dates})\n"
-        f"Suite Upgraded: {old_tier} -> {new_room_tier}\n"
-        f"Total Investment: ${new_total_investment:,.2f} USD\n"
-        f"30% Sanctuary Deposit: ${new_deposit:,.2f} USD\n"
-        f"70% Remaining Balance: ${new_balance:,.2f} USD (Due 45 days prior)\n\n"
+        f"Suite Upgraded: {old_tier} -> {clean_tier}\n"
+        f"Total Investment: ${rounded_new_total:,.2f} USD\n"
+        f"30% Sanctuary Deposit Requirement: ${new_deposit:,.2f} USD\n"
+        f"Collected via VAX / Wire to Date: ${total_paid:,.2f} USD\n"
+        f"Remaining Balance Due: ${actual_remaining:,.2f} USD\n\n"
         f"Dear {trip.client_name},\n"
-        f"Your sanctuary suite has been upgraded to the {new_room_tier}. "
+        f"Your sanctuary suite has been upgraded to the {clean_tier}. "
         f"Your updated payment schedule is reflected in your private sanctuary portal link."
     )
 
@@ -1013,16 +1128,21 @@ def upgrade_trip_suite_tier(
     db.commit()
     db.refresh(draft)
 
-    logger.info(f"Upgraded trip {trip.id} to {new_room_tier} (${new_total_investment}) [Draft #{draft.id}]")
+    logger.info(f"Upgraded trip {trip.id} to {clean_tier} (${rounded_new_total}) [Draft #{draft.id}]")
 
     return {
         "success": True,
-        "message": f"Successfully upgraded to {new_room_tier}.",
+        "message": f"Successfully upgraded to {clean_tier}.",
         "draft_id": draft.id,
-        "room_tier": new_room_tier,
-        "total_investment": new_total_investment,
+        "room_tier": clean_tier,
+        "total_investment": rounded_new_total,
         "deposit_amount": new_deposit,
+        "total_paid": total_paid,
+        "remaining_balance": actual_remaining,
         "final_balance": new_balance,
+        "deposit_status": trip.deposit_status,
+        "final_balance_status": trip.final_balance_status,
+        "trip_status": trip.status,
     }
 
 
@@ -1076,7 +1196,20 @@ def triage_client_clinical_profile(
             "Direct Heavy Acoustic Gong / High-Vibration Sound Bed on Abdomen"
         ])
 
-    if any(k in notes for k in ["anaphylaxis", "anaphylactic", "epipen", "epi-pen", "peanut allergy"]):
+    if any(k in notes for k in ["epilepsy", "seizure", "convulsion"]):
+        flagged.append("NEUROLOGICAL_SEIZURE_PRECAUTION")
+        contraindications.append("CONTRAINDICATION: Prohibit forced hyperventilation / Tummo breathwork and stroboscopic visual stimulation.")
+        blocked_modalities.extend([
+            "Holotropic / Tummo Hyperventilation Breathwork",
+            "Stroboscopic / Rapid Pulsed Visual Sound Baths",
+        ])
+
+    if any(k in notes for k in ["raynaud", "cold urticaria", "peripheral neuropathy"]):
+        flagged.append("COLD_EXPOSURE_CONTRAINDICATION")
+        contraindications.append("CONTRAINDICATION: Prohibit cold plunge / ice immersion due to peripheral vasospasm risk.")
+        blocked_modalities.append("Cold Plunge / Ice Immersion (<12°C)")
+
+    if any(k in notes for k in ["anaphylaxis", "anaphylactic", "epipen", "epi-pen", "peanut allergy", "tree nut allergy", "tree-nut", "shellfish allergy"]):
         flagged.append("ANAPHYLACTIC_ALLERGEN_ALERT")
         contraindications.append("HAZARD ALERT: Strict kitchen separation; verify dedicated food preparation surface.")
         blocked_modalities.append("Unverified Shared-Facility Communal Dining")
@@ -1219,48 +1352,6 @@ def freeze_trip_medical_emergency(
         "message": f"Clinical freeze enacted for {trip.client_name}. Hospital liaison staged [Draft #{draft.id}]."
     }
 
-    emergency_contact = client.emergency_contact if client and client.emergency_contact else {}
-    contact_name = emergency_contact.get("name", "Emergency Contact On File")
-    contact_phone = emergency_contact.get("phone", client.phone if client else "N/A")
-
-    content = (
-        f"CRITICAL MEDICAL ESCALATION & CLINICAL FREEZE\n"
-        f"Sanctuary: {trip.title} ({trip.dates})\n"
-        f"Guest: {trip.client_name} (DOB: {client.date_of_birth if client else 'On File'})\n"
-        f"Attending Nurse / Clinician: {attending_clinician}\n"
-        f"Clinical Event Trigger: {clinical_event}\n"
-        f"Designated Emergency Center: {local_facility}\n"
-        f"Next of Kin / Emergency Contact: {contact_name} ({contact_phone})\n\n"
-        f"Clinical Handover Notes:\n"
-        f"- Known Health Flags: {client.tags if client else 'None'}\n"
-        f"- Known Allergies / Diet: {client.dietary_requirements if client else 'None'}\n"
-        f"- Baseline Somatic Notes: {client.health_notes if client else 'None'}\n\n"
-        f"Action Dispatched: MedEvac transport pre-notified. Retreat activities for guest frozen with 100% financial credit protection."
-    )
-
-    draft = ActionDraft(
-        type="emergency_medical_liaison",
-        guest_name=trip.client_name,
-        recipient_email=trip.client_email,
-        content=content,
-        status="pending_review",
-    )
-    db.add(draft)
-    db.commit()
-    db.refresh(draft)
-
-    return {
-        "success": True,
-        "trip_id": trip.id,
-        "status": "EMERGENCY_MEDICAL_FREEZE",
-        "guest_name": trip.client_name,
-        "clinical_event": clinical_event,
-        "attending_clinician": attending_clinician,
-        "local_facility": local_facility,
-        "draft_id": draft.id,
-        "message": f"Clinical freeze enacted for {trip.client_name}. Hospital liaison staged [Draft #{draft.id}]."
-    }
-
 
 @router.post("/trips/{trip_id}/cancellation")
 def cancel_trip_with_refund_policy(
@@ -1286,47 +1377,60 @@ def cancel_trip_with_refund_policy(
 
     client = db.query(CRMClient).filter(CRMClient.id == trip.client_id).first()
 
-    total = trip.total_investment
-    deposit = trip.deposit_amount
-    balance = trip.final_balance
+    total = float(trip.total_investment or 0.0)
+    deposit = float(trip.deposit_amount or 0.0)
+    hist = trip.payment_history or []
+    if hist:
+        paid_to_date = round(sum(float(p.get("amount", 0.0)) for p in hist), 2)
+    elif (trip.final_balance_status or "").upper() in ("PAID", "PAID_IN_FULL", "SETTLED_IN_FULL"):
+        paid_to_date = total
+    elif (trip.deposit_status or "").upper() in ("PAID", "DEPOSIT_PAID"):
+        paid_to_date = round(max(0.0, total - float(trip.final_balance or 0.0)), 2)
+    else:
+        paid_to_date = 0.0
+
+    # Never refund or credit money that was never actually collected from the guest
+    paid_above_deposit = round(max(0.0, paid_to_date - deposit), 2)
+    paid_deposit_portion = round(min(paid_to_date, deposit), 2)
 
     if days_prior_to_departure > 60:
-        admin_fee = 500.0
-        credit_amount = max(0.0, deposit - admin_fee)
-        cash_refund = balance
-        forfeiture = admin_fee
+        admin_fee = min(500.0, paid_deposit_portion)
+        credit_amount = round(max(0.0, paid_deposit_portion - admin_fee), 2)
+        cash_refund = paid_above_deposit
+        forfeiture = round(admin_fee, 2)
         tier_label = "EARLY_CANCELLATION_GT_60D"
         policy_note = (
-            f"Over 60 days before retreat start. 70% balance (${balance:,.2f}) refunded to card. "
-            f"Deposit converted to Future Sanctuary Credit (${credit_amount:,.2f}) minus ${admin_fee:.2f} administration fee."
+            f"Over 60 days before retreat start. Paid funds above deposit (${cash_refund:,.2f}) refunded. "
+            f"Paid deposit converted to Future Sanctuary Credit (${credit_amount:,.2f}) minus ${admin_fee:.2f} administration fee. "
+            f"(Total collected to date: ${paid_to_date:,.2f})."
         )
     elif 30 <= days_prior_to_departure <= 60:
         if medical_certificate_provided:
-            credit_amount = total
+            credit_amount = paid_to_date
             cash_refund = 0.0
             forfeiture = 0.0
             tier_label = "MEDICAL_EXEMPTION_CONCIERGE_CREDIT_30_60D"
             policy_note = (
-                f"Physician medical exemption certificate verified. 100% of stay investment (${total:,.2f}) "
+                f"Physician medical exemption certificate verified. 100% of collected funds (${paid_to_date:,.2f}) "
                 f"converted to 18-month KAI Sanctuary Concierge Credit with zero penalty."
             )
         else:
-            half_balance = round(balance * 0.5, 2)
-            cash_refund = half_balance
+            half_paid_balance = round(paid_above_deposit * 0.5, 2)
+            cash_refund = half_paid_balance
             credit_amount = 0.0
-            forfeiture = deposit + (balance - half_balance)
+            forfeiture = round(max(0.0, paid_to_date - cash_refund), 2)
             tier_label = "STANDARD_CANCELLATION_30_60D"
             policy_note = (
-                f"30 to 60 days prior to departure. Deposit (${deposit:,.2f}) forfeited. "
-                f"50% of remaining balance (${half_balance:,.2f}) refunded to original card."
+                f"30 to 60 days prior to departure. Deposit portion (${paid_deposit_portion:,.2f}) forfeited. "
+                f"50% of paid balance above deposit (${half_paid_balance:,.2f}) refunded."
             )
     else:  # < 30 days
         cash_refund = 0.0
         credit_amount = 0.0
-        forfeiture = total
+        forfeiture = paid_to_date
         tier_label = "LATE_CANCELLATION_NON_REFUNDABLE_LT_30D"
         policy_note = (
-            f"Less than 30 days prior to departure. 100% of reservation (${total:,.2f}) is non-refundable. "
+            f"Less than 30 days prior to departure. Collected funds (${paid_to_date:,.2f}) are non-refundable. "
             f"Official Itemized Insurance Claim Statement staged for travel insurance reimbursement."
         )
 
@@ -1452,12 +1556,21 @@ def record_trip_split_payment(
         if not trip:
             raise HTTPException(status_code=404, detail="Trip record not found in native CRM")
 
+        if (trip.status or "").upper() in ("CANCELLED", "MEDICAL_FREEZE"):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Cannot record payment against trip in '{trip.status}' status. Re-activate the reservation first.",
+            )
+
         client = db.query(CRMClient).filter(CRMClient.id == trip.client_id).first()
 
         norm_currency = currency.strip().upper()
         if fx_amount is not None:
             usd_amount = round(fx_amount * fx_rate, 2)
             orig_amount = round(fx_amount, 2)
+        elif norm_currency != "USD" and fx_rate != 1.0:
+            usd_amount = round(amount * fx_rate, 2)
+            orig_amount = round(amount, 2)
         else:
             usd_amount = round(amount, 2)
             orig_amount = round(amount, 2)
@@ -1505,10 +1618,17 @@ def record_trip_split_payment(
         if remaining_balance == 0.0:
             trip.final_balance_status = "SETTLED_IN_FULL"
             trip.status = "CONFIRMED"
-            if client:
-                client.total_lifetime_spend = max(client.total_lifetime_spend, total_paid)
         else:
             trip.final_balance_status = "PARTIALLY_PAID"
+            if total_paid >= trip.deposit_amount and (trip.status or "").upper() in (
+                "INQUIRY",
+                "PROPOSED_ITINERARY",
+                "PROPOSAL_SIGNED",
+            ):
+                trip.status = "DEPOSIT_PAID"
+
+        if client:
+            client.total_lifetime_spend = max(float(client.total_lifetime_spend or 0.0), total_paid)
 
         trip.final_balance = remaining_balance
 
@@ -1580,7 +1700,7 @@ def get_sanctuary_dietary_manifest(
     """
     trips = db.query(CRMTrip).filter(
         CRMTrip.sanctuary_slug == sanctuary_slug,
-        CRMTrip.status != "CANCELLED"
+        CRMTrip.status.notin_(["CANCELLED", "MEDICAL_FREEZE"])
     ).all()
 
     guest_manifest = []
@@ -1602,7 +1722,7 @@ def get_sanctuary_dietary_manifest(
         flags = []
         protocols = []
 
-        if any(w in combined for w in ["anaphylaxis", "anaphylactic", "epipen", "peanut allergy", "tree nut allergy"]):
+        if any(w in combined for w in ["anaphylaxis", "anaphylactic", "epipen", "peanut allergy", "tree nut allergy", "tree-nut", "shellfish allergy"]):
             flags.append("RED_ALERT_ANAPHYLAXIS")
             protocols.append("Dedicated sterile prep table; zero airborne tree nut/peanut contact; emergency kit on standby.")
             category_counts["ANAPHYLAXIS_HAZARD"] += 1
@@ -1773,7 +1893,26 @@ def atomic_reserve_cohort(
         cohort_capacity = cohort.capacity_limit if cohort else 14
 
         if active_count >= cohort_capacity:
-            waitlist_position = (active_count - cohort_capacity) + 1
+            existing_waitlist = db.query(StagingIntake).filter(
+                StagingIntake.sanctuary_slug == sanctuary_slug,
+                StagingIntake.email == clean_email,
+                StagingIntake.status == "WAITLIST",
+            ).first()
+            existing_waitlist_count = db.query(StagingIntake).filter(
+                StagingIntake.sanctuary_slug == sanctuary_slug,
+                StagingIntake.status == "WAITLIST",
+            ).count()
+            if existing_waitlist:
+                return {
+                    "allocated": False,
+                    "status": "WAITLIST",
+                    "message": f"{clean_name} is already registered on the VIP Waitlist for {sanctuary_slug}.",
+                    "cohort_count": active_count,
+                    "waitlist_position": max(1, existing_waitlist_count),
+                    "intake_id": existing_waitlist.id,
+                    "draft_id": None,
+                }
+            waitlist_position = existing_waitlist_count + 1
 
             intake = StagingIntake(
                 source_ref="ATOMIC_RESERVE_WAITLIST",
@@ -1953,19 +2092,26 @@ def postpone_cohort_force_majeure(
     created_draft_ids = []
 
     for trip in trips:
-        if trip.status in ["CANCELLED_WITH_REFUND", "CANCELLED_FORFEITED"]:
+        if (trip.status or "").upper() in (
+            "CANCELLED",
+            "MEDICAL_FREEZE",
+            "CANCELLED_WITH_REFUND",
+            "CANCELLED_FORFEITED",
+            "FORCE_MAJEURE_POSTPONED",
+        ):
             continue
 
         history = trip.payment_history or []
-        paid_from_history = sum(p.get("amount", 0.0) for p in history)
+        paid_from_history = sum(float(p.get("amount", 0.0)) for p in history)
         if paid_from_history > 0:
             credit_amount = round(paid_from_history, 2)
-        elif trip.final_balance_status == "SETTLED_IN_FULL":
-            credit_amount = round(trip.total_investment, 2)
-        elif trip.deposit_status == "PAID":
-            credit_amount = round(trip.deposit_amount, 2)
+        elif (trip.final_balance_status or "").upper() in ("SETTLED_IN_FULL", "PAID", "PAID_IN_FULL"):
+            credit_amount = round(float(trip.total_investment or 0.0), 2)
+        elif (trip.deposit_status or "").upper() == "PAID":
+            credit_amount = round(float(trip.deposit_amount or 0.0), 2)
         else:
-            credit_amount = round(trip.deposit_amount, 2)
+            # Never issue free credit vouchers for unpaid proposals ($0.00 collected)
+            credit_amount = 0.0
 
         total_protected_credits = round(total_protected_credits + credit_amount, 2)
         voucher_code = f"VOUCHER-FM-{norm_slug.upper()[:3]}-{secrets.token_hex(3).upper()}"
@@ -2188,7 +2334,7 @@ class FlightDisruptionItem(BaseModel):
     flight_number: str
     original_arrival_time: str
     updated_arrival_time: str
-    delay_minutes: int = 0
+    delay_minutes: int = Field(0, ge=0, le=1440)
     status: str = "DELAYED"
     connecting_airport: Optional[str] = None
     terminal: Optional[str] = "International Terminal"
@@ -2221,7 +2367,8 @@ def resequence_cohort_flight_disruptions(
         clean_email = item.client_email.strip().lower()
         trip = db.query(CRMTrip).filter(
             CRMTrip.client_email == clean_email,
-            CRMTrip.sanctuary_slug.ilike(f"%{norm_slug}%")
+            CRMTrip.sanctuary_slug.ilike(f"%{norm_slug}%"),
+            CRMTrip.status.notin_(["CANCELLED", "MEDICAL_FREEZE"]),
         ).first()
 
         flight_data = {
@@ -2236,7 +2383,9 @@ def resequence_cohort_flight_disruptions(
         }
 
         if trip:
-            trip.smart_flight = flight_data
+            merged_flight = dict(trip.smart_flight or {})
+            merged_flight.update(flight_data)
+            trip.smart_flight = merged_flight
             updated_trips.append(trip.id)
 
         if item.status.upper() == "CANCELLED":
@@ -2584,7 +2733,7 @@ def resolve_room_allocation_conflict(
     trips = db.query(CRMTrip).filter(
         CRMTrip.sanctuary_slug.ilike(f"%{norm_slug}%"),
         CRMTrip.room_tier == payload.conflicted_room_tier,
-        CRMTrip.status.notin_(["CANCELLED_WITH_REFUND", "CANCELLED_FORFEITED"])
+        CRMTrip.status.notin_(["CANCELLED", "MEDICAL_FREEZE", "CANCELLED_WITH_REFUND", "CANCELLED_FORFEITED"])
     ).all()
 
     if len(trips) <= 1:
@@ -2762,11 +2911,11 @@ class ReviewIngestTriageRequest(BaseModel):
     guest_name: str
     guest_email: str
     stay_dates: str = "Jan 28 - Jan 31, 2027"
-    overall_rating: float = 5.0
-    deep_sleep_score: float = 95.0
-    quietude_score: float = 98.0
-    clinical_attentiveness_score: float = 99.0
-    review_text: str
+    overall_rating: float = Field(5.0, ge=1.0, le=5.0)
+    deep_sleep_score: float = Field(95.0, ge=0.0, le=100.0)
+    quietude_score: float = Field(98.0, ge=0.0, le=100.0)
+    clinical_attentiveness_score: float = Field(99.0, ge=0.0, le=100.0)
+    review_text: str = Field(..., min_length=1, max_length=5000)
     source: str = "POST_RETREAT_SURVEY"
 
 
@@ -2784,12 +2933,21 @@ def ingest_review_with_sentiment_triage(
     norm_slug = payload.sanctuary_slug.strip().lower()
     clean_email = payload.guest_email.strip().lower()
 
+    # Neutralize benign wellness praise phrases (e.g. "cold plunge", "pain relief", "zero noise")
+    # so 5-star reviews don't falsely trigger $1,500 service-recovery red alerts.
+    sanitized_review = payload.review_text.lower()
+    for benign in (
+        "cold plunge", "cold immersion", "cold therapy", "cold water", "cold towel",
+        "pain relief", "pain-free", "pain free", "no pain", "zero pain",
+        "no noise", "zero noise", "without noise", "no delay", "zero delay",
+    ):
+        sanitized_review = sanitized_review.replace(benign, " ")
+
     negative_keywords = [
         "noise", "generator", "disrupted", "disappointed", "unacceptable",
         "strained", "pain", "injury", "headache", "rude", "delayed", "cold"
     ]
-    text_lower = payload.review_text.lower()
-    has_negative_keyword = any(k in text_lower for k in negative_keywords)
+    has_negative_keyword = any(re.search(rf"\b{re.escape(k)}\b", sanitized_review) for k in negative_keywords)
     is_critical_negative = payload.overall_rating <= 2.5 or has_negative_keyword
 
     if is_critical_negative:
@@ -3108,17 +3266,35 @@ def settle_multi_guest_split_folio(
     """
     norm_slug = sanctuary_slug.strip().lower()
 
+    if not payload.split_records:
+        raise HTTPException(status_code=422, detail="At least one co-occupant split record is required.")
+    if math.isnan(payload.total_stay_investment) or math.isinf(payload.total_stay_investment) or payload.total_stay_investment <= 0:
+        raise HTTPException(status_code=422, detail="Total stay investment must be a positive finite amount.")
+    for rec in payload.split_records:
+        if math.isnan(rec.percentage_share) or math.isinf(rec.percentage_share) or rec.percentage_share <= 0:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Each co-occupant percentage share must be strictly positive (got {rec.percentage_share} for {rec.guest_name}).",
+            )
+
     total_pct = sum(r.percentage_share for r in payload.split_records)
     if abs(total_pct - 100.0) > 0.01:
         raise HTTPException(status_code=400, detail=f"Split percentages must total exactly 100.0% (Current sum: {total_pct:.2f}%)")
 
     allocated_splits = []
     draft_ids = []
+    total_cents = int(round(payload.total_stay_investment * 100))
+    allocated_cents = 0
     running_total = 0.0
 
-    for split in payload.split_records:
+    for idx, split in enumerate(payload.split_records):
         clean_email = split.guest_email.strip().lower()
-        share_amount = round(payload.total_stay_investment * (split.percentage_share / 100.0), 2)
+        if idx == len(payload.split_records) - 1:
+            share_cents = total_cents - allocated_cents
+        else:
+            share_cents = int(round(total_cents * (split.percentage_share / 100.0)))
+            allocated_cents += share_cents
+        share_amount = round(share_cents / 100.0, 2)
         running_total = round(running_total + share_amount, 2)
 
         client = db.query(CRMClient).filter(CRMClient.email == clean_email).first()
@@ -3255,8 +3431,27 @@ def verify_passport_immigration_validity(
 
     client = db.query(CRMClient).filter(CRMClient.id == trip.client_id).first()
 
-    expiry_dt = datetime.fromisoformat(payload.passport_expiry_date)
-    arrival_dt = datetime.fromisoformat(payload.retreat_arrival_date)
+    def _parse_border_date(raw_date: str, label: str):
+        cleaned = (raw_date or "").strip()
+        if not cleaned:
+            raise HTTPException(status_code=422, detail=f"{label} date is required (YYYY-MM-DD).")
+        try:
+            iso_norm = cleaned.replace("Z", "+00:00")
+            return datetime.fromisoformat(iso_norm).date()
+        except ValueError:
+            pass
+        for fmt in ("%m/%d/%Y", "%Y/%m/%d", "%d-%m-%Y"):
+            try:
+                return datetime.strptime(cleaned, fmt).date()
+            except ValueError:
+                continue
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid {label} date format '{cleaned}'. Expected YYYY-MM-DD (e.g. 2027-08-15).",
+        )
+
+    expiry_dt = _parse_border_date(payload.passport_expiry_date, "passport_expiry_date")
+    arrival_dt = _parse_border_date(payload.retreat_arrival_date, "retreat_arrival_date")
 
     days_remaining = (expiry_dt - arrival_dt).days
     mandated_threshold_days = 180
@@ -3264,21 +3459,29 @@ def verify_passport_immigration_validity(
     immigration_cleared = days_remaining >= mandated_threshold_days
 
     if not immigration_cleared:
-        alert_status = "CRITICAL_IMMIGRATION_EXPIRATION_RISK"
+        is_expired = days_remaining < 0
+        alert_status = "PASSPORT_EXPIRED" if is_expired else "CRITICAL_IMMIGRATION_EXPIRATION_RISK"
         action_required = "EXPEDITED_PASSPORT_RENEWAL_MANDATED"
 
         if client:
+            client.passport_valid_6mo = False
+            client.passport_expiry = expiry_dt.isoformat()
             tags = list(client.tags or [])
             if "PASSPORT_EXPEDITED_RENEWAL_REQUIRED" not in tags:
                 tags.append("PASSPORT_EXPEDITED_RENEWAL_REQUIRED")
             client.tags = tags
 
+        validity_summary = (
+            f"EXPIRED ({abs(days_remaining)} days before arrival)"
+            if is_expired
+            else f"{days_remaining} Days — Minimum Required: 180 Days"
+        )
         content = (
             f"URGENT IMMIGRATION ADVISORY: PASSPORT EXPIRATION WITHIN 6 MONTHS\n"
             f"Guest: {trip.client_name} ({trip.client_email}) | Trip: {trip.title}\n"
             f"Passport Country: {payload.passport_country} | Number: {payload.passport_number}\n"
-            f"Passport Expiration: {payload.passport_expiry_date}\n"
-            f"Retreat Arrival: {payload.retreat_arrival_date} (Validity Remaining: {days_remaining} Days — Minimum Required: 180 Days)\n\n"
+            f"Passport Expiration: {expiry_dt.isoformat()}\n"
+            f"Retreat Arrival: {arrival_dt.isoformat()} (Validity Remaining: {validity_summary})\n\n"
             f"IMMIGRATION HAZARD:\n"
             f"International border authorities and commercial airlines will deny boarding if passport "
             f"validity is under 6 months upon entry into Costa Rica / Mexico.\n\n"
@@ -3297,6 +3500,11 @@ def verify_passport_immigration_validity(
     else:
         alert_status = "PASSPORT_VALIDITY_CLEARED"
         action_required = "ROUTINE_BORDER_ENTRY"
+
+        if client:
+            client.passport_valid_6mo = True
+            client.passport_expiry = expiry_dt.isoformat()
+            client.tags = [t for t in (client.tags or []) if t != "PASSPORT_EXPEDITED_RENEWAL_REQUIRED"]
 
         content = (
             f"KAI SANCTUARY - TRAVEL DOCUMENT CLEARANCE CONFIRMATION\n"
@@ -3341,7 +3549,7 @@ class BodyworkSessionBookingRequest(BaseModel):
     client_email: str
     session_date: str = "2027-01-30"
     requested_time_slot: str = "14:00"
-    duration_minutes: int = 75
+    duration_minutes: int = Field(75, ge=15, le=240)
     notes: Optional[str] = "Chronic neck stiffness and shallow breathing"
 
 
@@ -3354,37 +3562,75 @@ def schedule_bodywork_session(
     """
     On-Site Healing Bodywork Atomic Scheduling Lock Engine:
     Guarantees thread-safe master practitioner appointment allocation,
-    prevents double-booking collisions, auto-offers adjacent slots during conflicts,
+    prevents overlapping interval double-booking collisions, auto-offers the next genuinely free slot,
     and stages session preparation drafts.
     """
     norm_slug = sanctuary_slug.strip().lower()
     clean_email = payload.client_email.strip().lower()
 
+    def _parse_hhmm(slot_str: str) -> int:
+        m = re.match(r"^\s*(\d{1,2}):(\d{2})\s*$", slot_str or "")
+        if not m:
+            raise HTTPException(status_code=422, detail=f"Invalid time slot '{slot_str}'. Expected HH:MM (e.g. 14:00).")
+        hh, mm = int(m.group(1)), int(m.group(2))
+        if not (0 <= hh <= 23 and 0 <= mm <= 59):
+            raise HTTPException(status_code=422, detail=f"Time slot '{slot_str}' is out of range (00:00–23:59).")
+        return hh * 60 + mm
+
+    def _format_hhmm(total_mins: int) -> str:
+        clamped = total_mins % (24 * 60)
+        return f"{clamped // 60:02d}:{clamped % 60:02d}"
+
+    req_start = _parse_hhmm(payload.requested_time_slot)
+    req_end = req_start + payload.duration_minutes
+
     with _bodywork_scheduling_lock:
         trip = db.query(CRMTrip).filter(
             CRMTrip.client_email == clean_email,
-            CRMTrip.sanctuary_slug.ilike(f"%{norm_slug}%")
+            CRMTrip.sanctuary_slug.ilike(f"%{norm_slug}%"),
+            CRMTrip.status.notin_(["CANCELLED", "MEDICAL_FREEZE"]),
         ).first()
 
         existing_trips = db.query(CRMTrip).filter(
-            CRMTrip.sanctuary_slug.ilike(f"%{norm_slug}%")
+            CRMTrip.sanctuary_slug.ilike(f"%{norm_slug}%"),
+            CRMTrip.status.notin_(["CANCELLED", "MEDICAL_FREEZE"]),
         ).all()
 
+        occupied_intervals = []
         slot_occupied_by = None
         for t in existing_trips:
             plan = t.suggested_plan or {}
             sessions = plan.get("scheduled_bodywork", [])
             for s in sessions:
-                if (s.get("practitioner") == payload.practitioner_name and
-                    s.get("date") == payload.session_date and
-                    s.get("time") == payload.requested_time_slot):
-                    slot_occupied_by = s.get("client_name", "Another Guest")
-                    break
-            if slot_occupied_by:
-                break
+                if (
+                    (s.get("practitioner") or "").strip().lower() == payload.practitioner_name.strip().lower()
+                    and s.get("date") == payload.session_date
+                ):
+                    try:
+                        s_start = _parse_hhmm(str(s.get("time", "")))
+                    except HTTPException:
+                        continue
+                    s_dur = int(s.get("duration_minutes") or 75)
+                    s_end = s_start + s_dur
+                    occupied_intervals.append((s_start, s_end, s.get("client_name", "Another Guest")))
+                    # True time-interval overlap check: [req_start, req_end) overlaps [s_start, s_end)
+                    if req_start < s_end and s_start < req_end and not slot_occupied_by:
+                        slot_occupied_by = s.get("client_name", "Another Guest")
 
         if slot_occupied_by:
-            adjacent_slot = "15:30"
+            # Find the next genuinely free slot (15-min practitioner turnaround buffer)
+            occupied_intervals.sort(key=lambda iv: iv[0])
+            candidate_start = req_start
+            for _ in range(24):
+                cand_end = candidate_start + payload.duration_minutes
+                blocking = next(
+                    (iv for iv in occupied_intervals if candidate_start < iv[1] and iv[0] < cand_end),
+                    None,
+                )
+                if not blocking:
+                    break
+                candidate_start = blocking[1] + 15
+            adjacent_slot = _format_hhmm(candidate_start)
             content = (
                 f"KAI SANCTUARY - BODYWORK SCHEDULE ADJUSTMENT & ADJACENT AVAILABILITY\n"
                 f"Guest: {payload.client_name} | Practitioner: {payload.practitioner_name}\n"

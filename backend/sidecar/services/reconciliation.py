@@ -3,7 +3,7 @@ import logging
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 from rapidfuzz import fuzz
-from backend.sidecar.models import StagedVoucherDiff, StagingIntake
+from backend.sidecar.models import StagedVoucherDiff, StagingIntake, CRMTrip
 from backend.models import ActionDraft
 
 logger = logging.getLogger("kai_reconciliation")
@@ -14,8 +14,15 @@ def parse_voucher_text(document_text: str, sanctuary_slug: str = "nosara") -> Di
     Extracts dates, confirmation numbers, room tiers, and rate details
     from raw voucher or contract text.
     """
-    # Confirmation / Voucher Number
-    ref_match = re.search(r"(?:confirmation|voucher|folio|booking\s*id|ref)\s*[:#\-]?\s*([A-Z0-9\-_]{4,32})", document_text, re.IGNORECASE)
+    # Confirmation / Voucher Number — require at least one digit so English labels like "Number" are never captured
+    ref_match = (
+        re.search(
+            r"(?:confirmation|voucher|folio|booking\s*id|vax|ref)\s*(?:number|no\.?)?\s*[:#\-]?\s*#?\s*((?=[A-Z0-9\-_]*\d)[A-Z0-9\-_]{4,32})\b",
+            document_text,
+            re.IGNORECASE,
+        )
+        or re.search(r"#\s*((?=[A-Z0-9\-_]*\d)[A-Z0-9\-_]{5,32})\b", document_text, re.IGNORECASE)
+    )
     voucher_ref = ref_match.group(1).upper() if ref_match else "VOUCHER-UNKNOWN"
 
     # Date ranges
@@ -54,7 +61,7 @@ def audit_manifest_diff(
     """
     logger.info(f"Auditing manifest diff for sanctuary '{sanctuary_slug}' with {len(external_guest_records)} external records")
 
-    # Fetch staged or synced intakes for this sanctuary
+    # Fetch staged or synced intakes PLUS active native CRMTrip records (deduped by email)
     db_intakes = db.query(StagingIntake).filter(
         StagingIntake.sanctuary_slug == sanctuary_slug,
         StagingIntake.status.in_(["PENDING_APPROVAL", "APPROVED", "CONFIRMED_IN_CRM"])
@@ -64,12 +71,30 @@ def audit_manifest_diff(
         {
             "id": i.id,
             "client_name": i.client_name,
-            "email": i.email,
+            "email": (i.email or "").strip().lower(),
             "room_tier": i.room_tier or "Private Villa Sanctuary",
             "source_ref": i.source_ref or ""
         }
         for i in db_intakes
     ]
+    seen_emails = {r["email"] for r in crm_records if r["email"]}
+    active_trips = db.query(CRMTrip).filter(
+        CRMTrip.sanctuary_slug == sanctuary_slug,
+        CRMTrip.status.notin_(["CANCELLED", "MEDICAL_FREEZE", "CANCELLED_WITH_REFUND", "CANCELLED_FORFEITED"]),
+    ).all()
+    for t in active_trips:
+        e_norm = (t.client_email or "").strip().lower()
+        if e_norm and e_norm in seen_emails:
+            continue
+        if e_norm:
+            seen_emails.add(e_norm)
+        crm_records.append({
+            "id": t.id,
+            "client_name": t.client_name,
+            "email": e_norm,
+            "room_tier": t.room_tier or "Private Villa Sanctuary",
+            "source_ref": t.crm_trip_id or "",
+        })
 
     discrepancies: List[Dict[str, Any]] = []
 
@@ -88,7 +113,8 @@ def audit_manifest_diff(
             "message": f"Sanctuary cohort limit of {cohort_cap} exceeded. External manifest contains {ext_count} guests (Sanctuary CRM staging: {confirmed_crm_count})."
         })
 
-    # RapidFuzz Name Matching
+    # Bidirectional RapidFuzz Name Matching (External -> CRM AND CRM -> External)
+    matched_crm_ids = set()
     for ext_guest in external_guest_records:
         ext_name = ext_guest.get("name", ext_guest.get("client_name", ""))
         ext_room = ext_guest.get("room", ext_guest.get("room_tier", "Unassigned"))
@@ -102,17 +128,16 @@ def audit_manifest_diff(
                 best_score = score
                 best_match = crm_guest
 
-        if best_score >= 80:
+        if best_score >= 80 and best_match:
+            matched_crm_ids.add(best_match["id"])
             # Check room tier alignment
-            if ext_room != "Unassigned" and best_match and ext_room.lower() not in best_match["room_tier"].lower():
+            if ext_room != "Unassigned" and ext_room.lower() not in best_match["room_tier"].lower():
                 discrepancies.append({
                     "type": "ROOM_TIER_MISMATCH",
                     "severity": "MEDIUM",
                     "external_name": ext_name,
                     "matched_crm_name": best_match["client_name"],
-                    "matched_crm_name": best_match["client_name"],
                     "external_room": ext_room,
-                    "crm_room": best_match["room_tier"],
                     "crm_room": best_match["room_tier"],
                     "message": f"Room discrepancy for {ext_name}: External listed as '{ext_room}', Sanctuary CRM as '{best_match['room_tier']}'."
                 })
@@ -123,6 +148,17 @@ def audit_manifest_diff(
                 "external_name": ext_name,
                 "external_room": ext_room,
                 "message": f"Guest '{ext_name}' appears on external ground manifest but does not match any Sanctuary CRM cohort record (best score: {best_score}%)."
+            })
+
+    # Reverse audit: Flag active CRM guests MISSING from the external hotel/ground-operator manifest!
+    for crm_guest in crm_records:
+        if crm_guest["id"] not in matched_crm_ids:
+            discrepancies.append({
+                "type": "MISSING_FROM_EXTERNAL_MANIFEST",
+                "severity": "HIGH",
+                "crm_name": crm_guest["client_name"],
+                "crm_room": crm_guest["room_tier"],
+                "message": f"Active KAI CRM guest '{crm_guest['client_name']}' ({crm_guest['room_tier']}) is MISSING from the external operator manifest!",
             })
 
     # Summary notes

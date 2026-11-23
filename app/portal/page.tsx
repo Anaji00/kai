@@ -358,7 +358,21 @@ export default function PortalDashboard() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 self-start md:self-auto">
+        <div className="flex items-center gap-2 self-start md:self-auto flex-wrap">
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("kai:vax:open"));
+              }
+            }}
+            title="Pull a VAX VacationAccess Reservation Number (ALG Vacations)"
+            className="inline-flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold text-white bg-emerald-800 hover:bg-emerald-900 rounded-md transition-all cursor-pointer shadow-2xs"
+          >
+            <Plane className="w-3.5 h-3.5 text-emerald-300" />
+            <span>Import VAX #</span>
+          </button>
+
           <button
             onClick={() => setIsVoiceModalOpen(true)}
             title="Voice Memo to Guest Dossier"
@@ -449,82 +463,28 @@ export default function PortalDashboard() {
         </div>
       </div>
 
-      {/* 2. Retreat Group Capacity & Size Monitor (12-14 Guests) */}
-      <div className="bg-white rounded-xl border border-[#E5DDD0] p-4 shadow-xs">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="font-serif text-base font-bold text-[#2D3E35]">
-            Sanctuary Capacity (12–14 Guests Max)
-          </h2>
-          <span className="text-[11px] font-semibold px-2 py-0.5 bg-[#F2ECE4] border border-[#E5DDD0] rounded text-[#2D3E35]">
-            14 Guest Cap
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {cohorts.map((c) => {
-            const totalBooked = (c.crm_confirmed_count ?? 0) + c.staged_count;
-            const pct = Math.min(100, Math.round((totalBooked / c.capacity_limit) * 100));
-            const isFull = c.remaining_spots === 0;
-            const isNearCap = c.remaining_spots <= 3 && c.remaining_spots > 0;
-
-            return (
-              <div
-                key={c.slug}
-                className="p-3.5 rounded-lg border border-[#E5DDD0] bg-[#FAF7F2]/60 hover:bg-[#FAF7F2] transition-colors"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-serif font-bold text-sm text-[#2D3E35]">{c.title}</span>
-                  <span
-                    className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isFull
-                        ? "bg-red-100 text-red-800"
-                        : isNearCap
-                          ? "bg-amber-100 text-amber-800"
-                          : "bg-emerald-100 text-emerald-800"
-                      }`}
-                  >
-                    {isFull ? "FULL" : `${c.remaining_spots} spots left`}
-                  </span>
-                </div>
-                <div className="text-[11px] text-[#5C6B5E] mt-1">{c.dates}</div>
-
-                {/* Progress bar */}
-                <div className="mt-3 w-full bg-[#E5DDD0] rounded-full h-2 overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-500 ${isFull ? "bg-red-500" : isNearCap ? "bg-amber-500" : "bg-[#2D3E35]"
-                      }`}
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-
-                <div className="flex justify-between text-[10px] text-[#5C6B5E] mt-1.5">
-                  <span>Confirmed: {(c.crm_confirmed_count ?? 0)}</span>
-                  <span>Staged: {c.staged_count}</span>
-                  <span className="font-bold">Cap: {c.capacity_limit}</span>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* 3. Inquiry Review Queue Controls */}
+      {/* 2. Inquiry Review Queue Controls */}
       <div className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-xl border border-[#E5DDD0] shadow-sm">
           <div className="flex items-center space-x-2">
             <span className="text-xs font-semibold text-[#2D3E35] uppercase tracking-wider">
-              Filter Inquiries:
+              Show:
             </span>
             <div className="flex items-center space-x-1">
-              {["ALL", "PENDING_APPROVAL", "CONFIRMED_IN_CRM"].map((st) => (
+              {[
+                { key: "ALL", label: "All Inquiries" },
+                { key: "PENDING_APPROVAL", label: "Needs Review" },
+                { key: "CONFIRMED_IN_CRM", label: "Confirmed in CRM" },
+              ].map((st) => (
                 <button
-                  key={st}
-                  onClick={() => setFilterStatus(st)}
-                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors ${filterStatus === st
+                  key={st.key}
+                  onClick={() => setFilterStatus(st.key)}
+                  className={`px-2.5 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer ${filterStatus === st.key
                       ? "bg-[#2D3E35] text-[#FAF7F2]"
                       : "text-[#5C6B5E] hover:bg-[#F2ECE4]"
                     }`}
                 >
-                  {st === "ALL" ? "All Statuses" : st.replace(/_/g, " ")}
+                  {st.label}
                 </button>
               ))}
             </div>
@@ -742,20 +702,20 @@ export default function PortalDashboard() {
                               <span>Guest Wellness &amp; Dietary Preferences</span>
                             </div>
                             <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              🌿 Restorative Retreat
+                              Restorative Retreat
                             </span>
                           </div>
                           <div>
                             <span className="font-medium text-[#5C6B5E]">Primary Focus:</span>{" "}
-                            {(intake.wellness_profile?.primary_focus as string) || (intake.clinical_profile?.intentions as string) || "Restorative travel & deep rest"}
+                            {(intake.wellness_profile?.primary_focus as string) || (intake.clinical_profile?.intentions as string) || "Rest & renewal"}
                           </div>
                           <div>
-                            <span className="font-medium text-[#5C6B5E]">Restorative Rhythm:</span>{" "}
-                            {(intake.wellness_profile?.preferred_rhythm as string) || (intake.clinical_profile?.movement_experience as string) || "Gentle sunrise yoga & twilight sound immersion"}
+                            <span className="font-medium text-[#5C6B5E]">Activity Preference:</span>{" "}
+                            {(intake.wellness_profile?.preferred_rhythm as string) || (intake.clinical_profile?.movement_experience as string) || "Morning yoga & evening sound bath"}
                           </div>
                           <div>
                             <span className="font-medium text-[#5C6B5E]">Dietary &amp; Chef Notes:</span>{" "}
-                            {(intake.wellness_profile?.nutrition_preferences as string) || (intake.clinical_profile?.health_notes as string) || "Seed-oil-free Blue Zone organic menu"}
+                            {(intake.wellness_profile?.nutrition_preferences as string) || (intake.clinical_profile?.health_notes as string) || "No restrictions noted"}
                           </div>
                         </div>
 
@@ -858,9 +818,9 @@ export default function PortalDashboard() {
                                 </div>
                               </div>
                               <div className="p-3.5 bg-white rounded-lg border border-[#E5DDD0]">
-                                <span className="font-semibold text-[#5C6B5E]">Daily Restorative Schedule:</span>
+                                <span className="font-semibold text-[#5C6B5E]">Suggested Daily Rhythm:</span>
                                 <div className="text-[11px] text-[#2D3E35] mt-1 leading-normal">
-                                  Gentle 4-7-8 calming breathwork &middot; 432Hz twilight sound immersion &middot; Farm-to-table coastal dining &middot; Deep restorative sleep
+                                  Morning movement &amp; breathwork &middot; Guided local excursion &middot; Afternoon spa or rest &middot; Group farm-to-table dinner
                                 </div>
                               </div>
                             </div>

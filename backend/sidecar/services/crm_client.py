@@ -92,7 +92,7 @@ class KaiTravelCRMClient:
                     intentions=clinical_profile.get("intentions"),
                     tags=tags,
                     passport_valid_6mo=True if "yes" in str(clinical_profile.get("passport_valid", "yes")).lower() else False,
-                    total_lifetime_spend=4850.0,
+                    total_lifetime_spend=0.0,
                     total_trips_count=1,
                     source="WEBSITE_INTAKE"
                 )
@@ -124,13 +124,13 @@ class KaiTravelCRMClient:
                 arr_code = "PVR" if "puerto" in (sanctuary_slug or "") else "LIR"
                 flight_block = {
                     "type": "FLIGHT",
-                    "airline": flight_request.get("preferred_airline", "United Airlines / Partner"),
-                    "flight_number": "UA 1420",
+                    "airline": flight_request.get("preferred_airline") or "",
+                    "flight_number": flight_request.get("flight_number") or "",
                     "departure_airport": dep_code,
                     "arrival_airport": arr_code,
                     "cabin_class": flight_request.get("cabin_class", "Business"),
-                    "smart_tracking": "CIRIUM_LIVE_ACTIVE",
-                    "live_status": "ON_TIME",
+                    "smart_tracking": "PENDING_TICKET_NUMBER",
+                    "live_status": "AWAITING_FLIGHT_DETAILS",
                     "meet_and_greet": "Chilled adaptogenic welcome at arrivals"
                 }
                 activities.insert(0, {
@@ -154,17 +154,17 @@ class KaiTravelCRMClient:
                 title=f"KAI Wellness Sanctuary - {sanctuary_title}",
                 dates=dates_label,
                 room_tier=room_tier or "Private Luxury Suite",
-                status="CONFIRMED" if contact_matching_status == "MATCHED_EXISTING_CONTACT" else "PROPOSED_ITINERARY",
+                status="PROPOSED_ITINERARY",
                 total_investment=4850.0,
-                deposit_amount=1500.0,
+                deposit_amount=1455.0,
                 deposit_status="PENDING_CLIENT_AUTHORIZATION",
-                final_balance=3350.0,
+                final_balance=3395.0,
                 final_balance_status="SCHEDULED",
                 smart_flight=flight_block,
                 clinical_thesis=consultation_thesis,
                 suggested_plan=consultation_thesis.get("llm_suggested_plan") if consultation_thesis else None,
                 itinerary_blocks=activities,
-                proposal_url=f"/portal?tab=crm&section=proposal&trip_id={trip_id}",
+                proposal_url=f"/my-retreat?ref={trip_id}",
                 deep_link=f"/portal?tab=crm&trip_id={trip_id}",
                 created_by=operator_name
             )

@@ -3,10 +3,12 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from starlette.testclient import TestClient
+from backend.database import init_db
 from backend.main import app
 
 from backend.services.retreats_service import RETREATS_CATALOG
 
+init_db()
 client = TestClient(app)
 
 

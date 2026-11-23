@@ -553,6 +553,19 @@ def commit_intake_to_crm(
     if not intake:
         raise HTTPException(status_code=404, detail="Staged intake not found")
 
+    # Idempotency Guard: Repeated clicks on 1-Click CRM Commit must not duplicate CRMTrip rows
+    if intake.status == "CONFIRMED_IN_CRM" and intake.crm_trip_id and intake.crm_contact_id:
+        return CrmCommitResponse(
+            success=True,
+            message="Intake was already committed to KAI Sanctuary CRM (idempotent replay).",
+            intake_id=intake.id,
+            crm_contact_id=intake.crm_contact_id,
+            crm_trip_id=intake.crm_trip_id,
+            applied_tags=["KAI_GUEST", "COHORT_2026_2027"],
+            status="CONFIRMED_IN_CRM",
+            synced_at=intake.synced_at or datetime.now(timezone.utc),
+        )
+
     from backend.sidecar.services.clinical_governance_engine import active_clinical_hold, clinical_hold_conflict
     hold = active_clinical_hold(intake.consultation_thesis)
     if hold:

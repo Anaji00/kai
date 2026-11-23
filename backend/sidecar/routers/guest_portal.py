@@ -6,8 +6,9 @@ Two-way interactions strictly stage ActionDrafts for Kareena's 1-click authoriza
 """
 
 import logging
+import math
 from fastapi import APIRouter, HTTPException, Query, Depends, Request, Response
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
 
@@ -66,17 +67,25 @@ auth_router = APIRouter(prefix="/api/auth/guest", tags=["Guest Authentication"])
 
 class GuestFlightUpdateRequest(BaseModel):
     token: Optional[str] = Field(None, description="Magic-link guest token, when not using a guest session")
-    flight_number: str = Field(..., description="Flight number, e.g. UA 142 or AA 1083")
-    delay_minutes: int = Field(0, description="Estimated flight delay in minutes")
-    gate: Optional[str] = Field(None, description="Arrival or departure gate")
-    notes: Optional[str] = Field(None, description="Additional traveler notes")
+    flight_number: str = Field(..., min_length=2, max_length=64, description="Flight number, e.g. UA 142 or AA 1083")
+    delay_minutes: int = Field(0, ge=0, le=1440, description="Estimated flight delay in minutes (0-1440)")
+    gate: Optional[str] = Field(None, max_length=32, description="Arrival or departure gate")
+    notes: Optional[str] = Field(None, max_length=1000, description="Additional traveler notes")
+
+    @field_validator("flight_number")
+    @classmethod
+    def validate_flight_number(cls, v: str) -> str:
+        cleaned = v.strip()
+        if len(cleaned) < 2:
+            raise ValueError("Please provide a valid flight number.")
+        return cleaned
 
 
 class GuestDietaryUpdateRequest(BaseModel):
     token: Optional[str] = Field(None, description="Magic-link guest token, when not using a guest session")
-    dietary_tags: List[str] = Field(default_factory=list, description="e.g. Gluten-Free, Plant-Based, Low-FODMAP")
-    allergies: Optional[str] = Field(None, description="Severe food allergies (nuts, shellfish, etc.)")
-    special_chef_notes: Optional[str] = Field(None, description="Notes for private villa chef")
+    dietary_tags: List[str] = Field(default_factory=list, max_length=30, description="e.g. Gluten-Free, Plant-Based, Low-FODMAP")
+    allergies: Optional[str] = Field(None, max_length=500, description="Severe food allergies (nuts, shellfish, etc.)")
+    special_chef_notes: Optional[str] = Field(None, max_length=1000, description="Notes for private villa chef")
 
 
 class GuestSomaticPulseRequest(BaseModel):
@@ -85,8 +94,16 @@ class GuestSomaticPulseRequest(BaseModel):
     phase: str = Field("MORNING_AWAKENING", description="MORNING_AWAKENING or EVENING_STILLNESS")
     restorative_sleep_score: int = Field(8, ge=1, le=10, description="Self-reported sleep quality (1-10)")
     nervous_system_ease: int = Field(8, ge=1, le=10, description="Nervous system calm & vagal ease (1-10)")
-    vagal_tone_descriptor: Optional[str] = Field("Calm & Grounded", description="Subjective somatic feeling")
-    private_reflection_notes: Optional[str] = Field(None, description="Private journal reflection")
+    vagal_tone_descriptor: Optional[str] = Field("Calm & Grounded", max_length=200, description="Subjective somatic feeling")
+    private_reflection_notes: Optional[str] = Field(None, max_length=2000, description="Private journal reflection")
+
+    @field_validator("phase")
+    @classmethod
+    def validate_phase(cls, v: str) -> str:
+        norm = v.strip().upper()
+        if norm not in ("MORNING_AWAKENING", "EVENING_STILLNESS"):
+            raise ValueError("Phase must be MORNING_AWAKENING or EVENING_STILLNESS.")
+        return norm
 
 
 class RevokeTokenRequest(BaseModel):
@@ -95,14 +112,23 @@ class RevokeTokenRequest(BaseModel):
 
 class GuestProposalApproveRequest(BaseModel):
     ref: str = Field(..., description="Sanctuary trip reference ID (kai_trp_... or id)")
-    cardholder_name: str = Field(..., description="Cardholder full legal name")
-    billing_postal_code: str = Field(..., description="Card billing postal/zip code")
-    card_last4: str = Field("4242", description="Card last 4 digits")
-    card_brand: str = Field("Visa", description="Card brand / network (Visa, Mastercard, Amex)")
+    guest_email: EmailStr = Field(..., description="Email on the reservation to verify guest identity")
+    payment_preference: str = Field(
+        "VAX_HOST_AGENCY_CALL",
+        description="Preferred offline settlement method: VAX_HOST_AGENCY_CALL, BANK_WIRE_ACH, or CORPORATE_WIRE",
+    )
     e_signature: str = Field(..., description="Legal electronic signature")
-    agreed_to_terms: bool = Field(True, description="Consent to 30% deposit authorization and sanctuary cancellation policy")
+    agreed_to_terms: bool = Field(True, description="Consent to sanctuary booking terms and cancellation policy")
     selected_room_tier: Optional[str] = Field(None, description="Optional self-service suite tier selected by guest")
     custom_total_investment: Optional[float] = Field(None, description="Updated total investment if suite tier upgraded")
+    flight_number: Optional[str] = Field(None, max_length=64, description="Optional arrival flight number for check-in")
+    origin_airport: Optional[str] = Field(None, max_length=16, description="Optional departure airport code")
+    dietary_notes: Optional[str] = Field(None, max_length=500, description="Optional dietary preferences or allergies")
+    # Legacy optional fields kept for backwards compatibility; never used to charge or vault cards
+    cardholder_name: Optional[str] = None
+    billing_postal_code: Optional[str] = None
+    card_last4: Optional[str] = None
+    card_brand: Optional[str] = None
 
 
 class GuestAccessRequest(BaseModel):
@@ -136,14 +162,35 @@ def _set_guest_cookies(response: Response, guest_id: str, email: str, session_id
 
 
 def _find_guest_booking(db: Session, email: str, reference: str):
-    """Matches email and booking reference together; returns (booking, intake), either possibly None."""
-    booking = db.query(Booking).filter(Booking.reference_code == reference).first()
+    """Matches email and booking/proposal reference together; returns (booking, intake, crm_trip)."""
+    raw_ref = reference.strip()
+    upper_ref = raw_ref.upper()
+    lower_ref = raw_ref.lower()
+
+    booking = db.query(Booking).filter(
+        or_(Booking.reference_code == upper_ref, Booking.reference_code == raw_ref)
+    ).first()
     if booking and normalize_email(booking.email) != email:
         booking = None
-    intake = db.query(StagingIntake).filter(StagingIntake.source_ref == reference).first()
+
+    intake = db.query(StagingIntake).filter(
+        or_(StagingIntake.source_ref == upper_ref, StagingIntake.source_ref == raw_ref)
+    ).first()
     if intake and normalize_email(intake.email) != email:
         intake = None
-    return booking, intake
+
+    crm_trip = db.query(CRMTrip).filter(
+        or_(
+            CRMTrip.crm_trip_id == raw_ref,
+            CRMTrip.crm_trip_id == lower_ref,
+            CRMTrip.id == raw_ref,
+            CRMTrip.id == lower_ref,
+        )
+    ).first()
+    if crm_trip and normalize_email(crm_trip.client_email or "") != email:
+        crm_trip = None
+
+    return booking, intake, crm_trip
 
 
 @auth_router.post("/request-access")
@@ -158,8 +205,8 @@ def request_guest_access(payload: GuestAccessRequest, request: Request, db: Sess
     record_attempt(db, ip_key)
     record_attempt(db, email_key)
 
-    booking, intake = _find_guest_booking(db, email, reference)
-    if booking or intake:
+    booking, intake, crm_trip = _find_guest_booking(db, email, payload.booking_reference)
+    if booking or intake or crm_trip:
         code = issue_guest_otp(db, email, reference)
         send_guest_otp_email(email, code)
     return {"success": True, "message": "If those details match a reservation, an access code is on its way."}
@@ -185,14 +232,25 @@ def verify_guest_access(payload: GuestVerifyRequest, response: Response, db: Ses
     reference = payload.booking_reference.strip().upper()
     if not verify_guest_otp(db, email, reference, payload.otp):
         raise HTTPException(status_code=401, detail="That code is incorrect or has expired.")
-    booking, intake = _find_guest_booking(db, email, reference)
-    if not booking and not intake:
+    booking, intake, crm_trip = _find_guest_booking(db, email, payload.booking_reference)
+    if not booking and not intake and not crm_trip:
         raise HTTPException(status_code=401, detail="That code is incorrect or has expired.")
 
-    guest_id = str(intake.id) if intake else f"booking-{booking.id}"
-    slug = (intake.sanctuary_slug if intake else booking.retreat_id) or "general"
-    name = intake.client_name if intake else booking.full_name
-    room = intake.room_tier if intake else booking.room_preference
+    if intake:
+        guest_id = str(intake.id)
+        slug = intake.sanctuary_slug or "general"
+        name = intake.client_name
+        room = intake.room_tier
+    elif crm_trip:
+        guest_id = str(crm_trip.id)
+        slug = crm_trip.sanctuary_slug or "general"
+        name = crm_trip.client_name
+        room = crm_trip.room_tier
+    else:
+        guest_id = f"booking-{booking.id}"
+        slug = booking.retreat_id or "general"
+        name = booking.full_name
+        room = booking.room_preference
     expires_at = datetime.now(timezone.utc) + timedelta(hours=settings.GUEST_SESSION_EXPIRE_HOURS)
     rec = create_verified_guest_session(db, guest_id, name, email, slug, room, expires_at)
     _set_guest_cookies(response, guest_id, email, rec.id, slug, expires_at)
@@ -452,6 +510,20 @@ def post_revoke_token(
 
 # ──── Interactive Client Proposal & Deposit Authorization Endpoints (Native KAI CRM) ────
 
+
+def _mask_email(email: Optional[str]) -> str:
+    """Masks an email address for public proposal display so ownership checks cannot be scraped from GET /proposal."""
+    raw = (email or "").strip()
+    if "@" not in raw:
+        return ""
+    local, domain = raw.split("@", 1)
+    if len(local) <= 2:
+        masked_local = local[0] + "*" * max(1, len(local) - 1) if local else "*"
+    else:
+        masked_local = local[0] + "***" + local[-1]
+    return f"{masked_local}@{domain}"
+
+
 @router.get("/proposal")
 def get_guest_proposal(
     ref: str = Query(..., description="Sanctuary trip reference ID (kai_trp_... or id)"),
@@ -509,7 +581,7 @@ def get_guest_proposal(
             "ref": trip.crm_trip_id,
             "trip_id": trip.id,
             "guest_name": trip.client_name,
-            "guest_email": trip.client_email,
+            "guest_email": _mask_email(trip.client_email),
             "title": trip.title,
             "sanctuary_slug": trip.sanctuary_slug,
             "dates": trip.dates,
@@ -538,21 +610,25 @@ def approve_guest_proposal(
     db: Session = Depends(get_db)
 ):
     """
-    Guest self-service proposal approval & credit card deposit authorization.
-    Transitions trip status from PROPOSED_ITINERARY to CONFIRMED,
-    vaults transaction authorization reference with legal e-signature,
-    stages an ActionDraft for Kareena Islam, RN, and creates an instant magic-link companion token.
+    Guest self-service proposal acceptance, suite confirmation, waiver e-signature,
+    and optional arrival check-in (flight & dietary details).
+
+    OFFLINE VAX / WIRE SETTLEMENT GOVERNANCE:
+    No card is charged or vaulted online. Signing records the guest's binding terms acceptance
+    and preferred offline settlement method (VAX VacationAccess card auth via Grand Travel & Cruise
+    or Bank Wire/ACH) and sets deposit_status = 'AWAITING_OFFLINE_SETTLEMENT'.
+    Only an authenticated advisor in the CRM marks funds PAID once cleared in VAX or bank wire.
     """
     if not payload.agreed_to_terms:
         raise HTTPException(
             status_code=400,
-            detail="You must accept the sanctuary payment authorization and cancellation terms to confirm your reservation."
+            detail="You must accept the sanctuary booking terms and cancellation policy to approve your proposal."
         )
 
     if not payload.e_signature or len(payload.e_signature.strip()) < 2:
         raise HTTPException(
             status_code=400,
-            detail="A valid legal e-signature is required for payment authorization."
+            detail="A valid legal e-signature is required to approve your proposal."
         )
 
     clean_ref = payload.ref.strip()
@@ -563,78 +639,148 @@ def approve_guest_proposal(
     if not trip:
         raise HTTPException(status_code=404, detail="Sanctuary trip proposal not found.")
 
-    # Tern CRM Parity: Dynamic Room Option & Suite Tier selection on approval
-    if payload.selected_room_tier:
-        trip.room_tier = payload.selected_room_tier.strip()
-    if payload.custom_total_investment is not None:
-        # Security Guard: A guest cannot arbitrarily discount their stay below the baseline quote
-        min_allowed = round(float(trip.total_investment), 2)
-        proposed_total = round(float(payload.custom_total_investment), 2)
-        if proposed_total >= min_allowed:
-            trip.total_investment = proposed_total
-            trip.deposit_amount = round(trip.total_investment * 0.3, 2)
-            trip.final_balance = round(trip.total_investment * 0.7, 2)
+    # Verify guest ownership by matching the email address on the reservation
+    if normalize_email(str(payload.guest_email)) != normalize_email(trip.client_email or ""):
+        raise HTTPException(
+            status_code=403,
+            detail="The email address entered does not match the guest email on this reservation."
+        )
 
-    auth_ref = f"AUTH-DEP-{secrets.token_hex(4).upper()}"
-    signed_timestamp = datetime.now(timezone.utc).isoformat()
+    trip_status_upper = (trip.status or "").upper()
+    if trip_status_upper in ("CANCELLED", "MEDICAL_FREEZE"):
+        raise HTTPException(
+            status_code=409,
+            detail="This sanctuary proposal is no longer active. Please contact concierge@kaiwellnessretreats.com for assistance.",
+        )
 
-    history = list(trip.payment_history or [])
-    auth_entry = {
-        "payment_id": str(uuid.uuid4()),
-        "amount": trip.deposit_amount,
-        "currency": trip.currency or "USD",
-        "payment_method": f"CARD_VAULT_{payload.card_brand.upper()}",
-        "card_last4": payload.card_last4,
-        "cardholder_name": payload.cardholder_name.strip(),
-        "billing_postal_code": payload.billing_postal_code.strip(),
-        "transaction_reference": auth_ref,
-        "e_signature": payload.e_signature.strip(),
-        "signed_at": signed_timestamp,
-        "notes": f"Client self-service proposal approval. 30% sanctuary deposit (${trip.deposit_amount:,.2f} USD) authorized. 70% balance (${trip.final_balance:,.2f} USD) scheduled 45 days prior.",
-        "processed_by": "CLIENT_SELF_SERVICE",
-        "timestamp": signed_timestamp,
+    # Dynamic Room Option & Suite Tier selection on approval with server-side surcharge floor
+    upgrade_surcharges = {
+        "private cliffside plunge villa": 3200.0,
+        "master penthouse sanctuary": 5500.0,
     }
-    history.append(auth_entry)
-    trip.payment_history = history
+    is_locked_paid = trip_status_upper == "CONFIRMED" or (trip.deposit_status or "").upper() == "PAID"
+    baseline_total = round(float(trip.total_investment or 0.0), 2)
+    original_tier_norm = (trip.room_tier or "").strip().lower()
+    requested_tier = (payload.selected_room_tier or "").strip()
+    requested_tier_norm = requested_tier.lower()
+    tier_updated = False
 
-    trip.deposit_status = "PAID"
-    trip.status = "CONFIRMED"
-    trip.final_balance_status = "SCHEDULED_45D"
+    if requested_tier and not is_locked_paid:
+        required_surcharge = 0.0
+        if requested_tier_norm in upgrade_surcharges and requested_tier_norm != original_tier_norm:
+            current_surcharge = upgrade_surcharges.get(original_tier_norm, 0.0)
+            required_surcharge = max(0.0, upgrade_surcharges[requested_tier_norm] - current_surcharge)
 
-    # Tern CRM Parity: Append milestone events to trip's living activity timeline
+        min_required_total = round(baseline_total + required_surcharge, 2)
+        if required_surcharge > 0:
+            if payload.custom_total_investment is None or not math.isfinite(float(payload.custom_total_investment)):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Upgrading to {requested_tier} requires the updated stay investment (${min_required_total:,.2f}).",
+                )
+            proposed_check = round(float(payload.custom_total_investment), 2)
+            if proposed_check < min_required_total:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Selected suite upgrade ({requested_tier}) requires a minimum investment of ${min_required_total:,.2f}.",
+                )
+        trip.room_tier = requested_tier
+        tier_updated = True
+
+    if payload.custom_total_investment is not None and not is_locked_paid:
+        raw_proposed = float(payload.custom_total_investment)
+        if not math.isfinite(raw_proposed) or raw_proposed <= 0 or raw_proposed > 1_000_000:
+            raise HTTPException(
+                status_code=400,
+                detail="Proposed total investment must be a valid finite amount up to $1,000,000.",
+            )
+        proposed_total = round(raw_proposed, 2)
+        if proposed_total < baseline_total:
+            raise HTTPException(
+                status_code=400,
+                detail="Total investment cannot be reduced below the curated proposal baseline.",
+            )
+        trip.total_investment = proposed_total
+        trip.deposit_amount = round(trip.total_investment * 0.3, 2)
+        trip.final_balance = round(trip.total_investment - trip.deposit_amount, 2)
+
+    agreement_ref = f"AGR-KAI-{secrets.token_hex(4).upper()}"
+    signed_timestamp = datetime.now(timezone.utc).isoformat()
+    payment_pref = (payload.payment_preference or "VAX_HOST_AGENCY_CALL").strip().upper()
+    pref_labels = {
+        "VAX_HOST_AGENCY_CALL": "VAX VacationAccess / ALGV Card Payment via Grand Travel Advisor",
+        "BANK_WIRE_ACH": "Domestic / International Bank Wire (ACH / SWIFT)",
+        "CORPORATE_WIRE": "Corporate / Executive Holding Wire",
+    }
+    pref_label = pref_labels.get(payment_pref, payment_pref)
+
+    # Persist optional arrival flight details directly onto smart_flight
+    if payload.flight_number or payload.origin_airport:
+        sf = dict(trip.smart_flight or {})
+        if payload.flight_number:
+            sf["flight_number"] = payload.flight_number.strip().upper()
+        if payload.origin_airport:
+            sf["departure_airport"] = payload.origin_airport.strip().upper()
+        trip.smart_flight = sf
+
+    # Update linked client waiver signature & optional dietary notes
+    client_rec = db.query(CRMClient).filter(
+        or_(CRMClient.id == trip.client_id, CRMClient.email == trip.client_email)
+    ).first()
+    if client_rec:
+        client_rec.waiver_status = "SIGNED"
+        client_rec.waiver_signed_at = datetime.now(timezone.utc)
+        if payload.dietary_notes and payload.dietary_notes.strip():
+            client_rec.dietary_requirements = payload.dietary_notes.strip()
+
+    # Do NOT mark deposit PAID online — advisor confirms once VAX/wire settles
+    if trip.deposit_status != "PAID":
+        trip.deposit_status = "AWAITING_OFFLINE_SETTLEMENT"
+    if trip.status in ("INQUIRY", "PROPOSED_ITINERARY"):
+        trip.status = "PROPOSAL_SIGNED"
+    if not trip.final_balance_status or trip.final_balance_status == "PENDING":
+        trip.final_balance_status = "SCHEDULED_60D"
+
+    # Append milestone events to trip's living activity timeline (NOT payment_history)
     timeline = list(trip.activity_timeline or [])
-    if payload.selected_room_tier:
+    if tier_updated:
         timeline.append({
-            "event": "SUITE_UPGRADED",
-            "title": f"Suite Selection Confirmed: {trip.room_tier}",
-            "description": f"Guest finalized suite tier as {trip.room_tier} (${trip.total_investment:,.2f} {trip.currency}).",
+            "event": "SUITE_SELECTED",
+            "title": f"Suite Selection Locked: {trip.room_tier}",
+            "description": f"Guest selected {trip.room_tier} (${trip.total_investment:,.2f} {trip.currency}).",
             "timestamp": signed_timestamp,
             "badge": "Suite Tier",
             "actor": "GUEST"
         })
     timeline.append({
-        "event": "DEPOSIT_AUTHORIZED",
-        "title": "30% Sanctuary Deposit Authorized",
-        "description": f"Authorized ${trip.deposit_amount:,.2f} {trip.currency} via {payload.card_brand} *{payload.card_last4} (Ref: {auth_ref}). E-Signature on file: '{payload.e_signature}'.",
+        "event": "PROPOSAL_SIGNED",
+        "title": "Proposal Signed · Awaiting Offline VAX / Wire Deposit",
+        "description": (
+            f"Agreement Ref {agreement_ref} e-signed by '{payload.e_signature.strip()}'. "
+            f"Preferred settlement: {pref_label} for 30% deposit (${trip.deposit_amount:,.2f} {trip.currency})."
+        ),
         "timestamp": signed_timestamp,
-        "badge": "Secured",
+        "badge": "Signed",
         "actor": "GUEST"
     })
     trip.activity_timeline = timeline
 
     alert_content = (
-        f"SANCTUARY PROPOSAL APPROVED & DEPOSIT AUTHORIZED\n"
+        f"SANCTUARY PROPOSAL SIGNED — AWAITING OFFLINE VAX / WIRE DEPOSIT\n"
         f"Guest: {trip.client_name} ({trip.client_email})\n"
         f"Sanctuary: {trip.title} ({trip.dates})\n"
         f"Suite Tier: {trip.room_tier}\n"
         f"Total Investment: ${trip.total_investment:,.2f} {trip.currency}\n"
-        f"Authorized Deposit: ${trip.deposit_amount:,.2f} {trip.currency} (Ref: {auth_ref})\n"
-        f"Cardholder: {payload.cardholder_name} | Card: {payload.card_brand} *{payload.card_last4}\n"
-        f"Legal E-Signature: {payload.e_signature} (Signed: {signed_timestamp})\n"
-        f"Remaining Balance: ${trip.final_balance:,.2f} {trip.currency} (Scheduled 45 days prior)\n\n"
-        f"Operational Next Steps for Concierge:\n"
-        f"1. Finalize Grand Travel flight meet-and-greet manifest.\n"
-        f"2. Stage welcome consultation pack for Nurse Kareena."
+        f"30% Deposit Due: ${trip.deposit_amount:,.2f} {trip.currency}\n"
+        f"70% Balance Due (60d Prior): ${trip.final_balance:,.2f} {trip.currency}\n"
+        f"Preferred Settlement Method: {pref_label}\n"
+        f"Agreement Ref: {agreement_ref}\n"
+        f"Legal E-Signature: {payload.e_signature.strip()} (Signed: {signed_timestamp})\n"
+        f"Arrival Flight Provided: {payload.flight_number or 'Pending'} ({payload.origin_airport or 'Origin TBD'})\n"
+        f"Dietary Notes Provided: {payload.dietary_notes or 'No changes noted'}\n\n"
+        f"Advisor Next Steps:\n"
+        f"1. Collect 30% deposit via VAX VacationAccess or send Grand Travel wire instructions.\n"
+        f"2. Log the VAX confirmation # or Wire reference in CRM -> Billing & Folios to mark PAID."
     )
     draft = ActionDraft(
         type="guest_proposal_approval_notification",
@@ -644,75 +790,6 @@ def approve_guest_proposal(
         status="pending_review",
     )
     db.add(draft)
-
-    # Tern CRM Parity: Trip-Stage Triggered Human-in-the-Loop Automation Sequence
-    # Sequence 1: Welcome & Solfeggio Audio Access Draft (Held for Founder 1-Click Dispatch)
-    welcome_draft = ActionDraft(
-        type="welcome_audio_dispatch",
-        guest_name=trip.client_name,
-        recipient_email=trip.client_email,
-        content=(
-            f"KAI SANCTUARY — FOUNDER WELCOME & ACOUSTIC ACCESS\n"
-            f"To: {trip.client_name} <{trip.client_email}>\n"
-            f"Subject: Welcome to KAI {trip.title} — Your Sanctuary Companion Access\n\n"
-            f"Dear {trip.client_name},\n\n"
-            f"Welcome to KAI Wellness Retreats. Your reservation for {trip.title} in our "
-            f"{trip.room_tier} is officially confirmed.\n\n"
-            f"As your retreat coordinator and clinical nurse director, I am personally reviewing your intake preferences. "
-            f"Ahead of your journey, you can begin gentle parasympathetic downregulation through our private 432Hz "
-            f"crystal sound immersion player, accessible through your guest sanctuary companion:\n\n"
-            f"Companion Access: https://kaiwellnessretreats.com/my-retreat?ref={trip.crm_trip_id}\n\n"
-            f"With warmth and restorative stillness,\n"
-            f"Kareena Islam, BSN, RN\n"
-            f"Founder & Somatic Director | KAI Wellness Retreats"
-        ),
-        status="pending_review",
-    )
-    db.add(welcome_draft)
-
-    # Sequence 2: 30-Day Packing Checklist & Microclimate Weather Brief Draft
-    packing_draft = ActionDraft(
-        type="packing_and_microclimate_brief",
-        guest_name=trip.client_name,
-        recipient_email=trip.client_email,
-        content=(
-            f"KAI SANCTUARY — 30-DAY PACKING & MICROCLIMATE PREPARATION\n"
-            f"To: {trip.client_name} <{trip.client_email}>\n"
-            f"Subject: Preparing for {trip.title} — Curated Packing & Arrival Guidance\n\n"
-            f"Dear {trip.client_name},\n\n"
-            f"We are looking forward to welcoming you to {trip.title} ({trip.dates}). "
-            f"To ensure ease and comfort in the coastal microclimate, our team has prepared your personal packing checklist "
-            f"and arrival run-sheet.\n\n"
-            f"Key Inclusions:\n"
-            f" • Breathable organic yoga attire and swimwear\n"
-            f" • Reef-safe mineral sunscreen and wide-brim sun hat\n"
-            f" • Evening linen layers for coastal ocean breezes\n\n"
-            f"Our Grand Travel & Cruise concierge will confirm your private chauffeur wave 7 days prior to departure.\n\n"
-            f"Warmly,\nKAI Concierge Desk"
-        ),
-        status="pending_review",
-    )
-    db.add(packing_draft)
-
-    # Sequence 3: 45-Day Final Balance Settlement Notice Draft
-    balance_draft = ActionDraft(
-        type="final_balance_settlement_notice",
-        guest_name=trip.client_name,
-        recipient_email=trip.client_email,
-        content=(
-            f"KAI SANCTUARY — 70% FINAL BALANCE SCHEDULE REMINDER\n"
-            f"To: {trip.client_name} <{trip.client_email}>\n"
-            f"Subject: Scheduled Final Balance Settlement Notice — {trip.title}\n\n"
-            f"Dear {trip.client_name},\n\n"
-            f"This is a courtesy reminder regarding your scheduled 70% final balance (${trip.final_balance:,.2f} {trip.currency}) "
-            f"for your upcoming retreat: {trip.title}.\n\n"
-            f"Per your authorized deposit agreement ({auth_ref}), this scheduled balance will settle 45 days prior to arrival. "
-            f"If you wish to settle via corporate wire or update your preferred card, please contact concierge@kaiwellnessretreats.com.\n\n"
-            f"Warmly,\nGrand Travel & Cruise Treasury Desk"
-        ),
-        status="pending_review",
-    )
-    db.add(balance_draft)
 
     token_result = generate_guest_magic_token(
         intake_id=trip.id,
@@ -730,8 +807,14 @@ def approve_guest_proposal(
 
     return {
         "success": True,
-        "message": f"Sanctuary proposal approved. Your 30% deposit of ${trip.deposit_amount:,.2f} has been authorized.",
-        "auth_reference": auth_ref,
+        "message": (
+            f"Thank you! Your proposal and suite selection are signed (Ref: {agreement_ref}). "
+            f"No card was charged here—Grand Travel & Cruise will follow up via {pref_label} "
+            f"to process your ${trip.deposit_amount:,.2f} {trip.currency} 30% deposit."
+        ),
+        "auth_reference": agreement_ref,
+        "agreement_reference": agreement_ref,
+        "payment_preference": payment_pref,
         "trip": {
             "ref": trip.crm_trip_id,
             "status": trip.status,

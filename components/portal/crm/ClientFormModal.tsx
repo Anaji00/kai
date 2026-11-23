@@ -35,18 +35,18 @@ const COMMON_TAGS = [
   "VIP Guest",
   "Private Villa",
   "Gluten-Free",
-  "Seed-Oil-Free",
+  "Dairy-Free",
   "Chauffeur Pickup",
   "First-Time Guest",
 ];
 
 const DIETARY_QUICK_PRESETS = [
   "Gluten-Free",
-  "Seed-Oil-Free",
+  "Dairy-Free",
   "Vegan",
   "Pescatarian",
   "Nut-Free",
-  "Dairy-Free",
+  "Vegetarian",
 ];
 
 export default function ClientFormModal({
@@ -357,7 +357,7 @@ export default function ClientFormModal({
                   type="text"
                   value={dietaryRequirements}
                   onChange={(e) => setDietaryRequirements(e.target.value)}
-                  placeholder="e.g. Gluten-Free, Seed-Oil-Free, Organic Pescatarian"
+                  placeholder="e.g. Gluten-Free, Dairy-Free, Pescatarian"
                   className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
                 />
                 <div className="flex flex-wrap items-center gap-1.5 mt-2">
@@ -605,7 +605,7 @@ export default function ClientFormModal({
                     onChange={(e) => setMovementExperience(e.target.value)}
                     className="w-full px-3 py-1.5 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] focus:bg-white focus:outline-none cursor-pointer"
                   >
-                    <option value="Beginner Somatic">Beginner Somatic</option>
+                    <option value="Beginner / All Levels">Beginner / All Levels</option>
                     <option value="Reformer Intermediate">Reformer Intermediate (1-3 yrs)</option>
                     <option value="Advanced Classical Reformer">Advanced Classical Reformer</option>
                     <option value="Restorative Only">Restorative &amp; Gentle Only</option>

@@ -55,6 +55,15 @@ interface ClinicalDossierPrintData {
   deterministic_hash: string;
 }
 
+function escHtml(value: unknown): string {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 function openPrintWindow(title: string, bodyHtml: string): void {
   if (typeof window === "undefined") return;
 
@@ -68,7 +77,7 @@ function openPrintWindow(title: string, bodyHtml: string): void {
 <html lang="en">
 <head>
   <meta charset="utf-8"/>
-  <title>${title} — KAI Sanctuary Dossier</title>
+  <title>${escHtml(title)} — KAI Sanctuary Dossier</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Inter:wght@300;400;500;600&display=swap');
     
@@ -207,14 +216,27 @@ export function printCohortManifest(data: CohortPrintData): void {
       (g, idx) => `
       <tr>
         <td><strong>${idx + 1}</strong></td>
-        <td><strong>${g.guest_name}</strong></td>
-        <td>${g.room_tier || "Standard Ocean Pavilion"}</td>
-        <td>${g.flight ? `${g.flight} (${g.arrival || "TBD"})` : "TBD"}</td>
-        <td>${g.dietary_notes || "None"}</td>
-        <td>${(g.clinical_flags || []).join(", ") || "Cleared"}</td>
+        <td><strong>${escHtml(g.guest_name)}</strong></td>
+        <td>${escHtml(g.room_tier || "Standard Ocean Pavilion")}</td>
+        <td>${g.flight ? `${escHtml(g.flight)} (${escHtml(g.arrival || "TBD")})` : "TBD"}</td>
+        <td>${escHtml(g.dietary_notes || "None")}</td>
+        <td>${escHtml((g.clinical_flags || []).join(", ") || "Cleared")}</td>
       </tr>`
     )
     .join("");
+
+  const protocolsHtml =
+    data.kitchen_protocols && data.kitchen_protocols.length > 0
+      ? `
+    <div class="summary-card" style="margin-top: 12px;">
+      <h4 style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #5C6B5E; margin-bottom: 6px;">
+        Operational &amp; Kitchen Protocols
+      </h4>
+      <ul style="padding-left: 18px; font-size: 12px; color: #2D3E35;">
+        ${data.kitchen_protocols.map((p) => `<li style="margin-bottom: 3px;">${escHtml(p)}</li>`).join("")}
+      </ul>
+    </div>`
+      : "";
 
   const body = `
     <div class="header">
@@ -222,19 +244,19 @@ export function printCohortManifest(data: CohortPrintData): void {
         <img src="/kai-logo.png" style="width: 38px; height: 38px; border-radius: 50%; object-fit: contain;" alt="KAI Logo" />
         <div>
           <h1 class="brand-title">KAI Wellness Retreats</h1>
-          <p class="brand-subtitle">Sanctuary Cohort Manifest & Transit Slip</p>
+          <p class="brand-subtitle">Sanctuary Cohort Manifest &amp; Transit Slip</p>
         </div>
       </div>
       <div style="text-align: right;">
-        <span class="badge">${data.location}</span>
-        <p style="font-size: 11px; margin-top: 4px; color: #5C6B5E;">${data.dates}</p>
+        <span class="badge">${escHtml(data.location)}</span>
+        <p style="font-size: 11px; margin-top: 4px; color: #5C6B5E;">${escHtml(data.dates)}</p>
       </div>
     </div>
 
     <div class="summary-card">
-      <h3 style="font-size: 14px; margin-bottom: 6px;">${data.title}</h3>
+      <h3 style="font-size: 14px; margin-bottom: 6px;">${escHtml(data.title)}</h3>
       <p style="font-size: 12px; color: #5C6B5E;">
-        Capacity: ${data.guests.length} / ${data.capacity} Confirmed Guests • VIP Ground Logistics & Dietary Protocols
+        Capacity: ${data.guests.length} / ${Number(data.capacity) || data.guests.length} Confirmed Guests • VIP Ground Logistics &amp; Dietary Protocols
       </p>
     </div>
 
@@ -250,35 +272,32 @@ export function printCohortManifest(data: CohortPrintData): void {
         </tr>
       </thead>
       <tbody>
-        ${rows}
+        ${rows || "<tr><td colspan='6'>No guests in current filter view.</td></tr>"}
       </tbody>
     </table>
+    ${protocolsHtml}
   `;
 
   openPrintWindow(`Cohort_Manifest_${data.title.replace(/\s+/g, "_")}`, body);
 }
 
 export function printBillingFolio(data: BillingFolioPrintData): void {
-  const txRows = (data.transactions || [
-    {
-      date: new Date().toLocaleDateString(),
-      description: "Initial Sanctuary Deposit / Reservation Hold",
-      method: "SWIFT Wire Transfer",
-      amount: data.total_paid,
-      reference: "WIRE-AUTONOMOUS-SYNC",
-    },
-  ])
-    .map(
-      (tx) => `
+  const safeTransactions = Array.isArray(data.transactions) ? data.transactions : [];
+  const txRows =
+    safeTransactions.length > 0
+      ? safeTransactions
+          .map(
+            (tx) => `
       <tr>
-        <td>${tx.date}</td>
-        <td>${tx.description}</td>
-        <td>${tx.method}</td>
-        <td><code>${tx.reference}</code></td>
-        <td style="text-align: right;"><strong>$${tx.amount.toLocaleString()}</strong></td>
+        <td>${escHtml(tx.date)}</td>
+        <td>${escHtml(tx.description)}</td>
+        <td>${escHtml(tx.method)}</td>
+        <td><code>${escHtml(tx.reference)}</code></td>
+        <td style="text-align: right;"><strong>$${Number(tx.amount || 0).toLocaleString()}</strong></td>
       </tr>`
-    )
-    .join("");
+          )
+          .join("")
+      : `<tr><td colspan="5" style="text-align: center; color: #5C6B5E; font-style: italic;">No settled VAX VacationAccess or Wire payments recorded yet.</td></tr>`;
 
   const body = `
     <div class="header">
@@ -286,34 +305,34 @@ export function printBillingFolio(data: BillingFolioPrintData): void {
         <img src="/kai-logo.png" style="width: 38px; height: 38px; border-radius: 50%; object-fit: contain;" alt="KAI Logo" />
         <div>
           <h1 class="brand-title">KAI Wellness Retreats</h1>
-          <p class="brand-subtitle">Itemized Billing Folio & Wire Settlement Voucher</p>
+          <p class="brand-subtitle">Itemized Billing Folio &amp; Wire Settlement Voucher</p>
         </div>
       </div>
       <div style="text-align: right;">
         <span class="badge ${data.remaining_balance <= 0 ? "badge-success" : ""}">
           ${data.remaining_balance <= 0 ? "PAID IN FULL" : "BALANCE OUTSTANDING"}
         </span>
-        <p style="font-size: 11px; margin-top: 4px; color: #5C6B5E;">Trip ID: <code>${data.trip_id}</code></p>
+        <p style="font-size: 11px; margin-top: 4px; color: #5C6B5E;">Trip ID: <code>${escHtml(data.trip_id)}</code></p>
       </div>
     </div>
 
     <div class="summary-card" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
       <div>
         <span style="font-size: 10px; text-transform: uppercase; color: #5C6B5E;">Client Name</span>
-        <h4 style="font-size: 14px; margin-top: 2px;">${data.guest_name}</h4>
-        <span style="font-size: 11px; color: #5C6B5E;">Destination: ${data.destination}</span>
+        <h4 style="font-size: 14px; margin-top: 2px;">${escHtml(data.guest_name)}</h4>
+        <span style="font-size: 11px; color: #5C6B5E;">Destination: ${escHtml(data.destination)}</span>
       </div>
       <div>
         <span style="font-size: 10px; text-transform: uppercase; color: #5C6B5E;">Total Stay Investment</span>
-        <h4 style="font-size: 16px; margin-top: 2px; color: #2D3E35;">$${data.total_investment.toLocaleString()} ${data.currency}</h4>
-        <span style="font-size: 11px; color: #389E0D;">Paid: $${data.total_paid.toLocaleString()}</span>
+        <h4 style="font-size: 16px; margin-top: 2px; color: #2D3E35;">$${Number(data.total_investment || 0).toLocaleString()} ${escHtml(data.currency)}</h4>
+        <span style="font-size: 11px; color: #389E0D;">Paid: $${Number(data.total_paid || 0).toLocaleString()}</span>
       </div>
       <div>
         <span style="font-size: 10px; text-transform: uppercase; color: #5C6B5E;">Remaining Balance</span>
         <h4 style="font-size: 16px; margin-top: 2px; color: ${data.remaining_balance > 0 ? "#CF1322" : "#389E0D"};">
-          $${data.remaining_balance.toLocaleString()} ${data.currency}
+          $${Number(data.remaining_balance || 0).toLocaleString()} ${escHtml(data.currency)}
         </h4>
-        <span style="font-size: 11px; color: #5C6B5E;">Deposit: ${data.deposit_status}</span>
+        <span style="font-size: 11px; color: #5C6B5E;">Deposit: ${escHtml(data.deposit_status)}</span>
       </div>
     </div>
 
@@ -327,7 +346,7 @@ export function printBillingFolio(data: BillingFolioPrintData): void {
           <th>Description</th>
           <th>Payment Method</th>
           <th>Transaction Reference</th>
-          <th style="text-align: right;">Amount (${data.currency})</th>
+          <th style="text-align: right;">Amount (${escHtml(data.currency || "USD")})</th>
         </tr>
       </thead>
       <tbody>
@@ -345,9 +364,9 @@ export function printGuestClinicalDossier(data: ClinicalDossierPrintData): void 
       (f, idx) => `
       <tr>
         <td><strong>0${idx + 1}</strong></td>
-        <td><span class="badge badge-alert">${f.category}</span></td>
-        <td>${f.rule}</td>
-        <td><strong style="color: #389E0D;">${f.safe_alternative}</strong></td>
+        <td><span class="badge badge-alert">${escHtml(f.category)}</span></td>
+        <td>${escHtml(f.rule)}</td>
+        <td><strong style="color: #389E0D;">${escHtml(f.safe_alternative)}</strong></td>
       </tr>`
     )
     .join("");
@@ -358,33 +377,33 @@ export function printGuestClinicalDossier(data: ClinicalDossierPrintData): void 
         <img src="/kai-logo.png" style="width: 38px; height: 38px; border-radius: 50%; object-fit: contain;" alt="KAI Logo" />
         <div>
           <h1 class="brand-title">KAI Wellness Retreats</h1>
-          <p class="brand-subtitle">Clinical Safety Protocol & Grounding Dossier</p>
+          <p class="brand-subtitle">Clinical Safety Protocol &amp; Grounding Dossier</p>
         </div>
       </div>
       <div style="text-align: right;">
         <span class="badge ${data.overall_severity.includes("HOLD") ? "badge-alert" : "badge-success"}">
-          ${data.overall_severity}
+          ${escHtml(data.overall_severity)}
         </span>
-        <p style="font-size: 10px; margin-top: 4px; color: #5C6B5E;">SHA-256: <code>${data.deterministic_hash.substring(0, 16)}...</code></p>
+        <p style="font-size: 10px; margin-top: 4px; color: #5C6B5E;">SHA-256: <code>${escHtml(data.deterministic_hash.substring(0, 16))}...</code></p>
       </div>
     </div>
 
     <div class="summary-card">
-      <h3 style="font-size: 14px; margin-bottom: 4px;">Guest: ${data.client_name}</h3>
+      <h3 style="font-size: 14px; margin-bottom: 4px;">Guest: ${escHtml(data.client_name)}</h3>
       <p style="font-size: 11px; color: #5C6B5E;">
-        Sanctuary: ${data.sanctuary} • Room: ${data.room_tier} • Dietary: ${data.dietary_notes || "Standard Anti-inflammatory"}
+        Sanctuary: ${escHtml(data.sanctuary)} • Room: ${escHtml(data.room_tier)} • Dietary: ${escHtml(data.dietary_notes || "Standard Anti-inflammatory")}
       </p>
       ${
         data.blocked_modalities.length > 0
           ? `<p style="margin-top: 8px; font-size: 11px; color: #CF1322; font-weight: 600;">
-              Contraindicated / Blocked Modalities: ${data.blocked_modalities.join(" • ")}
+              Contraindicated / Blocked Modalities: ${escHtml(data.blocked_modalities.join(" • "))}
             </p>`
           : `<p style="margin-top: 8px; font-size: 11px; color: #389E0D;">All standard somatic retreat modalities cleared.</p>`
       }
     </div>
 
     <h4 style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.1em; color: #5C6B5E; margin-bottom: 8px;">
-      Deterministic Protocol Findings & Safe Adaptations
+      Deterministic Protocol Findings &amp; Safe Adaptations
     </h4>
     <table>
       <thead>
@@ -430,7 +449,7 @@ export function printChargebackDefenseBundle(data: ChargebackAuditData): void {
     "Clinical 432Hz Sound Decompression & Autonomic Vagal Realignment",
     "Daily Organic Seed-Oil-Free Blue Zone Gastronomy by Private Executive Chef",
   ])
-    .map((item) => `<li style="margin-bottom: 4px;">${item}</li>`)
+    .map((item) => `<li style="margin-bottom: 4px;">${escHtml(item)}</li>`)
     .join("");
 
   const body = `
@@ -444,7 +463,7 @@ export function printChargebackDefenseBundle(data: ChargebackAuditData): void {
       </div>
       <div style="text-align: right;">
         <span class="badge badge-success">LEGALLY BINDING E-SIGNATURE</span>
-        <p style="font-size: 10px; margin-top: 4px; color: #5C6B5E;">Ref: <code>${data.auth_reference}</code></p>
+        <p style="font-size: 10px; margin-top: 4px; color: #5C6B5E;">Ref: <code>${escHtml(data.auth_reference)}</code></p>
       </div>
     </div>
 
@@ -453,31 +472,31 @@ export function printChargebackDefenseBundle(data: ChargebackAuditData): void {
         DISPUTE CASE EXHIBIT A: TRANSACTION AUTHENTICITY &amp; AUTHORIZATION
       </h3>
       <p style="font-size: 11px; line-height: 1.6; color: #5C6B5E;">
-        This document serves as definitive proof that the cardholder, <strong>${data.client_name}</strong>,
+        This document serves as definitive proof that the guest, <strong>${escHtml(data.client_name)}</strong>,
         voluntarily entered into an all-inclusive luxury sanctuary reservation agreement, acknowledged the non-refundable deposit terms,
-        and legally authorized host agency <strong>Grand Travel &amp; Cruise</strong> to vault and charge their card.
+        and legally authorized offline settlement through host agency <strong>Grand Travel &amp; Cruise</strong> (via VAX VacationAccess / ALGV or bank wire).
       </p>
     </div>
 
     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 16px 0;">
       <div class="summary-card">
         <h4 style="font-size: 11px; text-transform: uppercase; color: #5C6B5E; margin-bottom: 8px;">Cardholder &amp; Payment Provenance</h4>
-        <p style="font-size: 11px; margin: 3px 0;"><strong>Cardholder Name:</strong> ${data.client_name}</p>
-        <p style="font-size: 11px; margin: 3px 0;"><strong>Billing Location / ZIP:</strong> ${data.billing_address || "On File"}</p>
-        <p style="font-size: 11px; margin: 3px 0;"><strong>Card Network &amp; Account:</strong> ${data.card_brand} ending in <code>*${data.card_last4}</code></p>
-        <p style="font-size: 11px; margin: 3px 0;"><strong>Transaction Auth Token:</strong> <code>${data.auth_reference}</code></p>
-        <p style="font-size: 11px; margin: 3px 0;"><strong>Authorization Signed At:</strong> ${data.signed_timestamp}</p>
-        <p style="font-size: 11px; margin: 3px 0;"><strong>Digital Signature Record:</strong> <span style="font-family: serif; font-style: italic; color: #C07D63;">${data.e_signature || data.client_name}</span></p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Cardholder Name:</strong> ${escHtml(data.client_name)}</p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Billing Location / ZIP:</strong> ${escHtml(data.billing_address || "On File")}</p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Card Network &amp; Account:</strong> ${escHtml(data.card_brand)} ending in <code>*${escHtml(data.card_last4)}</code></p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Transaction Auth Token:</strong> <code>${escHtml(data.auth_reference)}</code></p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Authorization Signed At:</strong> ${escHtml(data.signed_timestamp)}</p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Digital Signature Record:</strong> <span style="font-family: serif; font-style: italic; color: #C07D63;">${escHtml(data.e_signature || data.client_name)}</span></p>
       </div>
 
       <div class="summary-card">
         <h4 style="font-size: 11px; text-transform: uppercase; color: #5C6B5E; margin-bottom: 8px;">Itinerary Binding &amp; Suite Allocation</h4>
-        <p style="font-size: 11px; margin: 3px 0;"><strong>Sanctuary Cohort:</strong> ${data.sanctuary_name}</p>
-        <p style="font-size: 11px; margin: 3px 0;"><strong>Reserved Cohort Dates:</strong> ${data.dates}</p>
-        <p style="font-size: 11px; margin: 3px 0;"><strong>Allocated Room Tier:</strong> ${data.room_tier}</p>
-        <p style="font-size: 11px; margin: 3px 0;"><strong>Total Stay Investment:</strong> $${data.total_investment.toLocaleString()} USD</p>
-        <p style="font-size: 11px; margin: 3px 0; color: #237804;"><strong>30% Authorized Deposit:</strong> $${data.deposit_authorized.toLocaleString()} USD</p>
-        <p style="font-size: 11px; margin: 3px 0;"><strong>70% Scheduled Final Balance:</strong> $${data.balance_scheduled.toLocaleString()} USD</p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Sanctuary Cohort:</strong> ${escHtml(data.sanctuary_name)}</p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Reserved Cohort Dates:</strong> ${escHtml(data.dates)}</p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Allocated Room Tier:</strong> ${escHtml(data.room_tier)}</p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>Total Stay Investment:</strong> $${Number(data.total_investment || 0).toLocaleString()} USD</p>
+        <p style="font-size: 11px; margin: 3px 0; color: #237804;"><strong>30% Authorized Deposit:</strong> $${Number(data.deposit_authorized || 0).toLocaleString()} USD</p>
+        <p style="font-size: 11px; margin: 3px 0;"><strong>70% Scheduled Final Balance:</strong> $${Number(data.balance_scheduled || 0).toLocaleString()} USD</p>
       </div>
     </div>
 
@@ -526,12 +545,11 @@ export function printChargebackDefenseBundle(data: ChargebackAuditData): void {
 
     <div class="summary-card" style="margin-top: 16px; font-size: 10px; line-height: 1.6; color: #5C6B5E; border: 1px dashed #E5DDD0;">
       <p>
-        <strong>MERCHANT LEGAL REPRESENTATION:</strong>
-        The cardholder explicitly certified at the moment of authorization:
-        <em>"I hereby authorize KAI Wellness Retreats and host agency Grand Travel &amp; Cruise to charge the non-refundable 30% sanctuary deposit to the card above.
-        I acknowledge that the remaining 70% balance will be automatically scheduled in accordance with the luxury cancellation schedule.
-        I agree not to initiate a chargeback or dispute for voluntary cancellations covered under this policy."</em>
-        This agreement complies fully with Visa Core Rules, Mastercard Dispute Resolution, and American Express Merchant Regulations.
+        <strong>MERCHANT &amp; HOST AGENCY REPRESENTATION:</strong>
+        The guest explicitly certified at the moment of signing:
+        <em>"I hereby approve this KAI Wellness Retreats proposal and acknowledge the 30% non-refundable deposit terms and 70% balance schedule processed offline through host agency Grand Travel &amp; Cruise via VAX VacationAccess or bank wire.
+        I agree to the luxury cancellation schedule above for voluntary cancellations."</em>
+        This signed agreement and offline VAX / wire settlement audit trail comply with travel agency merchant dispute standards.
       </p>
     </div>
   `;

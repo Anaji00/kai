@@ -115,6 +115,11 @@ export default function Footer() {
                 </Link>
               </li>
               <li>
+                <Link href="/newsletter" className="hover:text-terracotta transition-colors">
+                  Beyond The Retreats
+                </Link>
+              </li>
+              <li>
                 <Link href="/about#our-philosophy" className="hover:text-terracotta transition-colors">
                   Living BIG — Be In Gratitude
                 </Link>
@@ -145,9 +150,17 @@ export default function Footer() {
 
           {/* Newsletter / Waitlist */}
           <div className="md:col-span-4 space-y-4">
-            <h4 className="text-xs uppercase tracking-[0.2em] font-semibold text-olive">
-              Intimate Retreat Announcements
-            </h4>
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-xs uppercase tracking-[0.2em] font-semibold text-olive">
+                Beyond The Retreats
+              </h4>
+              <Link
+                href="/newsletter"
+                className="text-[11px] font-medium text-terracotta hover:underline"
+              >
+                Read &amp; Press &rarr;
+              </Link>
+            </div>
             <p className="text-xs text-sage/75 leading-relaxed">
               Because our retreats maintain an intimate capacity of 12 to 14 guests, openings are released privately to our circle first.
             </p>

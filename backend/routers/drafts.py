@@ -241,32 +241,44 @@ def execute_draft_dispatch(db: Session, draft: ActionDraft, operator_name: str =
     # 3. Guest Intakes & Booking Holds (Sanctuary CRM Commit) - Uses clean standard tags
     elif draft.type in ("guest_intake", "booking_hold", "crm_booking_review", "crm_sync_review"):
         dispatch_results["channel"] = "SANCTUARY_CRM"
-        intake = db.query(StagingIntake).filter(
-            _name_is(StagingIntake.client_name, draft.guest_name) |
-            (StagingIntake.source_ref == (draft.guest_name or "").strip())
-        ).first()
+        intake = None
+        if draft.target_entity_type == "staging_intakes" and draft.target_entity_id:
+            intake = db.query(StagingIntake).filter(StagingIntake.id == draft.target_entity_id).first()
+        if intake is None:
+            intake = db.query(StagingIntake).filter(
+                _name_is(StagingIntake.client_name, draft.guest_name) |
+                (StagingIntake.source_ref == (draft.guest_name or "").strip())
+            ).first()
 
         crm = crm_client
         if intake:
-            crm_res = crm.sync_intake_to_crm(
-                intake_id=str(intake.id),
-                client_name=intake.client_name,
-                email=intake.email,
-                phone=intake.phone,
-                sanctuary_slug=intake.sanctuary_slug,
-                room_tier=intake.room_tier,
-                clinical_profile=intake.clinical_profile or {},
-                consultation_thesis=intake.consultation_thesis or {},
-                flight_request=intake.flight_request,
-                operator_name=operator_name
-            )
-            intake.status = "CONFIRMED_IN_CRM"
-            intake.crm_trip_id = crm_res.get("crm_trip_id") 
-            intake.crm_contact_id = crm_res.get("crm_contact_id") 
-            intake.synced_at = datetime.now(timezone.utc)
-            db.commit()
-            dispatch_results["action_taken"] = f"Committed intake for {intake.client_name} to Sanctuary CRM"
-            dispatch_results["details"] = crm_res
+            if intake.status == "CONFIRMED_IN_CRM" and intake.crm_trip_id and intake.crm_contact_id:
+                dispatch_results["action_taken"] = f"Intake for {intake.client_name} was already committed to Sanctuary CRM (idempotent)"
+                dispatch_results["details"] = {
+                    "crm_contact_id": intake.crm_contact_id,
+                    "crm_trip_id": intake.crm_trip_id,
+                    "idempotent": True,
+                }
+            else:
+                crm_res = crm.sync_intake_to_crm(
+                    intake_id=str(intake.id),
+                    client_name=intake.client_name,
+                    email=intake.email,
+                    phone=intake.phone,
+                    sanctuary_slug=intake.sanctuary_slug,
+                    room_tier=intake.room_tier,
+                    clinical_profile=intake.clinical_profile or {},
+                    consultation_thesis=intake.consultation_thesis or {},
+                    flight_request=intake.flight_request,
+                    operator_name=operator_name
+                )
+                intake.status = "CONFIRMED_IN_CRM"
+                intake.crm_trip_id = crm_res.get("crm_trip_id")
+                intake.crm_contact_id = crm_res.get("crm_contact_id")
+                intake.synced_at = datetime.now(timezone.utc)
+                db.commit()
+                dispatch_results["action_taken"] = f"Committed intake for {intake.client_name} to Sanctuary CRM"
+                dispatch_results["details"] = crm_res
         else:
             booking = db.query(Booking).filter(_name_is(Booking.full_name, draft.guest_name)).first()
             if booking:
@@ -277,8 +289,8 @@ def execute_draft_dispatch(db: Session, draft: ActionDraft, operator_name: str =
                 client_name=draft.guest_name,
                 email=getattr(booking, "email", f"{draft.guest_name.lower().replace(' ', '.')}@example.com"),
                 phone=getattr(booking, "phone", "+1 555-0100"),
-                sanctuary_slug="nosara",
-                room_tier="Ocean Canopy Villa",
+                sanctuary_slug=getattr(booking, "retreat_id", None) or "puerto-vallarta-2027",
+                room_tier=getattr(booking, "room_preference", None) or "Private Villa Sanctuary",
                 clinical_profile={"health_notes": "Synchronized via approved booking hold"},
                 consultation_thesis={},
                 operator_name=operator_name
@@ -735,6 +747,8 @@ def discard_draft(
     draft = db.query(ActionDraft).filter(ActionDraft.id == draft_id).first()
     if not draft:
         raise HTTPException(status_code=404, detail="Action draft not found")
+    if draft.status == "approved":
+        raise HTTPException(status_code=409, detail="Approved drafts have already been dispatched and cannot be discarded.")
 
     draft.status = "discarded"
     draft.reviewed_by_operator_id = operator.id
@@ -762,6 +776,13 @@ def update_draft(
 
     if draft.status == "approved":
         raise HTTPException(status_code=409, detail="Approved drafts are already dispatched and cannot be edited.")
+
+    allowed_patch_statuses = {"pending_review", "approved", "discarded", "SCHEDULED"}
+    if payload.status not in allowed_patch_statuses:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid draft status '{payload.status}'. Allowed: {sorted(list(allowed_patch_statuses))}",
+        )
 
     draft.content = payload.content
     dispatch_result = None

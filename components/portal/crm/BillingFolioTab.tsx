@@ -24,6 +24,7 @@ import {
   recordCrmTripSplitPayment,
   settleMultiGuestSplitFolio,
   cancelCrmTripWithPolicy,
+  executeCopilotCrmAction,
 } from "@/lib/sidecar-api";
 
 export interface BillingFolioTabProps {
@@ -54,15 +55,17 @@ export function BillingFolioTab({
   const [selectedTripId, setSelectedTripId] = useState<string>(trips[0]?.id || "");
   const [busy, setBusy] = useState<string | null>(null);
 
-  // Billing Sub-Workspace Modes: "payment" (default) | "split" | "cancellation"
-  const [billingMode, setBillingMode] = useState<"payment" | "split" | "cancellation">("payment");
-  const [paymentSubMethod, setPaymentSubMethod] = useState<"card" | "wire">("card");
+  // Billing Sub-Workspace Modes: "payment" (default) | "split" | "commission_calendar" | "cancellation"
+  const [billingMode, setBillingMode] = useState<
+    "payment" | "split" | "commission_calendar" | "cancellation"
+  >("payment");
+  const [paymentSubMethod, setPaymentSubMethod] = useState<"card" | "wire">("wire");
 
-  // 1. Multi-Currency Payment Terminal state
+  // 1. Offline VAX / Wire Payment Ledger state
   const [currency, setCurrency] = useState<string>("USD");
   const [fxAmount, setFxAmount] = useState<number>(4350);
-  const [paymentMethod, setPaymentMethod] = useState<string>("SWIFT International Wire");
-  const [txRef, setTxRef] = useState<string>("WIRE-KAI-90214");
+  const [paymentMethod, setPaymentMethod] = useState<string>("VAX VacationAccess / ALGV Card Payment");
+  const [txRef, setTxRef] = useState<string>("VAX-84920174");
   const [paymentNotes, setPaymentNotes] = useState<string>("Sanctuary deposit payment");
   const [lastPaymentResult, setLastPaymentResult] = useState<{
     amount_recorded: number;
@@ -97,7 +100,7 @@ export function BillingFolioTab({
   // 3. Cancellation & Insurance Claim Generator state
   const [cancelDaysPrior, setCancelDaysPrior] = useState<number>(42);
   const [cancelReason, setCancelReason] = useState<string>(
-    "Acute L4-L5 lumbar disc herniation requiring neurosurgical rest"
+    "Medical or family travel change"
   );
   const [medicalCert, setMedicalCert] = useState<boolean>(true);
   const [cancelResult, setCancelResult] = useState<{
@@ -127,12 +130,20 @@ export function BillingFolioTab({
 
   const activeTrip = trips.find((t) => t.id === selectedTripId) || trips[0];
   const currentFxRate = FX_RATES[currency] || 1.0;
-  const convertedUsdPreview = Math.round(fxAmount * currentFxRate * 100) / 100;
+  const safeFxAmount = Number.isFinite(fxAmount) && fxAmount > 0 ? fxAmount : 0;
+  const convertedUsdPreview = Math.round(safeFxAmount * currentFxRate * 100) / 100;
 
-  const totalInv = activeTrip?.total_investment || 14500;
-  const paidAmt = activeTrip?.paid_amount || 0;
-  const remainingBal = Math.max(0, totalInv - paidAmt);
-  const percentPaid = Math.min(100, Math.round((paidAmt / totalInv) * 100));
+  const totalInv = Math.max(0, Number(activeTrip?.total_investment || 0));
+  const paidAmt = Math.max(0, Number(activeTrip?.paid_amount ?? 0));
+  const remainingBal = Math.max(0, Math.round((totalInv - paidAmt) * 100) / 100);
+  const percentPaid = totalInv > 0 ? Math.min(100, Math.round((paidAmt / totalInv) * 100)) : 0;
+
+  const handleSelectTrip = (newTripId: string) => {
+    setSelectedTripId(newTripId);
+    setLastPaymentResult(null);
+    setCardAuthResult(null);
+    setCancelResult(null);
+  };
 
   const notifyDraftUpdate = (msg: string) => {
     onNotify(msg);
@@ -145,6 +156,10 @@ export function BillingFolioTab({
     e.preventDefault();
     if (!activeTrip) {
       onNotify("Notice: Please sync or select an active trip first.");
+      return;
+    }
+    if (convertedUsdPreview <= 0) {
+      onNotify("Notice: Please enter a positive payment amount greater than $0.");
       return;
     }
     setBusy("payment");
@@ -160,6 +175,7 @@ export function BillingFolioTab({
         fxAmount
       );
       setLastPaymentResult(res);
+      setTxRef(`VAX-${Date.now().toString().slice(-6)}`);
       notifyDraftUpdate(
         `Recorded ${currency} ${fxAmount.toLocaleString()} ($${res.amount_recorded.toLocaleString()} USD @ ${currentFxRate}) for ${activeTrip.client_name}. Remaining balance: $${res.remaining_balance.toLocaleString()} USD (Draft #${res.draft_id}).`
       );
@@ -187,12 +203,48 @@ export function BillingFolioTab({
         remainingBal
       );
       setLastPaymentResult(res);
+      setTxRef(`VAX-${Date.now().toString().slice(-6)}`);
       notifyDraftUpdate(
         `Final Balance Settled: Recorded $${remainingBal.toLocaleString()} USD for ${activeTrip.client_name} (Folio cleared 100%, Draft #${res.draft_id} staged).`
       );
       onRefresh();
     } catch (err: unknown) {
       onNotify(`Notice: ${err instanceof Error ? err.message : "Failed to settle balance"}`);
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const handleQuickSplitCompanion5050 = async () => {
+    if (!activeTrip) return;
+    setBusy("split_5050");
+    try {
+      const matchedClient = clients.find(
+        (c) =>
+          c.id === activeTrip.client_id ||
+          c.full_name.toLowerCase() === activeTrip.client_name.toLowerCase()
+      );
+      const companionName =
+        matchedClient?.companion_name || `${activeTrip.client_name.split(" ")[0]}'s Roommate`;
+      const res = await executeCopilotCrmAction({
+        form_type: "split_companion_folio",
+        action_type: "split_companion_folio",
+        target_id: activeTrip.id,
+        sanctuary_slug: activeTrip.sanctuary_slug,
+        fields: {
+          primary_name: activeTrip.client_name,
+          companion_name: companionName,
+          total_investment: totalInv,
+          room_tier: activeTrip.room_tier,
+        },
+      });
+      notifyDraftUpdate(
+        res.summary ||
+          `Split ${activeTrip.client_name}'s $${totalInv.toLocaleString()} USD folio 50/50 with ${companionName}.`
+      );
+      onRefresh();
+    } catch (err: unknown) {
+      onNotify(`Notice: ${err instanceof Error ? err.message : "Failed 50/50 split"}`);
     } finally {
       setBusy(null);
     }
@@ -398,7 +450,7 @@ export function BillingFolioTab({
             {/* Quick Guest Selector */}
             <select
               value={activeTrip?.id || ""}
-              onChange={(e) => setSelectedTripId(e.target.value)}
+              onChange={(e) => handleSelectTrip(e.target.value)}
               className="px-3 py-1.5 text-xs rounded-lg border border-[#E5DDD0] bg-[#FAF7F2] text-[#2D3E35] font-semibold min-w-[280px]"
             >
               {trips.map((t) => (
@@ -412,14 +464,14 @@ export function BillingFolioTab({
 
         {/* Live Guest Ledger Metric Strip */}
         {activeTrip && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-[#FAF7F2] p-3.5 rounded-xl border border-[#E5DDD0]">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-[#FAF7F2] p-3.5 rounded-xl border border-[#E5DDD0]">
             <div>
               <div className="text-[10px] font-semibold uppercase text-[#5C6B5E]">Selected Guest</div>
               <div className="font-serif font-bold text-sm text-[#2D3E35] truncate mt-0.5">
                 {activeTrip.client_name}
               </div>
               <div className="text-[11px] text-[#5C6B5E] truncate">{activeTrip.room_tier}</div>
-              <div className="flex items-center gap-2 mt-2">
+              <div className="flex flex-wrap items-center gap-1.5 mt-2">
                 {onInspectGuest && (
                   <button
                     type="button"
@@ -453,6 +505,16 @@ export function BillingFolioTab({
                     <span>Itinerary</span>
                   </button>
                 )}
+                <button
+                  type="button"
+                  disabled={busy === "split_5050"}
+                  onClick={handleQuickSplitCompanion5050}
+                  className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-900 hover:text-amber-950 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded border border-amber-300 transition-colors cursor-pointer"
+                  title="Divide this booking 50/50 into two separate companion folios with independent payment tracking"
+                >
+                  <Users className="w-2.5 h-2.5 text-amber-800" />
+                  <span>{busy === "split_5050" ? "Splitting..." : "Split 50/50"}</span>
+                </button>
               </div>
             </div>
 
@@ -493,6 +555,40 @@ export function BillingFolioTab({
                 </button>
               )}
             </div>
+
+            <div>
+              <div className="text-[10px] font-semibold uppercase text-[#5C6B5E]">
+                VAX / ALGV Commission (14.5%)
+              </div>
+              <div className="text-sm font-bold text-emerald-800 font-mono mt-0.5">
+                +${Math.round(totalInv * 0.145).toLocaleString()} USD
+              </div>
+              <div className="text-[11px] text-[#5C6B5E]">
+                Net Retreat Margin:{" "}
+                <strong className="text-[#2D3E35]">
+                  ${Math.round(totalInv * 0.42).toLocaleString()}
+                </strong>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  const res = await executeCopilotCrmAction({
+                    form_type: "reconcile_commissions",
+                    action_type: "reconcile_commissions",
+                    sanctuary_slug: activeTrip.sanctuary_slug,
+                  });
+                  notifyDraftUpdate(
+                    res.summary ||
+                      `Reconciled 14.5% VAX/ALGV supplier commission ($${Math.round(totalInv * 0.145).toLocaleString()} USD) for ${activeTrip.client_name}.`
+                  );
+                }}
+                className="mt-2 inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-semibold text-emerald-900 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded transition-colors cursor-pointer"
+                title="Reconcile expected vs. received VAX/ALGV supplier commission across cohort"
+              >
+                <Sparkles className="w-2.5 h-2.5 text-emerald-700" />
+                <span>Reconcile Commission</span>
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -510,7 +606,7 @@ export function BillingFolioTab({
             }`}
           >
             <CreditCard className="w-3.5 h-3.5 text-emerald-700" />
-            <span>Receive Payment &amp; Card Vault</span>
+            <span>Log VAX / Wire Payment</span>
           </button>
 
           <button
@@ -524,6 +620,19 @@ export function BillingFolioTab({
           >
             <Users className="w-3.5 h-3.5 text-[#2D3E35]" />
             <span>Shared Villa Split Folio</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setBillingMode("commission_calendar")}
+            className={`px-3.5 py-1.5 rounded-md text-xs font-semibold transition-all flex items-center space-x-1.5 cursor-pointer ${
+              billingMode === "commission_calendar"
+                ? "bg-white text-emerald-900 shadow-xs"
+                : "text-[#5C6B5E] hover:text-[#2D3E35]"
+            }`}
+          >
+            <Receipt className="w-3.5 h-3.5 text-emerald-700" />
+            <span>60-Day Balances &amp; ALGV Commissions</span>
           </button>
 
           <button
@@ -542,18 +651,7 @@ export function BillingFolioTab({
 
         {billingMode === "payment" && (
           <div className="flex items-center gap-1.5 bg-[#FAF7F2] px-2.5 py-1 rounded-lg border border-[#E5DDD0] text-xs">
-            <span className="text-[10px] uppercase font-bold text-[#5C6B5E]">Method:</span>
-            <button
-              type="button"
-              onClick={() => setPaymentSubMethod("card")}
-              className={`px-2 py-0.5 rounded font-semibold transition-colors cursor-pointer ${
-                paymentSubMethod === "card"
-                  ? "bg-[#2D3E35] text-[#FAF7F2]"
-                  : "text-[#5C6B5E] hover:text-[#2D3E35]"
-              }`}
-            >
-              Direct Card Vault
-            </button>
+            <span className="text-[10px] uppercase font-bold text-[#5C6B5E]">Ledger Type:</span>
             <button
               type="button"
               onClick={() => setPaymentSubMethod("wire")}
@@ -563,25 +661,36 @@ export function BillingFolioTab({
                   : "text-[#5C6B5E] hover:text-[#2D3E35]"
               }`}
             >
-              SWIFT Wire / FX
+              VAX / Wire / ACH Ledger
+            </button>
+            <button
+              type="button"
+              onClick={() => setPaymentSubMethod("card")}
+              className={`px-2 py-0.5 rounded font-semibold transition-colors cursor-pointer ${
+                paymentSubMethod === "card"
+                  ? "bg-[#2D3E35] text-[#FAF7F2]"
+                  : "text-[#5C6B5E] hover:text-[#2D3E35]"
+              }`}
+            >
+              Offline VAX Card Auth Log
             </button>
           </div>
         )}
       </div>
 
-      {/* 3. MODE: RECEIVE PAYMENT & CARD VAULT */}
+      {/* 3. MODE: OFFLINE VAX / WIRE PAYMENT TRACKER */}
       {billingMode === "payment" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in">
-          {/* Main Payment & Vault Form */}
+          {/* Main Offline Payment Ledger Form */}
           <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-[#E5DDD0] shadow-xs space-y-4">
             {paymentSubMethod === "card" ? (
-              /* CARD AUTHORIZATION SUB-METHOD */
+              /* OFFLINE VAX CARD AUTHORIZATION RECORD (NO ONLINE CARD CHARGING) */
               <div>
-                <div className="flex items-center justify-between border-b border-[#E5DDD0] pb-3 mb-4">
+                <div className="flex items-center justify-between border-b border-[#E5DDD0] pb-3 mb-3">
                   <div className="flex items-center space-x-2">
                     <Lock className="w-4 h-4 text-emerald-700" />
                     <h3 className="font-serif text-base font-bold text-[#2D3E35]">
-                      Sanctuary Direct Credit Card Vault &amp; Authorization
+                      Log Offline VAX VacationAccess Card Authorization
                     </h3>
                   </div>
                   <button
@@ -593,6 +702,10 @@ export function BillingFolioTab({
                     <span>Chargeback Defense Pack</span>
                   </button>
                 </div>
+
+                <p className="text-[11px] text-[#5C6B5E] bg-[#FAF7F2] border border-[#E5DDD0] rounded-lg px-3 py-2 mb-3.5">
+                  <strong>Offline Tracker Only:</strong> Cards are charged directly inside VAX VacationAccess / ALGV by Grand Travel &amp; Cruise. Record the last 4 digits and reference code here for audit &amp; folio tracking — never enter full card numbers or CVV.
+                </p>
 
                 <form onSubmit={handleCardAuthorization} className="space-y-3.5 text-xs">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -611,7 +724,7 @@ export function BillingFolioTab({
 
                     <div>
                       <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">
-                        Card Brand
+                        Card Network (Processed in VAX)
                       </label>
                       <select
                         value={cardBrand}
@@ -626,16 +739,16 @@ export function BillingFolioTab({
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">
-                        Last 4 Digits
+                        Card Last 4 Digits (Reference Only)
                       </label>
                       <input
                         type="text"
                         maxLength={4}
                         value={cardLast4}
-                        onChange={(e) => setCardLast4(e.target.value)}
+                        onChange={(e) => setCardLast4(e.target.value.replace(/\D/g, ""))}
                         className="w-full px-3 py-2 rounded-lg border border-[#E5DDD0] bg-[#FAF7F2] font-mono font-bold text-[#2D3E35]"
                         required
                       />
@@ -643,28 +756,13 @@ export function BillingFolioTab({
 
                     <div>
                       <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">
-                        Expiry (MM/YY)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="08/29"
-                        maxLength={5}
-                        value={cardExpiry}
-                        onChange={(e) => setCardExpiry(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg border border-[#E5DDD0] bg-[#FAF7F2] font-mono text-[#2D3E35]"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">
-                        Billing ZIP
+                        Billing ZIP / Reference Note
                       </label>
                       <input
                         type="text"
                         value={billingAddress}
                         onChange={(e) => setBillingAddress(e.target.value)}
-                        placeholder="10019"
+                        placeholder="e.g. 77478 / VAX Res #84920174"
                         className="w-full px-3 py-2 rounded-lg border border-[#E5DDD0] bg-[#FAF7F2] text-[#2D3E35]"
                       />
                     </div>
@@ -673,13 +771,13 @@ export function BillingFolioTab({
                   {/* Authorization terms schedule */}
                   <div className="p-3 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] space-y-1.5 text-[11px]">
                     <div className="flex justify-between font-semibold text-[#2D3E35]">
-                      <span>30% Deposit Authorization (Immediate):</span>
+                      <span>30% Deposit Processed in VAX:</span>
                       <span className="font-bold text-emerald-800">
                         ${(activeTrip?.deposit_amount || Math.round(totalInv * 0.3)).toLocaleString()} USD
                       </span>
                     </div>
                     <div className="flex justify-between font-semibold text-[#5C6B5E]">
-                      <span>70% Final Balance Authorization (60d Prior):</span>
+                      <span>70% Final Balance Due (60d Prior):</span>
                       <span>${(activeTrip?.final_balance || Math.round(totalInv * 0.7)).toLocaleString()} USD</span>
                     </div>
                   </div>
@@ -693,7 +791,7 @@ export function BillingFolioTab({
                       required
                     />
                     <span className="text-[10px] text-[#5C6B5E] leading-tight">
-                      Guest e-signature on file authorizing Grand Travel &amp; Cruise to vault card and execute payment schedule per KAI Sanctuary Travel CRM terms with zero chargeback liability.
+                      Confirmed that Grand Travel &amp; Cruise processed this card payment inside VAX VacationAccess / ALGV and signed guest authorization is on file.
                     </span>
                   </label>
 
@@ -703,23 +801,23 @@ export function BillingFolioTab({
                     className="w-full py-2.5 rounded-lg bg-[#2D3E35] hover:bg-[#1f2c25] text-[#FAF7F2] font-semibold transition-colors cursor-pointer disabled:opacity-50"
                   >
                     {busy === "card_auth"
-                      ? "Securing Vault Authorization..."
-                      : `Authorize & Vault Card for $${(activeTrip?.deposit_amount || Math.round(totalInv * 0.3)).toLocaleString()} USD`}
+                      ? "Logging VAX Card Settlement..."
+                      : `Log Cleared VAX Card Deposit ($${(activeTrip?.deposit_amount || Math.round(totalInv * 0.3)).toLocaleString()} USD)`}
                   </button>
                 </form>
               </div>
             ) : (
-              /* SWIFT WIRE / FX SUB-METHOD */
+              /* OFFLINE VAX / WIRE / ACH PAYMENT LEDGER */
               <div>
                 <div className="flex items-center justify-between border-b border-[#E5DDD0] pb-3 mb-4">
                   <div className="flex items-center space-x-2">
                     <Globe className="w-4 h-4 text-emerald-700" />
                     <h3 className="font-serif text-base font-bold text-[#2D3E35]">
-                      International Wire &amp; Installment Terminal
+                      Offline VAX / Wire / ACH Payment Tracker
                     </h3>
                   </div>
                   <span className="text-[10px] font-mono bg-emerald-50 text-emerald-900 border border-emerald-200 px-2 py-0.5 rounded">
-                    Zero Penny Drift
+                    Advisor Ledger (USD)
                   </span>
                 </div>
 
@@ -813,16 +911,17 @@ export function BillingFolioTab({
                         onChange={(e) => setPaymentMethod(e.target.value)}
                         className="w-full px-2.5 py-2 rounded-lg border border-[#E5DDD0] bg-[#FAF7F2]"
                       >
+                        <option value="VAX VacationAccess / ALGV Card Payment">VAX VacationAccess / ALGV Card Payment</option>
+                        <option value="Domestic Wire / ACH Transfer">Domestic Wire / ACH Transfer</option>
                         <option value="SWIFT International Wire">SWIFT International Wire</option>
-                        <option value="KAI Direct Card Auth (Amex)">KAI Direct Card Auth (Amex)</option>
-                        <option value="HSA / Letter of Medical Necessity">HSA / Medical Card</option>
                         <option value="Corporate Executive Holding Wire">Corporate Holding Wire</option>
+                        <option value="HSA / Letter of Medical Necessity">HSA / Medical Card (Offline)</option>
                       </select>
                     </div>
 
                     <div>
                       <label className="block text-[10px] font-semibold uppercase text-[#5C6B5E] mb-1">
-                        Wire Reference / Auth Code
+                        VAX Res # / Wire Reference
                       </label>
                       <input
                         type="text"
@@ -961,6 +1060,178 @@ export function BillingFolioTab({
         </div>
       )}
 
+      {/* 4B. MODE: 60-DAY FINAL BALANCE & ALGV / GRAND TRAVEL COMMISSION CALENDAR */}
+      {billingMode === "commission_calendar" && (
+        <div className="bg-white p-5 rounded-xl border border-[#E5DDD0] shadow-xs space-y-5 animate-in fade-in text-xs">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#E5DDD0] pb-3.5">
+            <div>
+              <span className="text-[10px] font-mono uppercase font-bold text-emerald-800 block">
+                Grand Travel &amp; Cruise • VAX VacationAccess / ALGV Ledger
+              </span>
+              <h3 className="font-serif text-base font-bold text-[#2D3E35]">
+                60-Day Final Balance Schedule &amp; 14.5% Supplier Commission Calendar
+              </h3>
+              <p className="text-xs text-[#5C6B5E] mt-0.5">
+                Tracks supplier final payment drop-dead dates (60 days prior) and post-travel ALGV commission payouts (90% Advisor / 10% Host split).
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                disabled={busy === "batch_settle"}
+                onClick={async () => {
+                  setBusy("batch_settle");
+                  try {
+                    const res = await executeCopilotCrmAction({
+                      form_type: "batch_crm_update",
+                      action_type: "batch_crm_update",
+                      fields: { batch_operation: "settle all balances" },
+                    });
+                    notifyDraftUpdate(
+                      res.summary || "Auto-settled all open 70% final balances across the cohort."
+                    );
+                    onRefresh();
+                  } finally {
+                    setBusy(null);
+                  }
+                }}
+                className="px-3.5 py-2 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white font-bold cursor-pointer disabled:opacity-50"
+              >
+                {busy === "batch_settle"
+                  ? "Settling All Balances..."
+                  : "1-Click Settle All Due Balances"}
+              </button>
+            </div>
+          </div>
+
+          {/* Summary KPI Strip */}
+          {(() => {
+            const activeTripsOnly = trips.filter(
+              (t) => !["CANCELLED", "MEDICAL_FREEZE"].includes((t.status || "").toUpperCase())
+            );
+            const grossTotal = activeTripsOnly.reduce((s, t) => s + Number(t.total_investment || 0), 0);
+            const totalPaid = activeTripsOnly.reduce(
+              (s, t) => s + Number(t.paid_amount ?? 0),
+              0
+            );
+            const totalDue = Math.max(0, Math.round((grossTotal - totalPaid) * 100) / 100);
+            const totalComm145 = Math.round(grossTotal * 0.145 * 100) / 100;
+            const advisorNet90 = Math.round(totalComm145 * 0.9 * 100) / 100;
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="p-3 rounded-xl bg-[#FAF7F2] border border-[#E5DDD0]">
+                  <div className="text-[10px] uppercase font-semibold text-[#5C6B5E]">
+                    Gross Package Volume
+                  </div>
+                  <div className="font-mono font-bold text-sm text-[#2D3E35] mt-1">
+                    ${grossTotal.toLocaleString()} USD
+                  </div>
+                  <div className="text-[11px] text-[#5C6B5E]">{trips.length} Active Packages</div>
+                </div>
+                <div className="p-3 rounded-xl bg-[#FAF7F2] border border-[#E5DDD0]">
+                  <div className="text-[10px] uppercase font-semibold text-[#5C6B5E]">
+                    60-Day Balances Due
+                  </div>
+                  <div className="font-mono font-bold text-sm text-[#C07D63] mt-1">
+                    ${totalDue.toLocaleString()} USD
+                  </div>
+                  <div className="text-[11px] text-[#5C6B5E]">
+                    Due Date: Nov 29, 2026 (60d Prior)
+                  </div>
+                </div>
+                <div className="p-3 rounded-xl bg-emerald-50/70 border border-emerald-200">
+                  <div className="text-[10px] uppercase font-semibold text-emerald-900">
+                    ALGV / Amstar Commission (14.5%)
+                  </div>
+                  <div className="font-mono font-bold text-sm text-emerald-900 mt-1">
+                    +${totalComm145.toLocaleString()} USD
+                  </div>
+                  <div className="text-[11px] text-emerald-800">
+                    Disburses 30 Days Post-Checkout
+                  </div>
+                </div>
+                <div className="p-3 rounded-xl bg-[#FAF7F2] border border-[#E5DDD0]">
+                  <div className="text-[10px] uppercase font-semibold text-[#5C6B5E]">
+                    KAI Advisor Share (90%)
+                  </div>
+                  <div className="font-mono font-bold text-sm text-[#2D3E35] mt-1">
+                    +${advisorNet90.toLocaleString()} USD
+                  </div>
+                  <div className="text-[11px] text-[#5C6B5E]">
+                    Grand Travel Host Split (10%): $
+                    {Math.round(totalComm145 * 0.1).toLocaleString()}
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Itemized Commission & 60-Day Balance Table */}
+          <div className="overflow-x-auto rounded-xl border border-[#E5DDD0]">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-[#FAF7F2] text-[#5C6B5E] border-b border-[#E5DDD0] text-[11px]">
+                  <th className="py-2.5 px-3">Guest &amp; Package</th>
+                  <th className="py-2.5 px-3 text-right">Package Gross</th>
+                  <th className="py-2.5 px-3 text-right">60-Day Balance Due</th>
+                  <th className="py-2.5 px-3 text-right">14.5% ALGV Comm</th>
+                  <th className="py-2.5 px-3 text-right">90% Advisor Net</th>
+                  <th className="py-2.5 px-3 text-center">Payout Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E5DDD0]/70">
+                {trips
+                  .filter((t) => !["CANCELLED", "MEDICAL_FREEZE"].includes((t.status || "").toUpperCase()))
+                  .map((t) => {
+                  const inv = Number(t.total_investment || 0);
+                  const paid = Number(t.paid_amount ?? 0);
+                  const bal = Math.max(0, Math.round((inv - paid) * 100) / 100);
+                  const comm = Math.round(inv * 0.145 * 100) / 100;
+                  const net90 = Math.round(comm * 0.9 * 100) / 100;
+                  return (
+                    <tr key={t.id} className="hover:bg-[#FAF8F5]">
+                      <td className="py-2.5 px-3">
+                        <div className="font-bold text-[#2D3E35]">{t.client_name}</div>
+                        <div className="text-[11px] text-[#5C6B5E] truncate max-w-xs">
+                          {t.room_tier} · {t.dates || "Jan 28–31, 2027"}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-semibold">
+                        ${inv.toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono">
+                        {bal > 0 ? (
+                          <span className="text-amber-800 font-bold">${bal.toLocaleString()}</span>
+                        ) : (
+                          <span className="text-emerald-800 font-semibold">$0 (Cleared)</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-emerald-800">
+                        +${comm.toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-semibold text-[#2D3E35]">
+                        +${net90.toLocaleString()}
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold ${
+                            bal === 0
+                              ? "bg-emerald-100 text-emerald-900"
+                              : "bg-amber-100 text-amber-900"
+                          }`}
+                        >
+                          {bal === 0 ? "VERIFIED FOR PAYOUT" : "AWAITING 70% BAL"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* 5. MODE: CANCELLATION & INSURANCE CLAIMS (Safely Segregated) */}
       {billingMode === "cancellation" && (
         <div className="bg-white p-5 rounded-xl border border-rose-200 shadow-xs space-y-4 animate-in fade-in">
@@ -968,7 +1239,7 @@ export function BillingFolioTab({
             <div className="flex items-center space-x-2">
               <AlertTriangle className="w-4 h-4 text-rose-700" />
               <h3 className="font-serif text-base font-bold text-rose-950">
-                Cancellation &amp; Travel Insurance Claim Dossier Engine
+                Cancellation &amp; Refund Calculator
               </h3>
             </div>
             <span className="text-[10px] font-mono bg-rose-50 text-rose-900 border border-rose-200 px-2 py-0.5 rounded font-bold">

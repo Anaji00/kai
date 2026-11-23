@@ -1,4 +1,4 @@
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 from typing import Optional, List, Dict
 from datetime import datetime
 
@@ -80,6 +80,55 @@ class BookingCreate(BaseModel):
     intentions: Optional[str] = Field(None, max_length=5000, description="Personal intention for renewal")
     waiverAccepted: bool = Field(True, description="Release of liability checkbox acceptance")
     electronicSignature: Optional[str] = Field(None, max_length=200, description="Typed full legal name as electronic signature")
+
+    @field_validator("clientReference", mode="before")
+    @classmethod
+    def _normalize_client_reference(cls, v):
+        if v is None:
+            return None
+        if isinstance(v, str):
+            cleaned = v.strip().upper()
+            return cleaned or None
+        return v
+
+    @field_validator("fullName", "phone", "retreatId")
+    @classmethod
+    def _strip_required_non_blank(cls, v: str) -> str:
+        cleaned = v.strip()
+        if not cleaned:
+            raise ValueError("Field cannot be blank or whitespace only")
+        return cleaned
+
+    @field_validator("fullName")
+    @classmethod
+    def _validate_full_name_len(cls, v: str) -> str:
+        if len(v.strip()) < 2:
+            raise ValueError("Full legal name must be at least 2 characters")
+        return v.strip()
+
+    @field_validator("phone")
+    @classmethod
+    def _validate_phone_len(cls, v: str) -> str:
+        if len(v.strip()) < 7:
+            raise ValueError("Please enter a valid contact phone number")
+        return v.strip()
+
+    @field_validator("waiverAccepted")
+    @classmethod
+    def _require_waiver_accepted(cls, v: bool) -> bool:
+        if v is not True:
+            raise ValueError("You must accept the Release of Liability & Assumption of Risk waiver to submit")
+        return v
+
+    @field_validator("electronicSignature")
+    @classmethod
+    def _validate_electronic_signature(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return None
+        cleaned = v.strip()
+        if len(cleaned) < 2:
+            raise ValueError("Electronic signature must be at least 2 non-whitespace characters")
+        return cleaned
 
 
 class BookingResponse(BaseModel):

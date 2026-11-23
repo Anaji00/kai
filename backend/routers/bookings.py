@@ -170,16 +170,18 @@ def create_booking(
     retreat = get_retreat_by_slug_or_id(data.retreatId, db=db)
     retreat_title = retreat["title"] if retreat else data.retreatId
 
-    if data.clientReference:
-        existing = db.query(Booking).filter(Booking.reference_code == data.clientReference).first()
+    norm_client_ref = data.clientReference.strip().upper() if data.clientReference else None
+    if norm_client_ref:
+        existing = db.query(Booking).filter(Booking.reference_code == norm_client_ref).first()
         if existing:
             return _duplicate_booking_response(existing, data)
 
-    ref_code = data.clientReference or generate_reference()
-    while not data.clientReference and db.query(Booking).filter(Booking.reference_code == ref_code).first():
+    ref_code = norm_client_ref or generate_reference()
+    while not norm_client_ref and db.query(Booking).filter(Booking.reference_code == ref_code).first():
         ref_code = generate_reference()
 
-    waiver_signed_by = (data.electronicSignature or data.fullName).strip()
+    clean_full_name = " ".join(data.fullName.splitlines()).strip()
+    waiver_signed_by = " ".join((data.electronicSignature or clean_full_name).splitlines()).strip()
     waiver_signed_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
 
     combined_health_notes = data.healthNotes or ""
@@ -190,7 +192,7 @@ def create_booking(
         reference_code=ref_code,
         retreat_id=data.retreatId,
         retreat_title=retreat_title,
-        full_name=data.fullName,
+        full_name=clean_full_name,
         email=str(data.email),
         phone=data.phone,
         room_preference=data.roomPreference,
@@ -212,14 +214,15 @@ def create_booking(
         return _duplicate_booking_response(existing, data)
     db.refresh(new_booking)
     created_at = new_booking.created_at
-    # The background task opens its own session and FastAPI keeps this one until after it finishes.
-    # Holding both per booking exhausts the pool under a burst, so return this connection now.
+    # The staging & alert pipeline opens its own session; return the request connection first.
     db.close()
 
     retreat_info = retreat if retreat else {"title": retreat_title, "dates": "January 28 – 31, 2027"}
     data_dict = data.model_dump() if hasattr(data, "model_dump") else data.dict()
-    background_tasks.add_task(
-        process_booking_sidecar_background,
+
+    # Run synchronously so serverless runtimes (e.g. Vercel Python) cannot freeze/drop
+    # CRM staging rows or founder confirmation emails after returning 201.
+    process_booking_sidecar_background(
         ref_code=ref_code,
         retreat_id=data.retreatId,
         retreat_title=retreat_title,

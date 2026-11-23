@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   Users,
   Search,
@@ -37,11 +37,14 @@ import {
   fetchCrmTripDetail,
   automateCrmTripOutreach,
   atomicReserveSanctuaryCohort,
+  executeCopilotCrmAction,
+  approveEmailAction,
   CRMClientItem,
   CRMTripItem,
   CRMClientDetailResponse,
   CRMTripDetailResponse,
 } from "@/lib/sidecar-api";
+import { authFetch } from "@/lib/auth-fetch";
 import AttendeeSpreadsheetTab from "@/components/portal/crm/AttendeeSpreadsheetTab";
 import CohortCommandTab from "@/components/portal/crm/CohortCommandTab";
 import BillingFolioTab from "@/components/portal/crm/BillingFolioTab";
@@ -51,6 +54,7 @@ import { onFormFill } from "@/lib/portal-form-bus";
 
 const ClientFormModal = dynamic(() => import("@/components/portal/crm/ClientFormModal"), { ssr: false });
 const TripBuilderModal = dynamic(() => import("@/components/portal/crm/TripBuilderModal"), { ssr: false });
+const VaxReservationImporterModal = dynamic(() => import("@/components/portal/crm/VaxReservationImporterModal"), { ssr: false });
 
 export default function NativeTravelCRMPage() {
   const [activeTab, setActiveTab] = useState<
@@ -64,6 +68,11 @@ export default function NativeTravelCRMPage() {
   const [selectedTag, setSelectedTag] = useState<string>("ALL");
   const [selectedSanctuary, setSelectedSanctuary] = useState<string>("ALL");
 
+  // Keep a background/cached snapshot to avoid blanking UI during re-fetches
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const dataLoadedRef = useRef(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
   // General CRM Modals
   const [clientModalOpen, setClientModalOpen] = useState(false);
   const [clientToEdit, setClientToEdit] = useState<CRMClientItem | null>(null);
@@ -71,6 +80,7 @@ export default function NativeTravelCRMPage() {
   const [tripModalOpen, setTripModalOpen] = useState(false);
   const [tripToEdit, setTripToEdit] = useState<CRMTripItem | null>(null);
   const [preselectedClientId, setPreselectedClientId] = useState<string | undefined>(undefined);
+  const [vaxModalOpen, setVaxModalOpen] = useState(false);
 
   // Selected detail drawers
   const [selectedClientDetail, setSelectedClientDetail] = useState<CRMClientDetailResponse | null>(null);
@@ -89,8 +99,97 @@ export default function NativeTravelCRMPage() {
   const [automationFeedback, setAutomationFeedback] = useState<string | null>(null);
   const [expandedTripId, setExpandedTripId] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  // Inbound Email / WhatsApp Auto-Parser Queue (import@kaiwellnessretreats.com)
+  const isProduction = process.env.NODE_ENV === "production";
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [inboundItems, setInboundItems] = useState<
+    Array<{
+      id: string;
+      received_at: string;
+      sender: string;
+      subject: string;
+      raw_text: string;
+      extracted: any;
+      status: "STAGED" | "APPROVED";
+    }>
+  >([]);
+  const [showInboundQueue, setShowInboundQueue] = useState<boolean>(false);
+  const [approvingInboundId, setApprovingInboundId] = useState<string | null>(null);
+
+  useEffect(() => {
+    authFetch("/api/crm/inbound-parse")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.items) setInboundItems(data.items);
+      })
+      .catch(() => null);
+  }, []);
+
+  const handleApproveInboundItem = async (item: any) => {
+    if (approvingInboundId || item.status === "APPROVED") return;
+    setApprovingInboundId(item.id);
+    try {
+      const res = await executeCopilotCrmAction({
+        form_type: "smart_paste_extract",
+        action_type: "smart_paste_extract",
+        sanctuary_slug: item.extracted?.sanctuary_slug || "puerto-vallarta-2027",
+        fields: { raw_text: item.raw_text },
+      });
+      if (item.id && !String(item.id).startsWith("inb_dev_") && !String(item.id).startsWith("inb_vax_")) {
+        await approveEmailAction(String(item.id), "CREATE_INTAKE").catch(() => null);
+      }
+      setInboundItems((prev) =>
+        prev.map((x) => (x.id === item.id ? { ...x, status: "APPROVED" } : x))
+      );
+      setAutomationFeedback(
+        res.summary ||
+          `Approved & synced inbound booking for ${item.extracted?.guest_name || "Guest"} into CRM.`
+      );
+      loadData(true);
+    } catch (err) {
+      setAutomationFeedback(
+        `Error: ${err instanceof Error ? err.message : "Could not approve inbound item"}`
+      );
+    } finally {
+      setApprovingInboundId(null);
+    }
+  };
+
+  const handleSimulateInboundWebhook = async () => {
+    if (isProduction) return;
+    try {
+      const resp = await authFetch("/api/crm/inbound-parse", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from: "confirmations@algvacations.com",
+          subject: "Fw: VAX VacationAccess #84931029 — Marival Armony (Aris & Helene Thorne)",
+          text: "VAX Reservation #84931029 (Apple Vacations). Passenger: Aris Thorne (aris.thorne@med.edu, +1 617-555-0134) companion: Helene Thorne. Flights: JetBlue B6-891 out of BOS and American AA-1184 out of DFW to PVR. Oceanfront King Suite ($9,240 total, paid in full). Dietary: Gluten-Free.",
+          sanctuary_slug: "puerto-vallarta-2027",
+        }),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data?.item) {
+          setInboundItems((prev) => [data.item, ...prev]);
+          setShowInboundQueue(true);
+          setAutomationFeedback(data.message || "Received & parsed new forwarded VAX confirmation email.");
+        }
+      } else {
+        const err = await resp.json().catch(() => ({}));
+        setAutomationFeedback(`Notice: ${err.error || "Could not ingest simulated email."}`);
+      }
+    } catch {
+      setAutomationFeedback("Notice: Could not reach inbound parser endpoint.");
+    }
+  };
+
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent && !dataLoadedRef.current) {
+      setLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
     try {
       const [clientsData, tripsData] = await Promise.all([
         fetchCrmClients(
@@ -103,10 +202,14 @@ export default function NativeTravelCRMPage() {
       ]);
       setClients(clientsData);
       setTrips(tripsData);
+      setSyncError(null);
+      dataLoadedRef.current = true;
     } catch (err) {
       console.error("Failed to load native CRM data:", err);
+      setSyncError(err instanceof Error ? err.message : "Database connection error");
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   }, [searchQuery, selectedTag, selectedSanctuary]);
 
@@ -116,11 +219,11 @@ export default function NativeTravelCRMPage() {
 
   useEffect(() => {
     const handleCrmUpdated = () => {
-      loadData();
+      loadData(true);
     };
     window.addEventListener("crm-updated", handleCrmUpdated);
     const unsubFormFill = onFormFill((proposal) => {
-      loadData();
+      loadData(true);
       if (proposal.target_tab === "billing" || proposal.form_type === "billing_folio") {
         setActiveTab("billing");
       } else if (proposal.target_tab === "attendees" || proposal.form_type === "attendee_row") {
@@ -149,6 +252,34 @@ export default function NativeTravelCRMPage() {
     };
   }, [loadData]);
 
+  // Listen to Universal Copilot UI Commands (tab switches, modal launches, filter lenses)
+  useEffect(() => {
+    const handleCrmCommand = (e: Event) => {
+      const ce = e as CustomEvent<Record<string, any>>;
+      const cmd = ce.detail || {};
+      if (cmd.crm_tab === "attendees" || cmd.crm_tab === "cohorts" || cmd.crm_tab === "billing") {
+        setActiveTab(cmd.crm_tab);
+      }
+      if (cmd.view_mode === "table" || cmd.view_mode === "cards") {
+        setGuestViewMode(cmd.view_mode);
+      }
+      if (cmd.open_modal === "vax") {
+        setVaxModalOpen(true);
+      } else if (cmd.open_modal === "new_guest") {
+        setClientToEdit(null);
+        setClientModalOpen(true);
+      } else if (cmd.open_modal === "new_trip") {
+        setTripToEdit(null);
+        setTripModalOpen(true);
+      }
+      if (cmd.title) {
+        setAutomationFeedback(`KAI Assistant: ${cmd.title}`);
+      }
+    };
+    window.addEventListener("kai:crm:command", handleCrmCommand);
+    return () => window.removeEventListener("kai:crm:command", handleCrmCommand);
+  }, []);
+
   // Auto-dismiss floating toast notification after 4 seconds
   useEffect(() => {
     if (automationFeedback) {
@@ -164,16 +295,26 @@ export default function NativeTravelCRMPage() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         if (showShortcutsModal) setShowShortcutsModal(false);
+        if (vaxModalOpen) setVaxModalOpen(false);
+        if (clientModalOpen) setClientModalOpen(false);
+        if (tripModalOpen) setTripModalOpen(false);
         if (selectedClientDetail) setSelectedClientDetail(null);
         if (selectedTripDetail) setSelectedTripDetail(null);
         return;
       }
 
-      // Ignore hotkeys when typing in form controls
+      // Never hijack browser/system shortcuts (Cmd+V, Ctrl+V, Cmd+R, Ctrl+R, Cmd+N, etc.)
+      if (e.metaKey || e.ctrlKey || e.altKey) {
+        return;
+      }
+
+      // Ignore hotkeys when typing in form controls or contentEditable
+      const activeEl = document.activeElement as HTMLElement | null;
       if (
-        document.activeElement?.tagName === "INPUT" ||
-        document.activeElement?.tagName === "TEXTAREA" ||
-        document.activeElement?.tagName === "SELECT"
+        activeEl?.tagName === "INPUT" ||
+        activeEl?.tagName === "TEXTAREA" ||
+        activeEl?.tagName === "SELECT" ||
+        activeEl?.isContentEditable
       ) {
         return;
       }
@@ -181,6 +322,18 @@ export default function NativeTravelCRMPage() {
       if (e.key === "?" || (e.shiftKey && e.key === "/")) {
         e.preventDefault();
         setShowShortcutsModal((prev) => !prev);
+      } else if (e.key === "/") {
+        e.preventDefault();
+        if (activeTab === "attendees" && guestViewMode === "cards") {
+          searchInputRef.current?.focus();
+        } else {
+          setActiveTab("attendees");
+          setGuestViewMode("cards");
+          setTimeout(() => searchInputRef.current?.focus(), 50);
+        }
+      } else if (e.key === "v" || e.key === "V") {
+        e.preventDefault();
+        setVaxModalOpen(true);
       } else if (e.key === "n" || e.key === "N") {
         e.preventDefault();
         setClientToEdit(null);
@@ -204,7 +357,16 @@ export default function NativeTravelCRMPage() {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedClientDetail, selectedTripDetail, showShortcutsModal]);
+  }, [
+    selectedClientDetail,
+    selectedTripDetail,
+    showShortcutsModal,
+    vaxModalOpen,
+    clientModalOpen,
+    tripModalOpen,
+    activeTab,
+    guestViewMode,
+  ]);
 
   const handleOpenClientDetail = async (clientId: string) => {
     setLoadingClientDetail(true);
@@ -277,34 +439,64 @@ export default function NativeTravelCRMPage() {
 
   const popularTags = [
     "ALL",
-    "CORTISOL_RESET",
-    "VAGAL_DYSREGULATION",
-    "LIE_FLAT_AIR",
-    "BLUE_ZONE_DIET",
+    "VAX_PACKAGE",
+    "MULTI_ORIGIN",
+    "FIRST_CLASS",
     "VIP_RETREAT",
   ];
 
   return (
     <div className="space-y-6">
-      {/* Header & Title Strip (Clean Luxury Layout, Zero Emojis) */}
+      {/* Header & Title Strip */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2.5 flex-wrap">
             <h1 className="font-serif text-3xl font-bold text-[#2D3E35] tracking-tight">
               Retreat &amp; Guest CRM
             </h1>
-            <span className="text-[11px] font-mono font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
-              <CheckCircle2 className="w-3 h-3 text-emerald-700" />
-              <span>Auto-Saved &amp; Synced</span>
-            </span>
+            {syncError ? (
+              <span
+                title={syncError}
+                className="text-[11px] font-mono font-semibold bg-rose-100 text-rose-900 border border-rose-300 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1"
+              >
+                <span>Database Sync Error — Retry Refresh</span>
+              </span>
+            ) : (
+              <span className="text-[11px] font-mono font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3 text-emerald-700" />
+                <span>Synced to Database</span>
+              </span>
+            )}
           </div>
           <p className="text-sm text-[#5C6B5E] mt-1">
-            Click any guest row to edit rooms, status, payments, or dietary notes, or dispatch requests to KAI Assistant.
+            Click any cell to edit, or pull a VAX reservation number to import packages in one click.
           </p>
         </div>
 
         {/* Always-Visible Primary Actions */}
         <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setShowInboundQueue((prev) => !prev)}
+            className="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-950 border border-amber-300 rounded-lg transition-colors shadow-xs cursor-pointer"
+            title="View forwarded emails & WhatsApp messages auto-parsed via import@kaiwellnessretreats.com"
+          >
+            <Mail className="w-3.5 h-3.5 text-amber-700" />
+            <span>
+              Inbound Queue ({inboundItems.filter((i) => i.status === "STAGED").length})
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setVaxModalOpen(true)}
+            className="inline-flex items-center space-x-1.5 px-3.5 py-2 text-xs font-bold bg-emerald-800 text-white hover:bg-emerald-900 rounded-lg transition-colors shadow-xs cursor-pointer"
+            title="Pull a VAX VacationAccess Reservation Number (Shortcut: V)"
+          >
+            <Compass className="w-3.5 h-3.5 text-emerald-300" />
+            <span>Import VAX #</span>
+          </button>
+
           <button
             type="button"
             onClick={() => {
@@ -316,7 +508,7 @@ export default function NativeTravelCRMPage() {
             title="Open KAI Assistant to ask or update anything"
           >
             <Bot className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Ask KAI Assistant</span>
+            <span>Ask KAI</span>
           </button>
 
           <button
@@ -346,13 +538,13 @@ export default function NativeTravelCRMPage() {
 
           <button
             type="button"
-            onClick={loadData}
-            disabled={loading}
+            onClick={() => loadData(false)}
+            disabled={loading || isRefreshing}
             className="inline-flex items-center space-x-1.5 px-3 py-2 text-xs font-semibold text-[#2D3E35] bg-[#F2ECE4] hover:bg-[#EBE3D8] border border-[#E5DDD0] rounded-lg transition-all cursor-pointer"
             title="Refresh CRM data"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-            <span>Refresh</span>
+            <RefreshCw className={`w-3.5 h-3.5 ${loading || isRefreshing ? "animate-spin" : ""}`} />
+            <span>{isRefreshing ? "Syncing..." : "Refresh"}</span>
           </button>
 
           <button
@@ -367,6 +559,106 @@ export default function NativeTravelCRMPage() {
         </div>
       </div>
 
+      {/* Inbound Email & WhatsApp Auto-Parser Queue (Phase 2 Expansion) */}
+      {showInboundQueue && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50/70 p-4 shadow-xs space-y-3 animate-in fade-in text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-200 pb-2.5">
+            <div className="flex items-center gap-2">
+              <Mail className="w-4 h-4 text-amber-800" />
+              <div>
+                <span className="font-bold text-[#2D3E35]">
+                  Live Inbound Email &amp; WhatsApp Auto-Parser
+                </span>
+                <span className="ml-2 font-mono text-[10px] bg-white px-2 py-0.5 rounded border border-amber-300 text-amber-900">
+                  import@kaiwellnessretreats.com
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {!isProduction && (
+                <button
+                  type="button"
+                  onClick={handleSimulateInboundWebhook}
+                  className="px-2.5 py-1 rounded-md bg-white hover:bg-[#FAF7F2] text-[#2D3E35] border border-amber-300 text-[11px] font-semibold cursor-pointer"
+                >
+                  + Simulate Forwarded VAX Email (Dev)
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowInboundQueue(false)}
+                className="text-[#5C6B5E] hover:text-[#2D3E35] font-semibold cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {inboundItems.map((item) => (
+              <div
+                key={item.id}
+                className="p-3.5 rounded-xl bg-white border border-[#E5DDD0] flex flex-col justify-between gap-2.5"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[10px] text-[#5C6B5E]">
+                    <span className="font-mono truncate">{item.sender}</span>
+                    <span>{item.received_at}</span>
+                  </div>
+                  <div className="font-serif font-bold text-sm text-[#2D3E35]">
+                    {item.subject}
+                  </div>
+                  {item.extracted && (
+                    <div className="p-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[11px] space-y-0.5">
+                      <div>
+                        <strong>Guest:</strong> {item.extracted.guest_name}
+                        {item.extracted.companion_name
+                          ? ` + ${item.extracted.companion_name}`
+                          : ""}{" "}
+                        · <strong>Suite:</strong> {item.extracted.room_tier}
+                      </div>
+                      <div>
+                        <strong>Flight:</strong> {item.extracted.airline}{" "}
+                        {item.extracted.flight_number} ({item.extracted.origin_airport}→
+                        {item.extracted.arrival_airport}) · <strong>Total:</strong> $
+                        {Number(item.extracted.total_investment || 0).toLocaleString()} USD
+                      </div>
+                      <div>
+                        <strong>Dietary:</strong> {item.extracted.dietary_requirements}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <span
+                    className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded ${
+                      item.status === "APPROVED"
+                        ? "bg-emerald-100 text-emerald-900"
+                        : "bg-amber-100 text-amber-900"
+                    }`}
+                  >
+                    {item.status === "APPROVED" ? "SYNCED TO CRM" : "READY FOR 1-CLICK IMPORT"}
+                  </span>
+                  {item.status !== "APPROVED" && (
+                    <button
+                      type="button"
+                      disabled={approvingInboundId === item.id}
+                      onClick={() => handleApproveInboundItem(item)}
+                      className="px-3 py-1 rounded-lg bg-emerald-800 hover:bg-emerald-900 text-white text-[11px] font-bold cursor-pointer disabled:opacity-50"
+                    >
+                      {approvingInboundId === item.id
+                        ? "Syncing..."
+                        : "1-Click Approve & Sync"}
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* KPI Cards Grid (Clickable Operational Deep-Links) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div
@@ -374,11 +666,11 @@ export default function NativeTravelCRMPage() {
             setActiveTab("attendees");
             setGuestViewMode("cards");
           }}
-          className="p-4 rounded-xl bg-white border border-[#E5DDD0] hover:border-[#2D3E35]/40 shadow-xs transition-colors cursor-pointer"
+          className="p-4 rounded-xl bg-white border border-[#E5DDD0] hover:border-[#2D3E35]/40 shadow-xs transition-all hover:-translate-y-0.5 active:translate-y-0 cursor-pointer group"
         >
           <div className="flex items-center justify-between text-[#5C6B5E]">
-            <span className="text-xs font-semibold uppercase tracking-wider">Guests</span>
-            <Users className="w-4 h-4 text-[#2D3E35]" />
+            <span className="text-xs font-semibold uppercase tracking-wider group-hover:text-[#2D3E35] transition-colors">Guests</span>
+            <Users className="w-4 h-4 text-[#2D3E35] group-hover:scale-110 transition-transform" />
           </div>
           <div className="mt-2 text-2xl font-serif font-bold text-[#2D3E35]">{clients.length}</div>
           <div className="text-[11px] text-[#5C6B5E] mt-0.5">Active Directory &middot; Click for Cards</div>
@@ -390,11 +682,11 @@ export default function NativeTravelCRMPage() {
             setGuestViewMode("table");
             setSpreadsheetLens("ALL");
           }}
-          className="p-4 rounded-xl bg-white border border-[#E5DDD0] hover:border-[#2D3E35]/40 shadow-xs transition-colors cursor-pointer"
+          className="p-4 rounded-xl bg-white border border-[#E5DDD0] hover:border-[#2D3E35]/40 shadow-xs transition-all hover:-translate-y-0.5 active:translate-y-0 cursor-pointer group"
         >
           <div className="flex items-center justify-between text-[#5C6B5E]">
-            <span className="text-xs font-semibold uppercase tracking-wider">Bookings</span>
-            <Layers className="w-4 h-4 text-[#C07D63]" />
+            <span className="text-xs font-semibold uppercase tracking-wider group-hover:text-[#2D3E35] transition-colors">Bookings</span>
+            <Layers className="w-4 h-4 text-[#C07D63] group-hover:scale-110 transition-transform" />
           </div>
           <div className="mt-2 text-2xl font-serif font-bold text-[#2D3E35]">{trips.length}</div>
           <div className="text-[11px] text-[#5C6B5E] mt-0.5">Active Reservations &middot; Click for Roster</div>
@@ -406,11 +698,11 @@ export default function NativeTravelCRMPage() {
             setGuestViewMode("table");
             setSpreadsheetLens("BALANCE_DUE");
           }}
-          className="p-4 rounded-xl bg-white border border-[#E5DDD0] hover:border-[#2D3E35]/40 shadow-xs transition-colors cursor-pointer"
+          className="p-4 rounded-xl bg-white border border-[#E5DDD0] hover:border-[#2D3E35]/40 shadow-xs transition-all hover:-translate-y-0.5 active:translate-y-0 cursor-pointer group"
         >
           <div className="flex items-center justify-between text-[#5C6B5E]">
-            <span className="text-xs font-semibold uppercase tracking-wider">Revenue Tracked</span>
-            <CreditCard className="w-4 h-4 text-emerald-700" />
+            <span className="text-xs font-semibold uppercase tracking-wider group-hover:text-[#2D3E35] transition-colors">Revenue Tracked</span>
+            <CreditCard className="w-4 h-4 text-emerald-700 group-hover:scale-110 transition-transform" />
           </div>
           <div className="mt-2 text-2xl font-serif font-bold text-[#2D3E35]">
             ${totalLifetimeSpend.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
@@ -424,11 +716,11 @@ export default function NativeTravelCRMPage() {
             setGuestViewMode("table");
             setSpreadsheetLens("MISSING_FLIGHT");
           }}
-          className="p-4 rounded-xl bg-white border border-[#E5DDD0] hover:border-[#2D3E35]/40 shadow-xs transition-colors cursor-pointer"
+          className="p-4 rounded-xl bg-white border border-[#E5DDD0] hover:border-[#2D3E35]/40 shadow-xs transition-all hover:-translate-y-0.5 active:translate-y-0 cursor-pointer group"
         >
           <div className="flex items-center justify-between text-[#5C6B5E]">
-            <span className="text-xs font-semibold uppercase tracking-wider">Flights &amp; Transfers</span>
-            <Plane className="w-4 h-4 text-blue-700" />
+            <span className="text-xs font-semibold uppercase tracking-wider group-hover:text-[#2D3E35] transition-colors">Flights &amp; Transfers</span>
+            <Plane className="w-4 h-4 text-blue-700 group-hover:scale-110 transition-transform" />
           </div>
           <div className="mt-2 text-2xl font-serif font-bold text-[#2D3E35]">{activeFlightsCount}</div>
           <div className="text-[11px] text-[#5C6B5E] mt-0.5">Click for Missing Flights</div>
@@ -563,11 +855,12 @@ export default function NativeTravelCRMPage() {
               <div className="relative flex-1 max-w-xs">
                 <Search className="w-3.5 h-3.5 text-[#5C6B5E] absolute left-3 top-2.5" />
                 <input
+                  ref={searchInputRef}
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Filter guests by name or email..."
-                  className="w-full pl-9 pr-8 py-1.5 text-xs bg-[#FAF7F2] border border-[#E5DDD0] rounded-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2D3E35]"
+                  placeholder="Filter guests by name or email... (Press /)"
+                  className="w-full pl-9 pr-8 py-1.5 text-xs bg-[#FAF7F2] border border-[#E5DDD0] rounded-lg focus:bg-white focus:outline-none focus:ring-1 focus:ring-[#2D3E35] transition-all"
                 />
                 {searchQuery && (
                   <button
@@ -691,6 +984,32 @@ export default function NativeTravelCRMPage() {
                       >
                         <CalendarPlus className="w-3 h-3 text-emerald-700" />
                         <span>New Reservation</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (typeof window !== "undefined") {
+                            window.dispatchEvent(
+                              new CustomEvent("kai:copilot:open", {
+                                detail: {
+                                  guestContext: { name: client.full_name, id: client.id, email: client.email },
+                                  query: `Review status, reservation, and folio for ${client.full_name}`,
+                                },
+                              })
+                            );
+                            window.dispatchEvent(
+                              new CustomEvent("kai:copilot:select-guest", {
+                                detail: { guest_name: client.full_name, id: client.id },
+                              })
+                            );
+                          }
+                        }}
+                        className="inline-flex items-center space-x-1 px-2.5 py-1 text-xs font-semibold text-stone-100 bg-stone-900 hover:bg-stone-800 border border-stone-700 rounded-md transition-colors cursor-pointer"
+                        title={`Ask KAI Copilot about ${client.full_name}`}
+                      >
+                        <Bot className="w-3 h-3 text-emerald-400" />
+                        <span>Copilot</span>
                       </button>
 
                       <button
@@ -823,6 +1142,17 @@ export default function NativeTravelCRMPage() {
         preselectedClientId={preselectedClientId}
       />
 
+      {/* VAX VacationAccess 1-Click Package Importer */}
+      <VaxReservationImporterModal
+        isOpen={vaxModalOpen}
+        onClose={() => setVaxModalOpen(false)}
+        clients={clients}
+        onImported={(msg) => {
+          setAutomationFeedback(msg);
+          loadData(true);
+        }}
+      />
+
       {/* Keyboard Shortcuts Cheat Sheet Overlay */}
       {showShortcutsModal && (
         <div
@@ -835,9 +1165,9 @@ export default function NativeTravelCRMPage() {
             <div className="flex items-center justify-between border-b border-[#E5DDD0] pb-3">
               <div>
                 <h3 className="font-serif text-base font-bold text-[#2D3E35]">
-                  Concierge Keyboard Shortcuts
+                  Keyboard Shortcuts
                 </h3>
-                <p className="text-xs text-[#5C6B5E]">High-speed navigation without mouse clicks</p>
+                <p className="text-xs text-[#5C6B5E]">Quick navigation with minimal keystrokes</p>
               </div>
               <button
                 type="button"
@@ -851,7 +1181,13 @@ export default function NativeTravelCRMPage() {
 
             <div className="space-y-2 text-xs">
               <div className="flex items-center justify-between py-1.5 border-b border-[#E5DDD0]/60">
-                <span className="text-[#5C6B5E]">Focus Universal Search</span>
+                <span className="text-[#5C6B5E]">Pull VAX Reservation Number</span>
+                <kbd className="px-2 py-0.5 rounded bg-white border border-[#E5DDD0] font-mono text-[11px] font-bold shadow-xs">
+                  V
+                </kbd>
+              </div>
+              <div className="flex items-center justify-between py-1.5 border-b border-[#E5DDD0]/60">
+                <span className="text-[#5C6B5E]">Focus Search</span>
                 <kbd className="px-2 py-0.5 rounded bg-white border border-[#E5DDD0] font-mono text-[11px] font-bold shadow-xs">
                   /
                 </kbd>

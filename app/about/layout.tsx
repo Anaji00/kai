@@ -25,9 +25,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "About Kareena Islam, RN | KAI Wellness Retreats",
+    title: "About Kareena Islam, RN & Armaan Islam | KAI Wellness Retreats",
     description:
-      "Evidence-based clinical nursing meets 432Hz crystal sound healing and quiet luxury travel.",
+      "Meet Kareena Islam, BSN, RN and Armaan Islam—the siblings behind KAI Wellness Retreats.",
     images: [
       "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1200&q=80",
     ],

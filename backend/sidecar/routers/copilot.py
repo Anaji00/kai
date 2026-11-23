@@ -125,15 +125,15 @@ def chat_with_copilot(
             logger.warning(f"Non-blocking copilot conversation log error: {log_err}")
 
         return CopilotChatResponse(
-            response_text=f"KAI Clinical Briefing ({req.sanctuary_slug or 'Sanctuary'}): Restorative protocols active. All practices adhere to 12–14 guest maximum cohorts, titrated 4-7-8 vagal breathing, and 432Hz acoustic grounding.",
-            mode=req.mode or "clinical_safety",
+            response_text=f"KAI Sanctuary Briefing ({req.sanctuary_slug or 'Sanctuary'}): Operations active. All retreat groups maintain a 12–14 guest maximum, 30% deposit / 70% balance schedule, and coordinated VAX VacationAccess / Amstar transfers.",
+            mode=req.mode or "omniscient",
             safety_level="CLEAR",
             safety_screened=True,
             tool_calls=[],
             citations=[],
-            suggested_followups=["Check 12–14 guest capacity", "Screen guest intake for contraindications"],
+            suggested_followups=["Check 12–14 guest capacity", "Import VAX reservation #38492014", "Build chef dietary sheet"],
             latency_ms=elapsed_ms,
-            model_used="Deterministic-Clinical-Synthesis-v1"
+            model_used="Deterministic-Hospitality-Synthesis-v1"
         )
     except Exception as e:
         logger.error(f"Error processing copilot chat: {str(e)}", exc_info=True)

@@ -217,9 +217,9 @@ export default function DraftsQueuePage() {
   };
 
   const getTypeLabel = (type: string) => {
-    if (type === "post_retreat_integration") return "🌿 30-Day Post-Retreat Integration";
-    if (type === "guest_email_confirmation") return "💌 Pre-Arrival Welcome Dossier";
-    if (type === "priority_circle_welcome") return "👑 Priority Circle Invitation";
+    if (type === "post_retreat_integration") return "Post-Retreat Follow-Up";
+    if (type === "guest_email_confirmation") return "Pre-Arrival Welcome Guide";
+    if (type === "priority_circle_welcome") return "Priority Circle Invitation";
     return type.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   };
 

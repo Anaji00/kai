@@ -21,7 +21,8 @@ import {
   Mic,
   Database,
   Search,
-  LogOut
+  LogOut,
+  ChevronDown
 } from "lucide-react";
 import { authFetch } from "@/lib/auth-fetch";
 import { fetchCohortCapacities, SanctuaryCohortStatus, seedDemoIntakes, fetchDraftStats } from "@/lib/sidecar-api";
@@ -30,6 +31,7 @@ import PortalHelpModal from "@/components/portal/PortalHelpModal";
 import ClinicalCopilotDrawer from "@/components/portal/ClinicalCopilotDrawer";
 import VoiceConsultationModal from "@/components/portal/VoiceConsultationModal";
 import GlobalCommandPaletteModal from "@/components/portal/GlobalCommandPaletteModal";
+import VaxReservationImporterModal from "@/components/portal/crm/VaxReservationImporterModal";
 
 interface OperatorIdentity {
   email: string;
@@ -89,8 +91,10 @@ function OperatorSessionBadge() {
 
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  // Sign-in renders without the portal shell, whose effects would call authenticated APIs.
-  if (pathname === "/portal/login" || pathname === "/portal/reset-password") return <>{children}</>;
+  // Sign-in and password reset render without the operator shell.
+  if (pathname === "/portal/login" || pathname === "/portal/reset-password") {
+    return <>{children}</>;
+  }
   return <AuthenticatedPortalShell>{children}</AuthenticatedPortalShell>;
 }
 
@@ -104,8 +108,11 @@ function AuthenticatedPortalShell({ children }: { children: React.ReactNode }) {
   const [isCopilotOpen, setIsCopilotOpen] = useState(false);
   const [copilotInitialQuery, setCopilotInitialQuery] = useState<string | undefined>(undefined);
   const [copilotInitialMode, setCopilotInitialMode] = useState<any>(undefined);
+  const [copilotGuestContext, setCopilotGuestContext] = useState<Record<string, unknown> | undefined>(undefined);
   const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
+  const [isVaxModalOpen, setIsVaxModalOpen] = useState(false);
+  const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
   const [pendingDraftsCount, setPendingDraftsCount] = useState<number>(0);
 
   const loadDraftsCount = async () => {
@@ -141,12 +148,25 @@ function AuthenticatedPortalShell({ children }: { children: React.ReactNode }) {
     window.addEventListener("drafts-updated", loadDraftsCount);
 
     const handleOpenCopilot = (e: Event) => {
-      const customEvent = e as CustomEvent<{ query?: string; mode?: string }>;
+      const customEvent = e as CustomEvent<{
+        query?: string;
+        mode?: any;
+        guestName?: string;
+        guestContext?: Record<string, unknown>;
+      }>;
       if (customEvent.detail?.query) {
         setCopilotInitialQuery(customEvent.detail.query);
       }
       if (customEvent.detail?.mode) {
         setCopilotInitialMode(customEvent.detail.mode);
+      }
+      if (customEvent.detail?.guestName) {
+        setCopilotGuestContext({
+          name: customEvent.detail.guestName,
+          active_guest_name: customEvent.detail.guestName,
+        });
+      } else if (customEvent.detail?.guestContext) {
+        setCopilotGuestContext(customEvent.detail.guestContext);
       }
       setIsCopilotOpen(true);
     };
@@ -154,6 +174,9 @@ function AuthenticatedPortalShell({ children }: { children: React.ReactNode }) {
 
     const handleOpenVoice = () => setIsVoiceOpen(true);
     window.addEventListener("kai:voice:open", handleOpenVoice);
+
+    const handleOpenVax = () => setIsVaxModalOpen(true);
+    window.addEventListener("kai:vax:open", handleOpenVax);
 
     // Global Command Palette Shortcut (Cmd+K / Ctrl+K)
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
@@ -171,6 +194,7 @@ function AuthenticatedPortalShell({ children }: { children: React.ReactNode }) {
       window.removeEventListener("drafts-updated", loadDraftsCount);
       window.removeEventListener("kai:copilot:open", handleOpenCopilot);
       window.removeEventListener("kai:voice:open", handleOpenVoice);
+      window.removeEventListener("kai:vax:open", handleOpenVax);
       window.removeEventListener("keydown", handleGlobalKeyDown);
     };
   }, []);
@@ -192,25 +216,30 @@ function AuthenticatedPortalShell({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const navItems = [
+  const primaryNavItems = [
     { href: "/portal", label: "Inquiries", icon: Users },
-    { href: "/portal/crm", label: "CRM", icon: Database },
-    { 
-      href: "/portal/drafts", 
-      label: "Review Queue", 
-      icon: Send, 
-      badge: pendingDraftsCount > 0 ? String(pendingDraftsCount) : undefined 
+    { href: "/portal/crm", label: "CRM & Bookings", icon: Database },
+    {
+      href: "/portal/drafts",
+      label: "Review Queue",
+      icon: Send,
+      badge: pendingDraftsCount > 0 ? String(pendingDraftsCount) : undefined,
     },
     { href: "/portal/calendar", label: "Calendar", icon: Calendar },
-    { href: "/portal/travel-logistics", label: "Travel", icon: Compass },
+    { href: "/portal/travel-logistics", label: "Travel & Weather", icon: Compass },
     { href: "/portal/vendors", label: "Vendors", icon: Briefcase },
-    { href: "/portal/leads", label: "Partners", icon: Sparkles },
-    { href: "/portal/campaigns", label: "SMS", icon: Send },
-    { href: "/portal/reconciliation", label: "Manifest", icon: Scale },
     { href: "/portal/emails", label: "Inbox", icon: Mail },
-    { href: "/portal/webhooks", label: "Integrations", icon: Globe2 },
-    { href: "/portal/staff", label: "Staff", icon: Users },
   ];
+
+  const secondaryNavItems = [
+    { href: "/portal/reconciliation", label: "Billing & Manifest", icon: Scale },
+    { href: "/portal/campaigns", label: "SMS Broadcasts", icon: Send },
+    { href: "/portal/leads", label: "Partnerships", icon: Sparkles },
+    { href: "/portal/webhooks", label: "Integrations", icon: Globe2 },
+    { href: "/portal/staff", label: "Team & Staff", icon: Users },
+  ];
+
+  const activeSecondaryItem = secondaryNavItems.find((item) => pathname === item.href);
 
   return (
     <div className="-mt-20 min-h-screen bg-[#FAF7F2] text-[#2D3E35] flex flex-col font-sans selection:bg-[#5C6B5E] selection:text-[#FAF7F2]">
@@ -237,6 +266,16 @@ function AuthenticatedPortalShell({ children }: { children: React.ReactNode }) {
 
             {/* Right: Clean Utility Bar */}
             <div className="flex items-center space-x-1.5 whitespace-nowrap">
+              {/* 1-Click VAX VacationAccess Importer */}
+              <button
+                onClick={() => setIsVaxModalOpen(true)}
+                className="inline-flex items-center space-x-1.5 px-2.5 py-1 text-xs font-semibold text-emerald-950 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-md transition-all cursor-pointer"
+                title="Pull VAX VacationAccess Reservation Number (ALG Vacations)"
+              >
+                <Compass className="w-3.5 h-3.5 text-emerald-700" />
+                <span>VAX Import</span>
+              </button>
+
               {/* Global Command Palette Trigger */}
               <button
                 onClick={() => setIsCommandPaletteOpen(true)}
@@ -302,36 +341,79 @@ function AuthenticatedPortalShell({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* Clean Sub Navigation Bar */}
-          <nav className="flex space-x-1 overflow-x-auto py-1.5 border-t border-[#E5DDD0]/60 scrollbar-none">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href;
-              const Icon = item.icon;
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all ${
-                    isActive
+          <nav className="flex items-center justify-between py-1.5 border-t border-[#E5DDD0]/60">
+            <div className="flex items-center space-x-1 overflow-x-auto scrollbar-none">
+              {primaryNavItems.map((item) => {
+                const isActive = pathname === item.href;
+                const Icon = item.icon;
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setIsMoreMenuOpen(false)}
+                    className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all ${
+                      isActive
+                        ? "bg-[#2D3E35] text-[#FAF7F2] shadow-2xs"
+                        : "text-[#5C6B5E] hover:text-[#2D3E35] hover:bg-[#F2ECE4]/70"
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    <span>{item.label}</span>
+                    {item.badge && (
+                      <span
+                        className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
+                          isActive
+                            ? "bg-amber-400 text-black"
+                            : "bg-amber-100 text-amber-900"
+                        }`}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })}
+
+              {/* Secondary Tools Dropdown (K.I.S.S.) */}
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setIsMoreMenuOpen((prev) => !prev)}
+                  className={`flex items-center space-x-1 px-2.5 py-1.5 rounded-md text-xs font-medium whitespace-nowrap transition-all cursor-pointer ${
+                    activeSecondaryItem
                       ? "bg-[#2D3E35] text-[#FAF7F2] shadow-2xs"
                       : "text-[#5C6B5E] hover:text-[#2D3E35] hover:bg-[#F2ECE4]/70"
                   }`}
                 >
-                  <Icon className="w-3.5 h-3.5" />
-                  <span>{item.label}</span>
-                  {item.badge && (
-                    <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-semibold ${
-                        isActive
-                          ? "bg-amber-400 text-black"
-                          : "bg-amber-100 text-amber-900"
-                      }`}
-                    >
-                      {item.badge}
-                    </span>
-                  )}
-                </Link>
-              );
-            })}
+                  <span>{activeSecondaryItem ? activeSecondaryItem.label : "More Tools"}</span>
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </button>
+
+                {isMoreMenuOpen && (
+                  <div className="absolute left-0 mt-1.5 w-48 rounded-xl bg-white border border-[#E5DDD0] shadow-lg py-1.5 z-50">
+                    {secondaryNavItems.map((item) => {
+                      const isActive = pathname === item.href;
+                      const Icon = item.icon;
+                      return (
+                        <Link
+                          key={item.href}
+                          href={item.href}
+                          onClick={() => setIsMoreMenuOpen(false)}
+                          className={`flex items-center space-x-2 px-3 py-2 text-xs font-medium transition-colors ${
+                            isActive
+                              ? "bg-[#F2ECE4] text-[#2D3E35] font-semibold"
+                              : "text-[#5C6B5E] hover:bg-[#FAF7F2] hover:text-[#2D3E35]"
+                          }`}
+                        >
+                          <Icon className="w-3.5 h-3.5 text-[#C07D63]" />
+                          <span>{item.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
           </nav>
         </div>
       </header>
@@ -403,26 +485,30 @@ function AuthenticatedPortalShell({ children }: { children: React.ReactNode }) {
                 Ask KAI
               </span>
               <span className="text-[10px] text-neutral-400 block">
-                CRM &amp; Sanctuary AI
+                CRM &amp; VAX Assistant
               </span>
             </div>
           </button>
         </div>
       )}
 
-      {/* Footer Audit Signature */}
+      {/* Footer */}
       <footer className="bg-[#FAF7F2] border-t border-[#E5DDD0] py-4 text-center text-xs text-[#5C6B5E]">
         <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-2">
           <div>
-            KAI Wellness Retreats &copy; 2026–2027 &middot; Curated by Kareena Islam &middot; Grand Travel & Cruise Host Agency
+            KAI Wellness Retreats &middot; Kareena &amp; Armaan Islam
           </div>
           <div className="text-[11px] text-[#5C6B5E]/90 font-medium">
-            Founder Sanctuary Care Platform &middot; KAI Travel CRM Platform &middot; Grand Travel & Cruise Host Agency
+            Grand Travel &amp; Cruise &middot; ALG Vacations / VAX VacationAccess Partner
           </div>
         </div>
       </footer>
 
       {/* Modals and Drawers */}
+      <VaxReservationImporterModal
+        isOpen={isVaxModalOpen}
+        onClose={() => setIsVaxModalOpen(false)}
+      />
       <GlobalCommandPaletteModal
         isOpen={isCommandPaletteOpen}
         onClose={() => setIsCommandPaletteOpen(false)}
@@ -442,7 +528,9 @@ function AuthenticatedPortalShell({ children }: { children: React.ReactNode }) {
           setIsCopilotOpen(false);
           setCopilotInitialQuery(undefined);
           setCopilotInitialMode(undefined);
+          setCopilotGuestContext(undefined);
         }} 
+        guestContext={copilotGuestContext}
         initialQuery={copilotInitialQuery}
         initialMode={copilotInitialMode}
       />

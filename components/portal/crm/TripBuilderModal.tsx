@@ -48,65 +48,61 @@ interface ItineraryBlockItem {
 }
 
 const SANCTUARIES = [
-  { slug: "puerto-vallarta-2027", name: "Puerto Vallarta · Sierra Madre Sanctuary", defaultDates: "Oct 10–15, 2027" },
-  { slug: "nosara", name: "Nosara · Blue Zone Somatic Restoration", defaultDates: "Nov 14–19, 2026" },
-  { slug: "amalfi", name: "Amalfi Coast · Tyrrhenian Cliffside Immersion", defaultDates: "May 18–23, 2027" },
-  { slug: "bali", name: "Bali · Ubud Jungle Autonomic Sanctuary", defaultDates: "Sep 08–13, 2027" },
-  { slug: "custom", name: "Custom Bespoke Sanctuary Cohort", defaultDates: "Flexible 2027" },
+  { slug: "puerto-vallarta-2027", name: "Puerto Vallarta · Marival Armony", defaultDates: "Jan 28–31, 2027" },
+  { slug: "riviera-maya", name: "Riviera Maya · El Dorado Seaside Palms", defaultDates: "Mar 18–22, 2027" },
+  { slug: "nosara", name: "Nosara · Costa Rica Retreat", defaultDates: "Nov 14–19, 2026" },
+  { slug: "amalfi", name: "Amalfi Coast · Italy Retreat", defaultDates: "May 18–23, 2027" },
+  { slug: "bali", name: "Bali · Ubud & Coastal Retreat", defaultDates: "Sep 08–13, 2027" },
+  { slug: "custom", name: "Custom Group Package", defaultDates: "Flexible 2027" },
 ];
 
 const ROOM_TIERS = [
   "Oceanfront King Suite",
+  "Allure Oceanfront King & Double Suite",
+  "Sierra Ocean View King Suite",
+  "Two-Bedroom Oceanfront Swim-Up Suite",
   "Private Cliffside Plunge Villa",
-  "Master Penthouse Sanctuary",
   "Shared Ocean View Pavilion",
   "Garden Wellness Suite",
 ];
 
 const ACTIVITY_TYPES = [
-  { value: "somatic_wellness", label: "Somatic Reformer & Recovery" },
-  { value: "lodging_sanctuary", label: "Sanctuary Lodging & Villa" },
-  { value: "aviation_arrival", label: "Cirium Aviation & Flights" },
-  { value: "ground_chauffeur", label: "Private Tarmac Chauffeur" },
-  { value: "blue_zone_dining", label: "Organic Blue Zone Dining" },
-  { value: "clinical_screening", label: "Nurse Health & Safety Check" },
-  { value: "custom", label: "Bespoke Guest Modality" },
+  { value: "somatic_wellness", label: "Yoga, Breathwork & Sound Bath" },
+  { value: "lodging_sanctuary", label: "Hotel & Resort Stay" },
+  { value: "aviation_arrival", label: "Flights & Airfare" },
+  { value: "ground_chauffeur", label: "Airport Transfer (Amstar / Private)" },
+  { value: "blue_zone_dining", label: "Group Dining & Excursions" },
+  { value: "clinical_screening", label: "Wellness & Dietary Check" },
+  { value: "custom", label: "Custom Activity" },
 ];
 
 const DEFAULT_BLOCKS: ItineraryBlockItem[] = [
   {
     day: 1,
-    time: "15:00 - 18:30",
-    title: "Arrival, Private Tarmac Chauffeur & Sunset Sound Bath",
-    description: "Private SUV transfer, adaptogenic herbal welcome tonic, suite settling, and grounding oceanfront acoustic bowl immersion.",
+    time: "14:00 - 18:30",
+    title: "Arrival, Amstar Airport Transfer & Sunset Sound Bath",
+    description: "Private airport pickup, resort check-in, welcome refreshments, and evening crystal bowl sound bath.",
     activity_type: "aviation_arrival",
   },
   {
     day: 2,
-    time: "08:30 - 11:30",
-    title: "Morning Somatic Reformer & Thermal Contrast Flotation",
-    description: "Spinal decompression on clinical reformers followed by infrared sauna and cedar cold plunge therapy.",
+    time: "08:00 - 12:30",
+    title: "Sunrise Oceanfront Yoga & Group Brunch",
+    description: "Morning yoga and breathwork overlooking the water, followed by a relaxed group brunch and free afternoon.",
     activity_type: "somatic_wellness",
   },
   {
     day: 3,
-    time: "09:00 - 13:00",
-    title: "Vagal Nerve Realignment & Blue Zone Gastronomy Tasting",
-    description: "4-7-8 parasympathetic breathwork masterclass and multi-course organic plant-forward lunch by guest executive chef.",
+    time: "09:30 - 16:00",
+    title: "Coastal Catamaran Excursion & Sunset Meditation",
+    description: "Group boat excursion arranged through VAX / Vallarta Adventures, followed by sunset meditation.",
     activity_type: "blue_zone_dining",
   },
   {
     day: 4,
-    time: "14:00 - 17:00",
-    title: "Private Craniosacral Bodywork & Magnesium Ocean Float",
-    description: "One-on-one structural somatic release with master bodywork therapist followed by sensory deprivation saltwater float.",
-    activity_type: "somatic_wellness",
-  },
-  {
-    day: 5,
-    time: "08:00 - 11:30",
-    title: "Dawn Vinyasa, Farewell Integration Brunch & Airport Transfer",
-    description: "Gentle sunrise movement, take-home autonomic home-practice guide, parting organic brunch, and VIP airport dispatch.",
+    time: "08:30 - 12:00",
+    title: "Closing Gratitude Circle, Farewell Brunch & Airport Transfer",
+    description: "Morning movement, Living BIG closing reflection, farewell brunch, and private transfer to the airport.",
     activity_type: "ground_chauffeur",
   },
 ];
@@ -320,8 +316,8 @@ export default function TripBuilderModal({
         {
           day: nextDay,
           time: "14:00 - 18:30",
-          title: "VIP Gateway Arrival, Tarmac Chauffeur & Sunset Sound Bath",
-          description: "Private SUV gateway transfer, adaptogenic herbal welcome tonic, suite settling, and grounding oceanfront acoustic bowl immersion.",
+          title: "Arrival, Airport Transfer & Sunset Sound Bath",
+          description: "Private airport transfer, resort check-in, welcome drink, and evening oceanfront sound bath.",
           activity_type: "aviation_arrival",
         },
       ]);
@@ -331,8 +327,8 @@ export default function TripBuilderModal({
         {
           day: nextDay,
           time: "08:00 - 13:00",
-          title: "Sunrise Coastal Movement, Hydrotherapy & Blue Zone Dining",
-          description: "Anatomical vinyasa, cold plunge contrast therapy circuit, and anti-inflammatory organic harvest brunch with Nurse consultation.",
+          title: "Sunrise Yoga, Group Brunch & Excursion",
+          description: "Morning yoga and breathwork, group brunch, and afternoon coastal excursion or spa time.",
           activity_type: "somatic_wellness",
         },
       ]);
@@ -342,8 +338,8 @@ export default function TripBuilderModal({
         {
           day: nextDay,
           time: "09:00 - 12:30",
-          title: "Closing Integration Circle, Biomarker Review & Airport Escort",
-          description: "Vagal nerve integration check, customized take-home botanical protocol, and private chauffeured transfer to the airport departure lounge.",
+          title: "Closing Gratitude Circle & Airport Transfer",
+          description: "Morning reflection circle, farewell brunch, and private transfer to the airport.",
           activity_type: "ground_chauffeur",
         },
       ]);
@@ -462,13 +458,31 @@ export default function TripBuilderModal({
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-[#5C6B5E] hover:text-[#2D3E35] hover:bg-[#F2ECE4] transition-colors cursor-pointer"
-            title="Close (Esc)"
-          >
-            <X className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-2">
+            {!isEditing && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  if (typeof window !== "undefined") {
+                    window.dispatchEvent(new CustomEvent("kai:vax:open"));
+                  }
+                }}
+                className="px-3 py-1.5 rounded-lg bg-[#2D3E35] text-[#FAF7F2] hover:bg-[#1E2B24] text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                title="Paste a VAX VacationAccess Reservation # instead of typing manually"
+              >
+                <Plane className="w-3.5 h-3.5 text-[#C07D63]" />
+                <span>Have a VAX Reservation #? Import in 1 Click</span>
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-lg text-[#5C6B5E] hover:text-[#2D3E35] hover:bg-[#F2ECE4] transition-colors cursor-pointer"
+              title="Close (Esc)"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
         </div>
 
         {/* Modal Form */}
@@ -550,19 +564,19 @@ export default function TripBuilderModal({
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[11px] font-semibold text-[#5C6B5E] mb-1">
-                    Trip Lifecycle Status
+                    Booking Status
                   </label>
                   <select
                     value={tripStatus}
                     onChange={(e) => setTripStatus(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg bg-[#FAF7F2] border border-[#E5DDD0] text-[#2D3E35] font-semibold"
                   >
-                    <option value="PROPOSED_ITINERARY">PROPOSED_ITINERARY</option>
-                    <option value="CONFIRMED">CONFIRMED (Deposit Received)</option>
-                    <option value="IN_RETREAT">IN_RETREAT (Active Somatic Flow)</option>
-                    <option value="COMPLETED">COMPLETED</option>
-                    <option value="CANCELLED">CANCELLED</option>
-                    <option value="FORCE_MAJEURE_POSTPONED">FORCE_MAJEURE_POSTPONED</option>
+                    <option value="PROPOSED_ITINERARY">Proposed / Quote</option>
+                    <option value="CONFIRMED">Confirmed (Deposit Paid)</option>
+                    <option value="IN_RETREAT">In Retreat (Checked In)</option>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="CANCELLED">Cancelled</option>
+                    <option value="FORCE_MAJEURE_POSTPONED">Postponed / Date Change</option>
                   </select>
                 </div>
 

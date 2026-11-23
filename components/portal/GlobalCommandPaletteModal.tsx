@@ -196,11 +196,11 @@ export default function GlobalCommandPaletteModal({
     }> = [
       {
         id: "screen-inquiries",
-        title: "Guest Inquiries (Founder Studio)",
-        subtitle: "Review incoming retreat applications, staged intakes & medical notes",
+        title: "Guest Inquiries",
+        subtitle: "Review incoming retreat inquiries, guest preferences & medical notes",
         href: "/portal",
         icon: Users,
-        badge: "Staging",
+        badge: "Inquiries",
         keywords: ["inquiries", "intake", "founder", "staging", "leads", "applications", "screening"],
       },
       {
@@ -392,6 +392,36 @@ export default function GlobalCommandPaletteModal({
       action: () => void;
     }> = [
       {
+        id: "action-import-vax",
+        title: "Import VAX Reservation # (Apple Leisure Group Package)",
+        subtitle: "Paste a VAX reservation # to pull bundled Air + Hotel + Amstar Transfer + Excursions in USD",
+        icon: Plane,
+        badge: "VAX • Tern",
+        badgeColor: "bg-[#2D3E35] text-[#FAF7F2]",
+        keywords: [
+          "vax",
+          "vacationaccess",
+          "alg",
+          "apple leisure group",
+          "funjet",
+          "apple vacations",
+          "travel impressions",
+          "tern",
+          "reservation",
+          "package",
+          "import",
+          "84920174",
+          "84920319",
+          "84920911",
+        ],
+        action: () => {
+          onClose();
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("kai:vax:open"));
+          }
+        },
+      },
+      {
         id: "action-add-attendee",
         title: "+ Add New Attendee Row",
         subtitle: "Insert an editable row into the Monday.com-style retreat guest board",
@@ -571,25 +601,25 @@ export default function GlobalCommandPaletteModal({
       },
       {
         id: "ai-chef-dietary",
-        title: "Generate Private Chef Dietary Banquet Matrix",
-        subtitle: "Anti-inflammatory, seed-oil-free protocols with celiac & allergen cross-checks",
+        title: "Generate Private Chef Dietary & Allergy Sheet",
+        subtitle: "Guest allergies, celiac safety & meal preferences for the kitchen team",
         mode: "chef_hospitality",
         icon: Utensils,
         badge: "Kitchen",
         badgeColor: "bg-orange-700 text-white",
-        keywords: ["chef", "dietary", "matrix", "kitchen", "seed oil", "celiac", "allergy", "menu", "dining"],
-        query: "Generate Private Chef Dietary Banquet Matrix (Celiac, Allium-free, Vegan, Seed-Oil-Free) for upcoming cohort.",
+        keywords: ["chef", "dietary", "matrix", "kitchen", "celiac", "allergy", "menu", "dining"],
+        query: "Generate the Private Chef dietary and allergy sheet for our upcoming retreat guests.",
       },
       {
         id: "ai-clinical-triage",
-        title: "Check Cold Plunge & Breathwork Safety",
-        subtitle: "Nurse recommendations: gentle 4-7-8 breathing exercises for guest comfort",
+        title: "Check Guest Health & Activity Safety Notes",
+        subtitle: "Review guest health notes for cold plunge, breathwork & excursion comfort",
         mode: "clinical_safety",
         icon: HeartPulse,
         badge: "Nurse Care",
         badgeColor: "bg-rose-700 text-white",
-        keywords: ["clinical", "contraindication", "svt", "arrhythmia", "cold plunge", "breathwork", "safety", "nurse"],
-        query: "Scenario #7: Screen guest with SVT arrhythmia & nut anaphylaxis. Safe somatic adaptations under nurse protocol.",
+        keywords: ["clinical", "health", "cold plunge", "breathwork", "safety", "nurse"],
+        query: "Review guest health notes and list any activity adjustments needed for cold plunge or breathwork.",
       },
       {
         id: "ai-ops-capacity",
@@ -723,7 +753,7 @@ export default function GlobalCommandPaletteModal({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search screens, guest by name/flight #, actions, or ask Copilot..."
+            placeholder="Search screens, paste VAX reservation #, guest name, or flight #..."
             className="flex-1 bg-transparent border-none text-sm font-medium text-[#2D3E35] placeholder:text-[#5C6B5E]/70 focus:outline-hidden focus:ring-0"
           />
           {query ? (
