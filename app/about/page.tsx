@@ -105,15 +105,15 @@ export default function AboutPage() {
           {/* DOSSIER 1: KAREENA ISLAM */}
           <article className="rounded-3xl border border-sand-border bg-linen overflow-hidden shadow-md flex flex-col justify-between">
             <div>
-              <div className="relative h-80 w-full overflow-hidden bg-sand">
+              <div className="relative h-[28rem] sm:h-[30rem] w-full overflow-hidden bg-sand">
                 <Image
-                  src="https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1200&q=85"
+                  src="/images/about-movement.jpg"
                   alt="Kareena Islam, BSN, RN — Founder of KAI Wellness Retreats"
                   fill
                   priority
-                  className="object-cover"
+                  className="object-cover object-[center_30%]"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-sage-dark/90 via-sage-dark/30 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-sage-dark/85 via-sage-dark/20 to-transparent" />
                 <div className="absolute top-4 left-4 flex flex-wrap gap-2">
                   <span className="rounded-full bg-linen/95 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-olive">
                     Founder
@@ -253,15 +253,15 @@ export default function AboutPage() {
           {/* DOSSIER 2: ARMAAN ISLAM */}
           <article className="rounded-3xl border border-sand-border bg-linen overflow-hidden shadow-md flex flex-col justify-between">
             <div>
-              <div className="relative h-80 w-full overflow-hidden bg-sand">
+              <div className="relative h-[28rem] sm:h-[30rem] w-full overflow-hidden bg-sand">
                 <Image
-                  src="https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=1200&q=85"
+                  src="/images/about-armaan.jpg"
                   alt="Armaan Islam — Co-Founder, Certified Yoga Instructor & Ironman Finisher"
                   fill
                   priority
-                  className="object-cover"
+                  className="object-cover object-[center_25%]"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-sage-dark/90 via-sage-dark/35 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-sage-dark/85 via-sage-dark/20 to-transparent" />
                 <div className="absolute top-4 left-4 flex flex-wrap gap-2">
                   <span className="rounded-full bg-linen/95 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-olive">
                     Co-Founder

@@ -15,9 +15,9 @@ export const metadata: Metadata = {
     siteName: "KAI Wellness Retreats",
     images: [
       {
-        url: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1200&q=80",
-        width: 1200,
-        height: 630,
+        url: "/images/about-movement.jpg",
+        width: 576,
+        height: 1024,
         alt: "KAI Wellness Retreats — Founder & Sanctuary Philosophy",
       },
     ],
@@ -28,9 +28,7 @@ export const metadata: Metadata = {
     title: "About Kareena Islam, RN & Armaan Islam | KAI Wellness Retreats",
     description:
       "Meet Kareena Islam, BSN, RN and Armaan Islam—the siblings behind KAI Wellness Retreats.",
-    images: [
-      "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?auto=format&fit=crop&w=1200&q=80",
-    ],
+    images: ["/images/about-movement.jpg"],
   },
 };
 

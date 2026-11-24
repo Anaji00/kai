@@ -34,7 +34,6 @@ export default function Navbar() {
     { label: "Sanctuaries", href: "/retreats" },
     { label: "The Hearts Behind KAI", href: "/about" },
     { label: "Beyond The Retreats", href: "/newsletter" },
-    { label: "Reserve", href: "/book" },
   ];
 
   // The portal has its own header.
@@ -49,7 +48,7 @@ export default function Navbar() {
             : "bg-linen/85 backdrop-blur-md py-5 border-b border-sand-border/50"
         }`}
       >
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4">
           {/* Brand Logo */}
           <Link href="/" className="group flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full overflow-hidden shadow-2xs group-hover:scale-105 transition-transform">
